@@ -1,5 +1,32 @@
 # SVG Draw Application Project Skeleton Code For HLP Project 2021
 
+DEADLINE: 21:00 MONDAY 1 MARCH (INDIVIDUAL CODE)
+
+NEXT MEETING: Saturday 13 Feb 2pm UK time. 
+ - Watch ISSIE video before meeting.
+ - Play around with ISSIE
+ - Read through this document: https://intranet.ee.ic.ac.uk/t.clarke/HLP/lectures/proj21-interfaces.pdf
+ - Read through this document: https://intranet.ee.ic.ac.uk/t.clarke/HLP/lectures/web-intro.pdf
+
+People working on the same module should collaborate with interfaces
+
+Any changes in interface should be announced to the rest of the group as well
+
+Aditya: either Symbol or BusWire
+
+Symbol:
+ - Jo Merrick (can do Sheet?)
+
+BusWire:
+
+Sheet:
+ - Aaman Rebello
+
+
+
+
+
+
 See [The SVG Demo README](https://github.com/tomcl/hlp21-svg-elmish-demo/blob/master/README.md) for 
 code structure and how to build the dev environment: this is the same as the WS 3 SVG demo.
 
