@@ -1,12 +1,5 @@
 # SVG Draw Application Project Skeleton Code For HLP Project 2021
 
-## Before Tuesday
- - Look at your modules
- - Think of basic implementation
- - Write down any questions you have
- - Remember: meeting with advisor on Tuesday so try to get as much detail ready before then
- - Experiment with ISSIE (I think he said there a different version but probably that's more relevant for BusWire people)
-
 See [The SVG Demo README](https://github.com/tomcl/hlp21-svg-elmish-demo/blob/master/README.md) for 
 code structure and how to build the dev environment: this is the same as the WS 3 SVG demo.
 
