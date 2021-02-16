@@ -28,8 +28,8 @@ node_modules/
 .idea
 
 # Paket
-/.paket/
-/paket-files/*
+.paket/
+paket-files/*
 
 .config/
 .vscode/
@@ -237,8 +237,8 @@ docs/
 # FAKE build cache
 .fake/
 
-/bin/
-/dist/
+bin/
+dist/
 !/docsrc/tools
 !/docsrc/tools/templates
 !/docsrc/tools/templates/*
