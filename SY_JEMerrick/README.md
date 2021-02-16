@@ -4,15 +4,24 @@ Module: Symbol
 
 Symbol Advisor  - Sacha Ayoun - Email not piazza
 
+TODO: Convert to FP style (?)
+
+OOP Style Symbol class 
 Symbol:
     id
     Labels
         Input
             id
+            name
         Output
             id
+            name
         Name
-            id
+
+    boundingBox
+        Position_start
+        Height
+        Width
 
 
 
@@ -25,54 +34,48 @@ Grading goals/order of operation:
     
     BASIC IMPLEMENTATION REQUIRED:
 
-    1. Code explicitly some basic symbols:
-        a. Logic gate (e.g. AND)
-        b. Blocky component (e.g. Flip-flop)
-
-    2. Identify/Abstract common parts
-
-        Current thoughts: 
+    1. Identify/Abstract common parts
 
         a. Generic rectangle block
+
            DrawRect(height, width, starting_point)
                 Draws a rectangle of height x width where starting_point is a point on the box - TODO: DECIDE THIS
 
                 Thoughts:
                     Height/width would have to be determined outside the function based on logic/gate type
-                    Create the bounding box? - I think this is unnecessary, the initial bounding box will be = rectangle size
-            i
+                    Create the bounding box?
 
         b. Block title
+
             WriteName(name)
-                Write the block name in the top centre
+                Write the block name in the middle centre of the symbol
 
                 Thoughts:
                     Should it be moveable?
                     Should it be nameable?
-                    If we allow for movement of inputs/outputs, maybe the name of the component should go in the centre rather than top
-
+                    
         c. Input/output Inverter
+
             DrawInvert(id, listLabels) =
-                Takes the id of the port that requires an inverter (e.g. NAND would be output port)
-                Draws a circle on that port
+                Takes the id of the port that requires an inverter 
                 Search for which sublist id is in listLabels
                 Determines which side to draw the circle on
-
+                Draws a circle on that port
 
                 Thoughts:
                     Ratio of box to inverter size (?)
                         Radius = CIRCLE_TO_RECT_RATIO * height * width
                     Need to update bounding box
 
-            i. UpdateBound(radius, object_id)
+            i. UpdateBound(radius, object_id) = 
+                object_id.
                 
 
         d. Port labels
             
-            I think if we have a list for the ports on each side so like
-            [[left], [top], [right], [bottom]]
-            So and gate would be like this:
-            listLabels = [[Input; Input]; []; [Output]; []]
+            List of ports for each side in order: [[left], [top], [right], [bottom]]
+            e.g. AND:
+                listLabels = [[Input; Input]; []; [Output]; []]
             
             DrawLabels(listLabels) = 
                 For each sublist print the labels in the relavent orientation
