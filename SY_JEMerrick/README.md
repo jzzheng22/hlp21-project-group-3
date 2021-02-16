@@ -13,9 +13,11 @@ Symbol:
         Input
             id
             name
+            position (?)
         Output
             id
             name
+            position (?)
         Name
 
     boundingBox
