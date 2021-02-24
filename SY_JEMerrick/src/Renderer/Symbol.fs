@@ -16,28 +16,27 @@ let STD_HEIGHT = 30.
 let HW_RATIO = 0.75
 
 
-///<summary> PortInfo extends the CommonTypes.Port
+/// PortInfo extends the CommonTypes.Port
+///
 /// Pos: XYPos of the port on the canvas
+///
 /// Port: The original Port type from CommonTypes.Port
-/// Orientation: Int indicating which side of the shape the port is placed in (0 - left, 1 - top, 2 - right, 3 - bot)
+///
 /// Placement: Int indicating the position on that side the port is placed in going in ascending order where horizontals would be left->right, and verticals top->bottom
 type Portinfo = 
     {
         Pos: XYPos
         Port: CommonTypes.Port
-        Orientation: int
         Placement: int 
         NumWires: int
         name : string
     }
 
-/// Model to generate one symbol (skeleton). Id is a unique Id 
-/// for the symbol shared with Issie Component type.
-/// The real type will obviously be much larger.
-/// Complex information that never changes (other than Id) should 
-/// probably not be here, but looked up via some function
-/// from a more compact form, so that comparison of two Symbols to
-/// determine are they the same is fast.
+///Symbol is unique for each component, and shares CommonTypes.ComponentId
+///
+///Two positions TopL, BotR completely define the shape (all shapes are rectangular)
+///
+///Ports is a list of portinfo lists in the form [[left]; [top]; [right]; [bot]] such that other features such as port movement can be easily added in future
 type Symbol =
     {
         TopL: XYPos
@@ -45,7 +44,7 @@ type Symbol =
         LastDragPos : XYPos
         IsDragging : bool
         Id : CommonTypes.ComponentId
-        Ports : Portinfo list
+        Ports : Portinfo list list
 
     }
 
@@ -74,19 +73,17 @@ type Msg =
 
 //---------------------------------helper types and functions----------------//
 
-(*type Port = {
-Id : string
-PortNumber : int option
-PortType : PortType
-HostId : string
-    }*)
-
-/// <summary> Creates Symbol.PortInfo object </summary>
-/// <param name = "i"> Index of the port (e.g. INPUT1 : i = 0).</param>
-/// <param name = "port"> : the Port from commontypes to convert </param>
-/// <param name = "topL"> : the top left of the symbol associated with the port </param>
-/// <param name = "botR"> : the bottom right of the symbol associated with the port </param>
-/// <param name = "n"> : the total number of ports on the symbol associated with the port </param>
+/// Creates Symbol.PortInfo object
+///
+/// i : Index of the port (e.g. INPUT1 : i = 0).
+///
+/// port : the Port from commontypes to convert 
+///
+/// topL : the top left of the symbol associated with the port
+///
+/// botR : the bottom right of the symbol associated with the port 
+///
+/// n : the total number of ports on the symbol associated with the port 
 let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : int) (compId : CommonTypes.ComponentId) : Portinfo = 
     {   
         //Left, Top, Right, Bot
@@ -100,16 +97,12 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : in
             PortType = portType
             HostId = string(compId)
         };
-        Orientation = 
-            match portType with
-            | Input -> 0;
-            | Output -> 2;
         Placement = i;
         NumWires = 0;
         name = 
             match portType with
-            | Input -> sprintf "IN%i" i;
-            | Output -> sprintf "OUT%i" i;
+            | Input -> sprintf "IN %i" i;
+            | Output -> sprintf "OUT %i" i;
     }
 
 (*type type Symbol =
@@ -129,6 +122,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (pos : XYPos) (numIn 
     let n = List.max[numIn; numOut] |> float
     let h = STD_HEIGHT * n
     let w = HW_RATIO * float(h)
+    let numLabels = int(w/STD_HEIGHT)
     let _id = CommonTypes.ComponentId (Helpers.uuid())
     let botR = {X = pos.X - h; Y = pos.Y + w}
     let Inputs = 
@@ -144,7 +138,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (pos : XYPos) (numIn 
         LastDragPos = {X = 0.; Y = 0.};
         IsDragging = false;
         Id = _id
-        Ports = List.append Inputs Outputs
+        Ports = [Inputs; []; Outputs; []]
     }
 
 let posDiff a b =
@@ -191,7 +185,7 @@ let createNewSymbol (pos:XYPos) =
         LastDragPos = {X = 0. ; Y = 0.} // initial value can always be this
         IsDragging = false // initial value can always be this
         Id = CommonTypes.ComponentId (Helpers.uuid()) // create a unique id for this symbol
-        Ports = []
+        Ports = [[]]
     }
 
 
