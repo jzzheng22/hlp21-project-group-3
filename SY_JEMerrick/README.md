@@ -20,10 +20,8 @@ Symbol:
             position (?)
         Name
 
-    boundingBox
-        Position_start
-        Height
-        Width
+    TopLeft
+    BottomRight
 
 
 
@@ -131,3 +129,54 @@ Grading goals/order of operation:
     5. Drag
 
     6. Select
+
+
+
+
+Pseduo functions:
+
+type Symbol =
+    {
+        Pos: XYPos
+        PosBot: XYPos
+        LastDragPos : XYPos
+        IsDragging : bool
+        Id : CommonTypes.ComponentId
+        Ports : Portinfo list
+
+    }
+
+PortInfo =
+    {
+        Pos: XYPos
+        Port: CommonTypes.Port
+        Orientation: int
+        Placement: int 
+        NumWires: int
+    }
+
+PortToPortInfo(i, Port, type, TopL, BotR, n) = 
+    {   
+        //Left, Top, Right, Bot
+        match type with
+        | 0 -> { X = TopL.X; Y = ((TopL.Y - BotR.Y) * i / n) }
+        | 2 -> { X = BotR.X; Y = ((TopL.Y - BotR.Y) * i / n) }
+        | _ -> failwithf "shouldnt happen"
+        Port = x
+        Orientation = 0
+        Placement = i
+        NumWires = 0
+    }
+    
+CreateNewComponent(Pos, Component) =
+    
+    TopL = Pos
+    n = max(inputs.size, outputs.size)
+    Height = STD_HEIGHT * n
+    Width = STD_HW_RATIO * Height
+    BotR = TopL with {X -= Height; Y += Width}
+    Inputs = Inputs 
+            |> Enumerate 
+            |> Map(fun (i, x) -> 
+            |> snd
+    BoundingBox = (TopL, BotR)
