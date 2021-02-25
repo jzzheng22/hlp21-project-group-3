@@ -12,8 +12,8 @@ open Helpers
 
 //Static variables
 let CIRCLE_TO_RECT_RATIO = 0.2
-let STD_HEIGHT = 30.
-let HW_RATIO = 0.75
+let STD_HEIGHT = 20.
+let HW_RATIO = 0.9
 
 
 /// PortInfo extends the CommonTypes.Port
@@ -31,6 +31,7 @@ type Portinfo =
         NumWires: int
         Name : string
         Invert : bool
+        Box : XYPos * XYPos
     }
 
 ///Symbol is unique for each component, and shares CommonTypes.ComponentId
@@ -45,7 +46,7 @@ type Symbol =
         LastDragPos : XYPos
         IsDragging : bool
         Id : CommonTypes.ComponentId
-        Ports : Portinfo list list
+        Ports : Portinfo list
         Type : CommonTypes.ComponentType
         Name : string
 
@@ -103,6 +104,18 @@ let typeToName (compType : CommonTypes.ComponentType) =
     | _ -> failwithf "AHHH WHY AM I HERE?"
 
 
+///Returns a tuple of float = (Height, Width)
+///Inputs: Bottom right coordinate, top left coordinate
+let getHW (botR : XYPos) (topL : XYPos) = 
+    (botR.Y - topL.Y, botR.X - topL.X)
+
+let midXY (botR : XYPos) (topL : XYPos) =
+    let midY = (botR.Y + topL.Y) / 2.
+    let midX = (botR.X + topL.X) / 2.
+    (midX, midY)
+   
+let addXYVal (xy : XYPos) (n : float) : XYPos = 
+    {X = xy.X + n; Y = xy.Y + n}
 /// Creates Symbol.PortInfo object
 ///
 /// i : Index of the port (e.g. INPUT1 : i = 0).
@@ -115,13 +128,16 @@ let typeToName (compType : CommonTypes.ComponentType) =
 ///
 /// n : the total number of ports on the symbol associated with the port 
 let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : int) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) : Portinfo = 
-    let h = (botR.Y - topL.Y)
+    let h = getHW botR topL |> fst
+    let portPosY = topL.Y + (h * float(i + 1) / float(n + 1))
+    let pos =
+        match portType with
+        | CommonTypes.PortType.Input -> { X = topL.X; Y = portPosY};
+        | CommonTypes.PortType.Output -> { X = botR.X; Y = portPosY};
     {   
-        //Left, Top, Right, Bot
-        Pos = 
-            match portType with
-            | CommonTypes.PortType.Input -> { X = topL.X; Y = topL.Y + (h * float(i + 1) / float(n + 1)) };
-            | CommonTypes.PortType.Output -> { X = botR.X; Y = topL.Y + (h * float(i + 1) / float(n + 1)) };
+        
+        Pos = pos
+            
         Port = {
             Id = Helpers.uuid();
             PortNumber = Some i
@@ -141,7 +157,7 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : in
                                             || compType = CommonTypes.ComponentType.Nor
                                             || compType = CommonTypes.ComponentType.Xnor -> true;
             | _ -> false;
-
+        Box = (addXYVal pos -1., addXYVal pos 1.)
     }
 
 ///Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
@@ -169,7 +185,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         LastDragPos = {X = 0.; Y = 0.};
         IsDragging = false;
         Id = _id
-        Ports = [Inputs; []; Outputs; []]
+        Ports = List.append Inputs Outputs
         Type = compType
         Name = typeToName compType
             
@@ -189,22 +205,14 @@ let posAdd a b =
 
 let posOf x y = {X=x;Y=y}
 
-///Returns an int indicating the side of the object that a port is on 0 = Left, 1 = Top, 2 = Right, 3 = Bottom
-let findSide id listLabels = listLabels |> List.findIndex(List.contains id)
+///Finds whether a coordinate is within a port's bounding box
+let testBox (port : Portinfo) (coord : XYPos) : bool =
+    let topL = port.Box |> fst
+    let botR = port.Box |> snd
+    if topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
+    then true
+    else false
 
-///Returns a tuple (side, index) indicating the index/position that the port lies in
-let findPos id listLabels = 
-    let i = listLabels |> findSide id 
-    let j = listLabels |> List.item i |> List.findIndex((=) id)
-    (i, j)
-
-///Returns a react element for an inverter on a specific port
-let drawInvert id listLabels =
-    //index of outer position tells us whether port is left/top/right/bottom
-    let side = findSide id listLabels
-    let indx = findPos id listLabels
-    //let pos = listLabels.[side].[indx]
-    0
 
 
 //-----------------------------Skeleton Model Type for symbols----------------//
@@ -255,7 +263,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                     BotR = posAdd sym.BotR diff
                     Ports = 
                         sym.Ports
-                        |> List.map (List.map (fun y -> {y with Pos = posAdd y.Pos diff}))
+                        |> List.map (fun y -> {y with Pos = posAdd y.Pos diff})
                     LastDragPos = pagePos
                 }
         )
@@ -308,7 +316,7 @@ let private renderObj =
                     "grey"
 
             let labels : ReactElement list = 
-                List.concat props.Obj.Ports
+                props.Obj.Ports
                 |> List.map(fun i ->
                     text[
                         X i.Pos.X
@@ -327,15 +335,15 @@ let private renderObj =
                     rect[
                         X props.Obj.TopL.X
                         Y props.Obj.TopL.Y
-                        SVGAttr.Height (props.Obj.BotR.Y - props.Obj.TopL.Y)
-                        SVGAttr.Width (props.Obj.BotR.X - props.Obj.TopL.X)
+                        SVGAttr.Height ((getHW props.Obj.BotR props.Obj.TopL) |> fst)
+                        SVGAttr.Width ((getHW props.Obj.BotR props.Obj.TopL) |> snd)
                         SVGAttr.Fill color
                         SVGAttr.Stroke color
                         SVGAttr.StrokeWidth 1][]
 
                     text[
-                        X ((props.Obj.BotR.X + props.Obj.TopL.X)/2.)
-                        Y ((props.Obj.TopL.Y + props.Obj.BotR.Y)/2.)
+                        X ((midXY props.Obj.BotR props.Obj.TopL) |> fst)
+                        Y ((midXY props.Obj.BotR props.Obj.TopL) |> snd)
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
@@ -345,7 +353,19 @@ let private renderObj =
                         ]
                     ][str <| sprintf "%A" props.Obj.Name]
                 ]
-
+            
+            let drawInvert =
+                props.Obj.Ports
+                |> List.filter(fun x -> x.Invert = true)
+                |> List.map(fun i ->
+                    circle[
+                        Cx i.Pos.X
+                        Cy i.Pos.Y
+                        R 5.
+                        SVGAttr.Fill "blue"
+                        SVGAttr.Stroke "blue"
+                        SVGAttr.StrokeWidth 1][])
+            
             
             g   [ 
                     OnMouseUp (fun ev -> 
@@ -359,7 +379,7 @@ let private renderObj =
                         |> props.Dispatch
                         document.addEventListener("mousemove", handleMouseMove.current)
                     )
-            ](List.append displayBox labels)
+            ](displayBox@labels@drawInvert)
             
     , "Circle"
     , equalsButFunctions
@@ -378,6 +398,21 @@ let view (model : Model) (dispatch : Msg -> unit) =
     )
     |> ofList
 
+//---------------Helpers for interface functions--------------------//
+
+///An exhaustive search through the model, which returns the Portinfo object corresponding to an input string port ID
+let initPortSearch (symModel: Model) : Portinfo list = 
+    symModel
+    |> List.map(fun sym -> sym.Ports)
+    |> List.concat
+
+let portSearchID (symModel: Model) (pId : string) : Portinfo Option =
+    initPortSearch symModel
+    |> List.tryFind (fun port -> string(port.Port.Id) = pId)
+
+let portSearchPos (symModel: Model) (pos : XYPos) : Portinfo Option =
+    initPortSearch symModel
+    |> List.tryFind (fun port -> testBox port pos)
 
 //---------------Other interface functions--------------------//
 
@@ -385,29 +420,33 @@ let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos =
     List.find (fun sym -> sym.Id = sId) symModel
     |> (fun sym -> sym.TopL)
 
-let portPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos = 
-    List.find (fun sym -> sym.Id = sId) symModel
-    |> (fun sym -> sym.TopL)
+///Searches through the whole model until the port is found and retruns the position of that port
+///This would be much faster if sheet gave me the component
+let getPortCoords (symModel: Model) (pId : string) : XYPos = 
+    portSearchID symModel pId
+    |> function
+    | Some port -> port.Pos
+    | None -> failwithf "ERROR: Couldn't find port"
+        
+///Returns all symbols in the model in the form (ID, bounding box topLeft, bounding box botRight)
+let getBoundingBoxes (symModel : Model) (startCoord : XYPos) : (string * XYPos * XYPos) list =
+    symModel
+    |> List.map (fun sym -> (string(sym.Id), sym.TopL, sym.BotR))
 
+///Finds the portType of a specific port
+let getPortType (symModel: Model) (pId : string) : CommonTypes.PortType =
+    portSearchID symModel pId
+    |> function
+    | Some port -> port.Port.PortType
+    | None -> failwithf "ERROR: Couldn't find port"
 
-/// Update the symbol with matching componentId to comp, or add a new symbol based on comp.
-let updateSymbolModelWithComponent (symModel: Model) (comp:CommonTypes.Component) =
-    (*match List.tryFind (fun sym -> string(sym.Id) = comp.Id) symModel with
-    | Some x -> x
-    | None -> CreateNewSymbol ({X = 1.0; Y = 1.0}) //dummy for now*)
-    failwithf "Not implemented"
-
-
-/// Return the output Buswire width (in bits) if this can be calculated based on known
-/// input wire widths, for the symbol wId. The types used here are possibly wrong, since
-/// this calculation is based on ports, and the skeleton code does not implement ports or
-/// port ids. If This is done the inputs could be expressed in terms of port Ids.
-let calculateOutputWidth 
-        (wId: CommonTypes.ConnectionId) 
-        (outputPortNumber: int) 
-        (inputPortWidths: int option list) : int option =
-    failwithf "Not implemented"
-
+///Finds if a position lies on a port. Returns Some(position, portId) if found, none otherwise.
+let isPort (symModel : Model) (pos : XYPos) : (XYPos * string) Option =
+    portSearchPos symModel pos
+    |> function
+    | Some port -> Some(port.Pos, string(port.Port.Id))
+    | None -> None
+    
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
