@@ -31,12 +31,12 @@ let RAD = 3.
 /// Placement: Int indicating the position on that side the port is placed in going in ascending order where horizontals would be left->right, and verticals top->bottom
 type Portinfo = 
     {
-        Pos: XYPos
         Port: CommonTypes.Port
         NumWires: int
         Name : string
         Invert : bool
         Box : XYPos * XYPos
+        slotPos : int
     }
 
 
@@ -51,12 +51,12 @@ type Symbol =
         LastDragPos : XYPos
         IsDragging : bool
         Id : CommonTypes.ComponentId
-        Ports : Portinfo list
         Type : CommonTypes.ComponentType
         Name : string
         Highlight : bool
         PortHighlight : bool
-
+        PortMap : XYPos list
+        PortList : Portinfo list
     }
 
 
@@ -85,6 +85,7 @@ type Msg =
     | DeleteSymbol of sIdList:CommonTypes.ComponentId list
     | Highlight of sIdList: CommonTypes.ComponentId list
     | HighlightPorts of sId : CommonTypes.ComponentId
+    | DragPort of sId : CommonTypes.ComponentId * pId : string * pagePos: XYPos
     | UpdateSymbolModelWithComponent of CommonTypes.Component // Issie interface
 
 
@@ -141,13 +142,17 @@ let addXYVal (xy : XYPos) (n : float) : XYPos = {X = xy.X + n; Y = xy.Y + n}
 let numPortsHorizontal (sym : Symbol) : int = int((sym.BotR.X - sym.TopL.X)/STD_HEIGHT)
 
 ///The number of possible ports on the left/right side of the Symbol = Height / STD_HEIGHT
-let numPortsVertical (sym : Symbol) : int = int((sym.TopL.Y - sym.BotR.Y)/STD_HEIGHT)
+let numPortsVertical (sym : Symbol) : int = int((sym.BotR.Y - sym.TopL.Y)/STD_HEIGHT)
 
 let posDiff a b = {X=a.X-b.X; Y=a.Y-b.Y}
 
 let posAdd a b = {X=a.X+b.X; Y=a.Y+b.Y}
 
 let posOf x y = {X=x;Y=y}
+
+let absDiff a b = 
+    let diff = (posDiff a b)
+    diff.X + diff.Y
 
 ///Displace will move a port position _away_ from the box.
 ///
@@ -174,7 +179,15 @@ let testBox (port : Portinfo) (coord : XYPos) : bool =
     else false
 
 
-
+let portPos (i : int) (n : int) (topL : XYPos) (botR : XYPos) : XYPos = 
+    let h = getHW botR topL |> fst
+    let w = getHW botR topL |> snd
+    let x = topL.X + (w * float(i + 1) / float(n + 1))
+    let y = topL.Y + (h * float(i + 1) / float(n + 1))
+    {X = x; Y = y}
+   
+let findPos (port : Portinfo) (portMap : XYPos list) : XYPos =
+    List.item port.slotPos portMap
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -188,22 +201,20 @@ let testBox (port : Portinfo) (coord : XYPos) : bool =
 /// topL : the top left of the symbol associated with the port.
 /// botR : the bottom right of the symbol associated with the port.
 /// n : the total number of ports on the symbol associated with the port.
-let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : int) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) : Portinfo = 
+let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (botR : XYPos) (n : int) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) : Portinfo = 
     
     //Intermediate calculations needed
-    let h = getHW botR topL |> fst
-    let portPosY = topL.Y + (h * float(i + 1) / float(n + 1))
+        
+
     let pos =
         match portType with
-        | CommonTypes.PortType.Input -> { X = topL.X; Y = portPosY};
-        | CommonTypes.PortType.Output -> { X = botR.X; Y = portPosY};
+        | CommonTypes.PortType.Input -> { X = topL.X; Y = (portPos i n topL botR).Y};
+        | CommonTypes.PortType.Output -> { X = botR.X; Y = (portPos i n topL botR).Y};
     
 
     //Object creation
     {   
-        
-        Pos = pos
-            
+                 
         Port = {
             Id = Helpers.uuid();
             PortNumber = Some i
@@ -226,7 +237,9 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : in
                                             || compType = CommonTypes.ComponentType.Xnor -> true;
             | _ -> false;
         
-        Box = (addXYVal pos -1., addXYVal pos 1.)
+        Box = (addXYVal pos -1., addXYVal pos 1.);
+        slotPos = i
+
     }
 
 
@@ -234,7 +247,6 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : in
 
 ///Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut : int) (pos : XYPos) : Symbol =
-    
     //Intermediate calculations
 
     let n = List.max[numIn; numOut] |> float
@@ -243,14 +255,28 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
     let _id = CommonTypes.ComponentId (Helpers.uuid())
-    
-    let Inputs = 
+
+    //Making slot position list
+    let l = 
+        [0..int(n) - 1]
+        |> List.map (fun i -> {X = pos.X; Y = (portPos i (int(n)) pos botR).Y})
+    let r = 
+        [0..int(n) - 1]
+        |> List.map (fun i -> {X = botR.X; Y = (portPos i (int(n)) pos botR).Y})
+    let t = 
+        [0..int(HW_RATIO * n) - 1]
+        |> List.map (fun i -> {X = (portPos i (int(n)) pos botR).X; Y = pos.Y})
+    let b = 
+        [0..int(HW_RATIO * n) - 1]
+        |> List.map (fun i -> {X = (portPos i (int(n)) pos botR).X; Y = botR.Y})
+    let slots = List.concat [l; r; t; b]
+    let ins = 
         [0..numIn - 1]
         |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Input pos botR numIn _id compType)
-    let Outputs = 
-        [0..numOut - 1]
+    let outs = 
+        [numIn..numOut + numIn - 1]
         |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Output pos botR numOut _id compType)
-
+    let inOut = List.append ins outs
     //Symbol Creation
     {
         TopL = pos;
@@ -258,11 +284,12 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         LastDragPos = {X = 0.; Y = 0.};
         IsDragging = false;
         Id = _id
-        Ports = List.append Inputs Outputs
         Type = compType
         Name = typeToName compType
         Highlight = false
         PortHighlight = false
+        PortMap = slots
+        PortList = inOut
     }
 
 
@@ -309,10 +336,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 { sym with
                     TopL = posAdd sym.TopL diff
                     BotR = posAdd sym.BotR diff
-                    Ports = 
-                        sym.Ports
-                        |> List.map (fun y -> {y with Pos = posAdd y.Pos diff})
                     LastDragPos = pagePos
+                    PortMap =
+                        sym.PortMap
+                        |> List.map (fun x -> posAdd x diff)
                 }
         )
         , Cmd.none
@@ -353,6 +380,48 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
             else
                 { sym with
                     PortHighlight = false 
+                }
+        )
+        , Cmd.none
+
+    | DragPort (sId, pId, pagePos) ->
+        model
+        |> List.map (fun sym ->
+            if sId <> sym.Id then
+                sym
+            else
+                let diff = pagePos
+                { sym with
+                    PortList =
+                        let PortIndx = List.indexed sym.PortList
+
+                        //The port we are moving
+                        let port = List.find (fun x -> string(x.Port.Id) = pId) sym.PortList
+
+                        //The index we want to move the port to is the one closest to the mouse
+                        let i = 
+                            List.map (fun x -> absDiff pagePos x) sym.PortMap
+                            |> List.indexed
+                            |> List.minBy (snd)
+                            |> fst
+                        
+                        //If some element in PortList x  has x.slotPos = i
+                        //Swap x and port which means:
+                        //Make x.slotPos = port.slotPos
+                        
+                        sym.PortList
+                        |> List.tryFind (fun x -> x.slotPos = i)
+                        |> function
+                        | Some x -> sym.PortList
+                                    |> List.filter (fun v -> v <> x || v <> port)
+                                    |> List.append [{x with slotPos = port.slotPos}]
+                                    |> List.append [{port with slotPos = i}]
+                        | None ->   sym.PortList
+                                    |> List.filter (fun v -> v <> port)
+                                    |> List.append [{port with slotPos = i}]
+
+                                
+                        
                 }
         )
         , Cmd.none
@@ -399,11 +468,11 @@ let private renderObj =
             
 
             let labels : ReactElement list = 
-                props.Obj.Ports
+                props.Obj.PortList
                 |> List.map(fun i ->
                     text[
-                        X ((displace -10. i.Pos props.Obj) |> fst)
-                        Y ((displace -10. i.Pos props.Obj) |> snd)
+                        X ((displace -10. (findPos i props.Obj.PortMap) props.Obj) |> fst)
+                        Y ((displace -10. (findPos i props.Obj.PortMap) props.Obj)  |> snd)
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
@@ -440,12 +509,12 @@ let private renderObj =
                 ]
             
             let drawInvert =
-                props.Obj.Ports
+                props.Obj.PortList
                 |> List.filter(fun x -> x.Invert = true)
                 |> List.map(fun i ->
                     circle[
-                        Cx ((displace 3. i.Pos props.Obj) |> fst)
-                        Cy ((displace 3. i.Pos props.Obj) |> snd)
+                        Cx ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> fst)
+                        Cy ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> snd)
                         R RAD
                         SVGAttr.Fill color
                         SVGAttr.Stroke "black"
@@ -453,11 +522,11 @@ let private renderObj =
 
             let ports =
                 if props.Obj.PortHighlight then
-                    props.Obj.Ports
+                    props.Obj.PortList
                     |> List.map(fun i ->
                         circle[
-                            Cx ((displace 3. i.Pos props.Obj) |> fst)
-                            Cy ((displace 3. i.Pos props.Obj) |> snd)
+                            Cx ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> fst)
+                            Cy ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> snd)
                             R RAD
                             SVGAttr.Fill "blue"
                             SVGAttr.Stroke "blue"
@@ -508,7 +577,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
 ///An exhaustive search through the model, which returns the Portinfo object corresponding to an input string port ID
 let initPortSearch (symModel: Model) : Portinfo list = 
     symModel
-    |> List.map(fun sym -> sym.Ports)
+    |> List.map(fun sym -> sym.PortList)
     |> List.concat
 
 //Tries to find port object by portID, returns Some(portInfo) if found, else None
@@ -529,15 +598,18 @@ let portSearchPos (symModel: Model) (pos : XYPos) : Portinfo Option =
 //TODO - REMOVE - ONLY USED BY BUSWIRE - Currently connects every input 0 to each other.
 let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos = 
     List.find (fun sym -> sym.Id = sId) symModel
-    |> (fun sym -> sym.Ports.[0].Pos)
+    |> (fun sym -> (findPos sym.PortList.[0] sym.PortMap))
 
 ///Searches through the whole model until the port is found and retruns the position of that port
 ///This would be much faster if sheet gave me the component
 let getPortCoords (symModel: Model) (pId : string) : XYPos = 
-    portSearchID symModel pId
+    symModel
+    |> List.tryFind(fun sym -> List.contains pId (List.map (fun x -> string(x)) sym.PortList))
     |> function
-    | Some port -> port.Pos
+    | Some sym -> (findPos (List.find (fun x -> string(x.Port.Id) = pId) sym.PortList) sym.PortMap)
     | None -> failwithf "ERROR: Couldn't find port"
+
+    //|> List.tryFind (fun port -> string(port.Port.Id) = pId)
         
 ///Returns all symbols in the model in the form (ID, bounding box topLeft, bounding box botRight)
 let getBoundingBoxes (symModel : Model) (startCoord : XYPos) : (string * XYPos * XYPos) list =
@@ -555,9 +627,10 @@ let getPortType (symModel: Model) (pId : string) : CommonTypes.PortType =
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * string) Option =
     portSearchPos symModel pos
     |> function
-    | Some port -> Some(port.Pos, string(port.Port.Id))
+    | Some port -> Some(getPortCoords symModel (string(port)), string(port))    
     | None -> None
-    
+
+
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
