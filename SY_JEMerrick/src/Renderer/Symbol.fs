@@ -115,12 +115,13 @@ let typeToName (compType : CommonTypes.ComponentType) =
 ///
 /// n : the total number of ports on the symbol associated with the port 
 let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : int) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) : Portinfo = 
+    let h = (botR.Y - topL.Y)
     {   
         //Left, Top, Right, Bot
         Pos = 
             match portType with
-            | CommonTypes.PortType.Input -> { X = topL.X; Y = ((topL.Y - botR.Y) * float(i) / float(n)) };
-            | CommonTypes.PortType.Output -> { X = botR.X; Y = ((topL.Y - botR.Y) * float(i) / float(n)) };
+            | CommonTypes.PortType.Input -> { X = topL.X; Y = topL.Y + (h * float(i + 1) / float(n + 1)) };
+            | CommonTypes.PortType.Output -> { X = botR.X; Y = topL.Y + (h * float(i + 1) / float(n + 1)) };
         Port = {
             Id = Helpers.uuid();
             PortNumber = Some i
@@ -153,12 +154,12 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let w = HW_RATIO * h
     
     let _id = CommonTypes.ComponentId (Helpers.uuid())
-    let botR = {X = pos.X + w; Y = pos.Y - h}
+    let botR = {X = pos.X + w; Y = pos.Y + h}
     let Inputs = 
-        [0..numIn]
+        [0..numIn - 1]
         |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Input pos botR numIn _id compType)
     let Outputs = 
-        [0..numOut]
+        [0..numOut - 1]
         |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Output pos botR numOut _id compType)
 
     //Symbol Creation
@@ -217,9 +218,9 @@ let drawInvert id listLabels =
 
 /// Dummy function for test. The real init would probably have no symbols.
 let init () =
-    List.allPairs [1..14] [1..14]
+    List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol CommonTypes.ComponentType.And 1 1 pos)) 
+    |> List.map (fun pos -> (CreateNewSymbol CommonTypes.ComponentType.And 3 1 pos)) 
     , Cmd.none
 
 /// update function which displays symbols
@@ -252,6 +253,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 { sym with
                     TopL = posAdd sym.TopL diff
                     BotR = posAdd sym.BotR diff
+                    Ports = 
+                        sym.Ports
+                        |> List.map (List.map (fun y -> {y with Pos = posAdd y.Pos diff}))
                     LastDragPos = pagePos
                 }
         )
@@ -303,6 +307,46 @@ let private renderObj =
                 else
                     "grey"
 
+            let labels : ReactElement list = 
+                List.concat props.Obj.Ports
+                |> List.map(fun i ->
+                    text[
+                        X i.Pos.X
+                        Y i.Pos.Y
+                        Style[
+                            TextAnchor "middle"
+                            DominantBaseline "middle"
+                            FontSize "5px"
+                            FontWeight "bold"
+                            Fill "Black"
+                        ]
+                    ][str <| sprintf "%s" i.Name])
+
+            let displayBox : ReactElement list =
+                [
+                    rect[
+                        X props.Obj.TopL.X
+                        Y props.Obj.TopL.Y
+                        SVGAttr.Height (props.Obj.BotR.Y - props.Obj.TopL.Y)
+                        SVGAttr.Width (props.Obj.BotR.X - props.Obj.TopL.X)
+                        SVGAttr.Fill color
+                        SVGAttr.Stroke color
+                        SVGAttr.StrokeWidth 1][]
+
+                    text[
+                        X ((props.Obj.BotR.X + props.Obj.TopL.X)/2.)
+                        Y ((props.Obj.TopL.Y + props.Obj.BotR.Y)/2.)
+                        Style[
+                            TextAnchor "middle"
+                            DominantBaseline "middle"
+                            FontSize "5px"
+                            FontWeight "bold"
+                            Fill "Black"
+                        ]
+                    ][str <| sprintf "%A" props.Obj.Name]
+                ]
+
+            
             g   [ 
                     OnMouseUp (fun ev -> 
                         document.removeEventListener("mousemove", handleMouseMove.current)
@@ -315,28 +359,7 @@ let private renderObj =
                         |> props.Dispatch
                         document.addEventListener("mousemove", handleMouseMove.current)
                     )
-                ][
-                    rect[
-                        X props.Obj.TopL.X
-                        Y props.Obj.TopL.Y
-                        SVGAttr.Height (props.Obj.TopL.Y - props.Obj.BotR.Y)
-                        SVGAttr.Width (props.Obj.BotR.X - props.Obj.TopL.X)
-                        SVGAttr.Fill color
-                        SVGAttr.Stroke color
-                        SVGAttr.StrokeWidth 1][]
-
-                    text[
-                        X ((props.Obj.BotR.X + props.Obj.TopL.X)/2.)
-                        Y (((props.Obj.TopL.Y + props.Obj.BotR.Y)/2.) + (props.Obj.TopL.Y - props.Obj.BotR.Y))
-                        Style[
-                            TextAnchor "middle"
-                            DominantBaseline "middle"
-                            FontSize "5px"
-                            FontWeight "bold"
-                            Fill "Black"
-                        ]
-                    ][str <| sprintf "%A" props.Obj.Name]
-            ]
+            ](List.append displayBox labels)
             
     , "Circle"
     , equalsButFunctions
