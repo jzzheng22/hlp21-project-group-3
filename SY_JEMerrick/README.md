@@ -181,11 +181,29 @@ CreateNewComponent(Pos, Component) =
             |> snd
     BoundingBox = (TopL, BotR)
 
+Depreciated functions I may need in future
+
+///Returns an int indicating the side of the object that a port is on 0 = Left, 1 = Top, 2 = Right, 3 = Bottom
+let findSide id listLabels = listLabels |> List.findIndex(List.contains id)
+
+///Returns a tuple (side, index) indicating the index/position that the port lies in
+let findPos id listLabels = 
+    let i = listLabels |> findSide id 
+    let j = listLabels |> List.item i |> List.findIndex((=) id)
+    (i, j)
+
+///Returns a react element for an inverter on a specific port
+let drawInvert id listLabels =
+    //index of outer position tells us whether port is left/top/right/bottom
+    let side = findSide id listLabels
+    let indx = findPos id listLabels
+    //let pos = listLabels.[side].[indx]
+    0
 
 
 OBJECTIVES TIMELINE 
 
-25/02/21
+24/02/21
    
     COMPLETE: 
         INIT SYMBOL TYPE
@@ -196,9 +214,31 @@ OBJECTIVES TIMELINE
 
     ADJUSTMENTS NEEDED: 
         PORT LABELS FULLY INSIDE THE BOX - Probably involves making a seperate function that takes in string as param
-        PRINT INVERTERS
+        
 
     NEXT TASKS:
+        PRINT INVERTERS
         INTERFACE FUNCS
         UPDATE MOVEMENT FROM DEMO LISTEN STUFF TO WITH MESSAGES
         CHECK ALL TYPES DONE
+
+25/02/21
+
+    COMPLETE:
+        PRINT INVERTERS
+        INTERFACE FUNCS:
+            SYMBOL.GETPORTCOORDS
+            SYMBOL.GETBOUNDINGBOXES
+            SYMBOL.GETPORTTYPE
+            SYMBOL.ISPORT
+
+
+    ADJUSTMENTS NEEDED:
+        MAKE INVERTERS PRINT ON THE OUTSIDE OF THE BOX RATHER THAN THE MIDDLE
+        MAKE LABELS PRINT ON THE OUTSIDE OF THE BOX RATHER THAN THE MIDDLE
+        MAKE PRETTY SYMBOLS
+        MAKE CODE PRETTIER
+    
+    NEXT TASKS:
+        WRITE MESSAGE STUFF
+        TRANSFER PORTS FROM LIST TO MAP??
