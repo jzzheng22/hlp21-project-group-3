@@ -180,3 +180,24 @@ CreateNewComponent(Pos, Component) =
             |> Map(fun (i, x) -> 
             |> snd
     BoundingBox = (TopL, BotR)
+
+
+
+OBJECTIVES FOR ME TIMELINE 
+
+25/02/21
+   
+    COMPLETE: 
+        INIT SYMBOL TYPE
+        INIT PORTS
+        CREATE RECTANGLE
+        PRINT I/O LABELS
+        PRINT SYMBOL TYPE
+
+    ADJUSTMENTS NEEDED: 
+        PORT LABELS FULLY INSIDE THE BOX - Probably involves making a seperate function that takes in string as param
+        PRINT INVERTERS
+
+    NEXT TASKS:
+        INTERFACE FUNCS
+        CHECK ALL TYPES DONE
