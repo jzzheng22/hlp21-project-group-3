@@ -6,13 +6,20 @@ open Elmish
 open Elmish.React
 open Helpers
 
+
+
+
 //------------------------------------------------------------------------//
 //-------------------------------Symbol Types-----------------------------//
 //------------------------------------------------------------------------//
 
+
+
 //Static variables
 let STD_HEIGHT = 30.
-let HW_RATIO = 0.9
+let HW_RATIO = 0.95
+let RAD = 3.
+
 
 
 /// PortInfo extends the CommonTypes.Port
@@ -26,18 +33,17 @@ type Portinfo =
     {
         Pos: XYPos
         Port: CommonTypes.Port
-        Placement: int 
         NumWires: int
         Name : string
         Invert : bool
         Box : XYPos * XYPos
     }
 
+
+
 ///Symbol is unique for each component, and shares CommonTypes.ComponentId
 ///
 ///Two positions TopL, BotR completely define the shape (all shapes are rectangular)
-///
-///Ports is a list of portinfo lists in the form [[left]; [top]; [right]; [bot]] such that other features such as port movement can be easily added in future
 type Symbol =
     {
         TopL: XYPos
@@ -56,7 +62,12 @@ type Symbol =
 
 type Model = Symbol list
 
+
+
+//---------------------------------------------------------------------------//
 //----------------------------Message Type-----------------------------------//
+//---------------------------------------------------------------------------//
+
 
 /// Messages to update symbol model
 /// These are OK for the demo - but possibly not the correct messages for
@@ -77,12 +88,18 @@ type Msg =
     | UpdateSymbolModelWithComponent of CommonTypes.Component // Issie interface
 
 
-//---------------------------------helper types and functions----------------//
 
-//Was this necessary??? I have no idea
+
+
+//---------------------------------------------------------------------------//
+//------------------------------helper functions-----------------------------//
+//---------------------------------------------------------------------------//
+
+
+
 
 ///Takes a component type and returns the corresponding symbol label/title/name as a string
-let typeToName (compType : CommonTypes.ComponentType) =
+let typeToName (compType : CommonTypes.ComponentType) : string =
     match compType with
     | CommonTypes.ComponentType.Constant _ -> "1" //This is a buffer right?
     | CommonTypes.ComponentType.Not -> "1"
@@ -107,36 +124,82 @@ let typeToName (compType : CommonTypes.ComponentType) =
     | _ -> "" //For any buses/wires
 
 
-///Returns a tuple of float = (Height, Width)
-///Inputs: Bottom right coordinate, top left coordinate
-let getHW (botR : XYPos) (topL : XYPos) = 
-    (botR.Y - topL.Y, botR.X - topL.X)
 
+///Returns a tuple of float = (Height, Width) from two coordinates
+let getHW (botR : XYPos) (topL : XYPos) = (botR.Y - topL.Y, botR.X - topL.X)
+
+///Finds the midpoint of two coordinates
 let midXY (botR : XYPos) (topL : XYPos) : XYPos =
     let midY = (botR.Y + topL.Y) / 2.
     let midX = (botR.X + topL.X) / 2.
     {X = midX; Y = midY}
-   
-let addXYVal (xy : XYPos) (n : float) : XYPos = 
-    {X = xy.X + n; Y = xy.Y + n}
-/// Creates Symbol.PortInfo object
+
+///Adds a float value onto an XYPos
+let addXYVal (xy : XYPos) (n : float) : XYPos = {X = xy.X + n; Y = xy.Y + n}
+
+///The number of possible ports on the top/bot side of the Symbol = Width / STD_HEIGHT
+let numPortsHorizontal (sym : Symbol) : int = int((sym.BotR.X - sym.TopL.X)/STD_HEIGHT)
+
+///The number of possible ports on the left/right side of the Symbol = Height / STD_HEIGHT
+let numPortsVertical (sym : Symbol) : int = int((sym.TopL.Y - sym.BotR.Y)/STD_HEIGHT)
+
+let posDiff a b = {X=a.X-b.X; Y=a.Y-b.Y}
+
+let posAdd a b = {X=a.X+b.X; Y=a.Y+b.Y}
+
+let posOf x y = {X=x;Y=y}
+
+///Displace will move a port position _away_ from the box.
+///
+///For inverters call with positive n.
+///For labels call with negative n.
+let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
+    let x = 
+        if pos.X = sym.TopL.X then (pos.X - n)
+        elif pos.X = sym.BotR.X then (pos.X + n)
+        else pos.X
+    let y =
+        if pos.Y = sym.TopL.Y then (pos.Y - n)
+        elif pos.Y = sym.BotR.Y then (pos.Y + n)
+        else pos.Y
+    (x, y)
+
+
+///Finds whether a coordinate is within a port's bounding box
+let testBox (port : Portinfo) (coord : XYPos) : bool =
+    let topL = port.Box |> fst
+    let botR = port.Box |> snd
+    if topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
+    then true
+    else false
+
+
+
+//---------------------------------------------------------------------------//
+//----------------------helper initialisation funcs--------------------------//
+//---------------------------------------------------------------------------//
+
+
+
+/// Creates Symbol.PortInfo object. 
 ///
 /// i : Index of the port (e.g. INPUT1 : i = 0).
-///
-/// port : the Port from commontypes to convert 
-///
-/// topL : the top left of the symbol associated with the port
-///
-/// botR : the bottom right of the symbol associated with the port 
-///
-/// n : the total number of ports on the symbol associated with the port 
+/// port : the Port from commontypes to convert.
+/// topL : the top left of the symbol associated with the port.
+/// botR : the bottom right of the symbol associated with the port.
+/// n : the total number of ports on the symbol associated with the port.
 let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : int) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) : Portinfo = 
+    
+    //Intermediate calculations needed
     let h = getHW botR topL |> fst
     let portPosY = topL.Y + (h * float(i + 1) / float(n + 1))
     let pos =
         match portType with
         | CommonTypes.PortType.Input -> { X = topL.X; Y = portPosY};
         | CommonTypes.PortType.Output -> { X = botR.X; Y = portPosY};
+    
+
+    //Object creation
     {   
         
         Pos = pos
@@ -147,12 +210,14 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : in
             PortType = portType
             HostId = string(compId)
         };
-        Placement = i;
+
         NumWires = 0;
+        
         Name = 
             match portType with
             | CommonTypes.PortType.Input -> sprintf "IN %i" i;
             | CommonTypes.PortType.Output -> sprintf "OUT %i" i;
+        
         Invert = 
             match portType with
             | CommonTypes.PortType.Output when compType = CommonTypes.ComponentType.Not
@@ -160,8 +225,12 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : in
                                             || compType = CommonTypes.ComponentType.Nor
                                             || compType = CommonTypes.ComponentType.Xnor -> true;
             | _ -> false;
+        
         Box = (addXYVal pos -1., addXYVal pos 1.)
     }
+
+
+
 
 ///Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut : int) (pos : XYPos) : Symbol =
@@ -171,9 +240,10 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let n = List.max[numIn; numOut] |> float
     let h = STD_HEIGHT * n
     let w = HW_RATIO * h
+    let botR = {X = pos.X + w; Y = pos.Y + h}
     
     let _id = CommonTypes.ComponentId (Helpers.uuid())
-    let botR = {X = pos.X + w; Y = pos.Y + h}
+    
     let Inputs = 
         [0..numIn - 1]
         |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Input pos botR numIn _id compType)
@@ -195,53 +265,27 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         PortHighlight = false
     }
 
-///The number of possible ports on the top/bot side of the Symbol = Width / STD_HEIGHT
-let numPortsHorizontal (sym : Symbol) : int = int((sym.BotR.X - sym.TopL.X)/STD_HEIGHT)
-
-///The number of possible ports on the left/right side of the Symbol = Height / STD_HEIGHT
-let numPortsVertical (sym : Symbol) : int = int((sym.TopL.Y - sym.BotR.Y)/STD_HEIGHT)
-
-let posDiff a b =
-    {X=a.X-b.X; Y=a.Y-b.Y}
-
-let posAdd a b =
-    {X=a.X+b.X; Y=a.Y+b.Y}
-
-let posOf x y = {X=x;Y=y}
-
-///Finds whether a coordinate is within a port's bounding box
-let testBox (port : Portinfo) (coord : XYPos) : bool =
-    let topL = port.Box |> fst
-    let botR = port.Box |> snd
-    if topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
-    then true
-    else false
-
-
-
-//-----------------------------Skeleton Model Type for symbols----------------//
-
-
-
 
 //-----------------------Skeleton Message type for symbols---------------------//
 
 
-
-/// Dummy function for test. The real init would probably have no symbols.
+/// Dummy function for test. Creates 4 NAND gates with 2 input, 1 output.
 let init () =
     List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
     |> List.map (fun pos -> (CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 pos)) 
     , Cmd.none
 
+
 /// update function which displays symbols
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     match msg with
     | AddSymbol (compType, pagePos, numIn, numOut) ->
         (CreateNewSymbol compType numIn numOut pagePos) :: model, Cmd.none
+
     | DeleteSymbol sIdList -> 
         List.filter (fun sym -> List.contains sym.Id sIdList = false) model, Cmd.none
+
     | StartDragging (sId, pagePos) ->
         model
         |> List.map (fun sym ->
@@ -316,9 +360,12 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
     | _ -> failwithf "Not implemented"
 
-//----------------------------View Function for Symbols----------------------------//
 
-//Using the skeleton code for 'RenderCircle' as the generic parent rendering function for all blocks
+
+//---------------------------------------------------------------------------------//
+//----------------------------View Function for Symbols----------------------------//
+//---------------------------------------------------------------------------------//
+
 
 /// Input to react component (which does not re-evaluate when inputs stay the same)
 /// This generates View (react virtual DOM SVG elements) for one symbol
@@ -331,7 +378,7 @@ type private RenderObjProps =
 
 /// View for one symbol with caching for efficient execution when input does not change
 let private renderObj =
-    FunctionComponent.Of(
+    FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
         fun (props : RenderObjProps) ->
             let handleMouseMove =
                 Hooks.useRef(fun (ev : Types.Event) ->
@@ -349,27 +396,14 @@ let private renderObj =
                 else
                     "gainsboro"
 
-            ///Displace will move a port position __AWAY__ from the box. 
-            ///For inverters call with positive n
-            ///For labels call with negative n
-            let displace (n : float) (pos : XYPos) : (float * float) =
-                let x = 
-                    if pos.X = props.Obj.TopL.X then (pos.X - n)
-                    elif pos.X = props.Obj.BotR.X then (pos.X + n)
-                    else pos.X
-                let y =
-                    if pos.Y = props.Obj.TopL.Y then (pos.Y - n)
-                    elif pos.Y = props.Obj.BotR.Y then (pos.Y + n)
-                    else pos.Y
-                (x, y)
-
+            
 
             let labels : ReactElement list = 
                 props.Obj.Ports
                 |> List.map(fun i ->
                     text[
-                        X ((displace -10. i.Pos) |> fst)
-                        Y ((displace -10. i.Pos) |> snd)
+                        X ((displace -10. i.Pos props.Obj) |> fst)
+                        Y ((displace -10. i.Pos props.Obj) |> snd)
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
@@ -384,11 +418,13 @@ let private renderObj =
                     rect[
                         X props.Obj.TopL.X
                         Y props.Obj.TopL.Y
+                        Rx 0.75
+                        Ry 0.75
                         SVGAttr.Height ((getHW props.Obj.BotR props.Obj.TopL) |> fst)
                         SVGAttr.Width ((getHW props.Obj.BotR props.Obj.TopL) |> snd)
                         SVGAttr.Fill color
                         SVGAttr.Stroke "black"
-                        SVGAttr.StrokeWidth 1][]
+                        SVGAttr.StrokeWidth 0.5][]
 
                     text[
                         X ((midXY props.Obj.BotR props.Obj.TopL).X)
@@ -408,21 +444,21 @@ let private renderObj =
                 |> List.filter(fun x -> x.Invert = true)
                 |> List.map(fun i ->
                     circle[
-                        Cx ((displace 3. i.Pos) |> fst)
-                        Cy ((displace 3. i.Pos) |> snd)
-                        R 3.
+                        Cx ((displace 3. i.Pos props.Obj) |> fst)
+                        Cy ((displace 3. i.Pos props.Obj) |> snd)
+                        R RAD
                         SVGAttr.Fill color
                         SVGAttr.Stroke "black"
-                        SVGAttr.StrokeWidth 1][])
+                        SVGAttr.StrokeWidth 0.5][])
 
             let ports =
                 if props.Obj.PortHighlight then
                     props.Obj.Ports
                     |> List.map(fun i ->
                         circle[
-                            Cx ((displace 3. i.Pos) |> fst)
-                            Cy ((displace 3. i.Pos) |> snd)
-                            R 3.
+                            Cx ((displace 3. i.Pos props.Obj) |> fst)
+                            Cy ((displace 3. i.Pos props.Obj) |> snd)
+                            R RAD
                             SVGAttr.Fill "blue"
                             SVGAttr.Stroke "blue"
                             SVGAttr.Opacity 0.5
@@ -431,7 +467,7 @@ let private renderObj =
                     []
             
             
-            g   [ 
+            g   [ //TODO UPDATE THIS MOVEMENT WHEN DECIDED PROPERLY
                     OnMouseUp (fun ev -> 
                         document.removeEventListener("mousemove", handleMouseMove.current)
                         EndDragging props.Obj.Id
@@ -462,7 +498,12 @@ let view (model : Model) (dispatch : Msg -> unit) =
     )
     |> ofList
 
+
+
+
+
 //---------------Helpers for interface functions--------------------//
+
 
 ///An exhaustive search through the model, which returns the Portinfo object corresponding to an input string port ID
 let initPortSearch (symModel: Model) : Portinfo list = 
@@ -470,19 +511,25 @@ let initPortSearch (symModel: Model) : Portinfo list =
     |> List.map(fun sym -> sym.Ports)
     |> List.concat
 
+//Tries to find port object by portID, returns Some(portInfo) if found, else None
 let portSearchID (symModel: Model) (pId : string) : Portinfo Option =
     initPortSearch symModel
     |> List.tryFind (fun port -> string(port.Port.Id) = pId)
 
+//Tries to find port object by position, returns Some(portInfo) if found, else None
 let portSearchPos (symModel: Model) (pos : XYPos) : Portinfo Option =
     initPortSearch symModel
     |> List.tryFind (fun port -> testBox port pos)
 
+
+
+
 //---------------Other interface functions--------------------//
 
+//TODO - REMOVE - ONLY USED BY BUSWIRE - Currently connects every input 0 to each other.
 let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos = 
     List.find (fun sym -> sym.Id = sId) symModel
-    |> (fun sym -> sym.TopL)
+    |> (fun sym -> sym.Ports.[0].Pos)
 
 ///Searches through the whole model until the port is found and retruns the position of that port
 ///This would be much faster if sheet gave me the component

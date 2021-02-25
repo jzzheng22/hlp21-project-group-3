@@ -4,204 +4,59 @@ Module: Symbol
 
 Symbol Advisor  - Sacha Ayoun - Email not piazza
 
-TODO: Convert to FP style (?)
+DOCUMENTATION
 
-OOP Style Symbol class 
-Symbol:
-    id
-    Labels
-        Input
-            id
-            name
-            position (?)
-        Output
-            id
-            name
-            position (?)
-        Name
+STATIC VARIABLES:
+    STD_HEIGHT - Standard Height to make Symbol from
+    HW_RATIO - Ratio of Height to Width for Symbol
+    RAD - Radius for inverters and port highlighting
 
-    TopLeft
-    BottomRight
+TYPES:
+    Portinfo
+        Position                    - Location of the port on the canvas
+        Port                        - From CommonTypes
+        NumWires                    - Keeps track of the number of wires connected to a port 
+        Name                        - Label to be printed for that port
+        Invert                      - A bool which = True if the port requires an inverter
+        Box                         - The bounding box for the port 
 
-
-
-Interface for symbol:
-
-
-
-Notes for me:
-Grading goals/order of operation:
-    
-    BASIC IMPLEMENTATION REQUIRED:
-
-    1. Identify/Abstract common parts
-
-        a. Generic rectangle block
-
-           DrawRect(height, width, starting_point)
-                Draws a rectangle of height x width where starting_point is a point on the box - TODO: DECIDE THIS
-
-                Thoughts:
-                    Height/width would have to be determined outside the function based on logic/gate type
-                    Create the bounding box?
-
-        b. Block title
-
-            WriteName(name)
-                Write the block name in the middle centre of the symbol
-
-                Thoughts:
-                    Should it be moveable?
-                    Should it be nameable?
-                    
-        c. Input/output Inverter
-
-            DrawInvert(id, listLabels) =
-                Takes the id of the port that requires an inverter 
-                Search for which sublist id is in listLabels
-                Determines which side to draw the circle on
-                Draws a circle on that port
-
-                Thoughts:
-                    Ratio of box to inverter size (?)
-                        Radius = CIRCLE_TO_RECT_RATIO * height * width
-                    Need to update bounding box
-
-            i. UpdateBound(radius, object_id) = 
-                object_id.
-                
-
-        d. Port labels
-            
-            List of ports for each side in order: [[left], [top], [right], [bottom]]
-            e.g. AND:
-                listLabels = [[Input; Input]; []; [Output]; []]
-            
-            DrawLabels(listLabels) = 
-                For each sublist print the labels in the relavent orientation
-
-            Thoughts:
-                I think this can be abstracted further but I'm not sure right now
-    
-    3. Implement the symbols listed in common types using the abstract functions made
-
-        a. Generic logic block:
-
-            MakeBlock(inputs, outputs, start_pos) =
-                h = STANDARD_HEIGHT * max(inputs, outputs)
-                w = HEIGHT_WIDTH_RATIO * h
-                drawRect(h, w, start_pos)
-                drawLabels([inputs]; []; [outputs]; [])
-
-        b. Call inverter for specific ports as per ComponentType
-
-    4. Messages
-        a. What messages does Symbol get sent/send ? Discuss this with team - dont need this to write the symbol definitions though
-        b. Bounding box - where the wire should not pass, should this include/disinclude the inverter circle?
-
-    5. Implementing custom type
-
-    6. Update function
-        List of objects (id), and position
+    Symbol
+        TopL                        - The top left coordinate of the symbol
+        BotR                        - The bottom right coordinate of the symbol
+        LastDragPos                 - The position where dragging last occured (DO WE NEED THIS ?)
+        IsDragging                  - A bool which = True if dragging 
+        Id                          - The component ID associated with the symbol
+        Ports                       - A List of Portinfo ports associated with the symbol
+        Type                        - The component type associated with the symbol
+        Name                        - The label to be prtined for the symbol
+        Highlight                   - A bool indicating which = True if the symbol should be highlighted
+        PortHighlight               - A bool indicating which = True if the ports should be highlighted
 
 
-    EXTRA
+MESSAGES:
+    MouseMsg                        - ALTERATIONS TO COME (MOVE)
+    StartDragging                   - ALTERATIONS TO COME (MOVE)
+    Dragging                        - ALTERATIONS TO COME (MOVE)
+    EndDragging                     - ALTERATIONS TO COME (MOVE)
+    AddSymbol                       - Adds a new symbol to the model based on ComponentType, Position, Number of Inputs, Number of Outputs
+    DeleteSymbol                    - Removes a symbol from the model based on ComponentID
+    Highlight                       - Highlights symbols from a list of ComponentID, anything not in the list will be un-highlighted
+    HighlightPorts                  - Highlights the symbol ports of a single ComponentID 
+    UpdateSymbolModelWithComponent  - TODO
 
-    - TODO: Come back to this later
-    
-    6. Port movement 
-        Current thoughts:
 
-        Find selected label in the label list, move to location
+INTERFACE FUNCTIONS:
+    getPortCoords                   - Inputs(model, portId), Returns the XYPos of the portID
+    getBoundingBoxes                - Returns a list of bounding boxes in the form (ComponentID, TopLeftCoordinate, BotRightCoordinate)
+    getPortType                     - Takes a model and portID, Returns whether a port is input/output
+    isPort                          - Takes a model, XYpos and returns Some(XYPos, PortID) if the position was on a port, or None otherwise
 
-        Restrictions (?)
-            1. Do we need any restrictions?
-            2. Cannot have inputs and outputs on the same side
-            3. Max number of labels on one side = max(inputs, outputs)
-            4. Would we have to work out number of labels allowed based on the symbol that has been made
-                a. I.e. we cannot fit 3 labels on the bottom of an AND gate
-
-        I think I need to talk to sheet guys about this, as they would be determining the mouse clicks and other things
-        This might be simpler for me
-
-    4. Resizing
-
-    5. Drag
-
-    6. Select
+INTERFACE TO ISSIE
+    TODO
 
 
 
-
-Pseduo functions:
-
-type Symbol =
-    {
-        Pos: XYPos
-        PosBot: XYPos
-        LastDragPos : XYPos
-        IsDragging : bool
-        Id : CommonTypes.ComponentId
-        Ports : Portinfo list
-
-    }
-
-PortInfo =
-    {
-        Pos: XYPos
-        Port: CommonTypes.Port
-        Orientation: int
-        Placement: int 
-        NumWires: int
-    }
-
-PortToPortInfo(i, Port, type, TopL, BotR, n) = 
-    {   
-        //Left, Top, Right, Bot
-        match type with
-        | 0 -> { X = TopL.X; Y = ((TopL.Y - BotR.Y) * i / n) }
-        | 2 -> { X = BotR.X; Y = ((TopL.Y - BotR.Y) * i / n) }
-        | _ -> failwithf "shouldnt happen"
-        Port = x
-        Orientation = 0
-        Placement = i
-        NumWires = 0
-    }
-    
-CreateNewComponent(Pos, Component) =
-    
-    TopL = Pos
-    n = max(inputs.size, outputs.size)
-    Height = STD_HEIGHT * n
-    Width = STD_HW_RATIO * Height
-    BotR = TopL with {X -= Height; Y += Width}
-    Inputs = Inputs 
-            |> Enumerate 
-            |> Map(fun (i, x) -> 
-            |> snd
-    BoundingBox = (TopL, BotR)
-
-Depreciated functions I may need in future
-
-///Returns an int indicating the side of the object that a port is on 0 = Left, 1 = Top, 2 = Right, 3 = Bottom
-let findSide id listLabels = listLabels |> List.findIndex(List.contains id)
-
-///Returns a tuple (side, index) indicating the index/position that the port lies in
-let findPos id listLabels = 
-    let i = listLabels |> findSide id 
-    let j = listLabels |> List.item i |> List.findIndex((=) id)
-    (i, j)
-
-///Returns a react element for an inverter on a specific port
-let drawInvert id listLabels =
-    //index of outer position tells us whether port is left/top/right/bottom
-    let side = findSide id listLabels
-    let indx = findPos id listLabels
-    //let pos = listLabels.[side].[indx]
-    0
-
-
-OBJECTIVES TIMELINE 
+OBJECTIVES TIMELINE (FOR ME)
 
 24/02/21
    
@@ -248,5 +103,8 @@ OBJECTIVES TIMELINE
     
     NEXT TASKS:
         WRITE UP CODE SPECIFICATION EXPLAINING FUNCTIONS
-        TALK ABOUT MOVE MESSAGE - IM NOT 100% SURE IT WILL WORK AS CURRENTLY SPECIFIED
-        TRANSFER PORTS FROM LIST TO MAP??
+        (GROUP) TALK ABOUT MOVE MESSAGE - IM NOT 100% SURE IT WILL WORK AS CURRENTLY SPECIFIED
+        PORTS - I DONT THINK XY-POSITION SHOULD NECESSARILY BE SAVED ? 
+        MAKE PORTS MANUALLY ADJUSTABLE
+        MANUAL ROTATION
+        MANUAL SCALING
