@@ -11,8 +11,7 @@ open Helpers
 //------------------------------------------------------------------------//
 
 //Static variables
-let CIRCLE_TO_RECT_RATIO = 0.2
-let STD_HEIGHT = 20.
+let STD_HEIGHT = 30.
 let HW_RATIO = 0.9
 
 
@@ -49,6 +48,8 @@ type Symbol =
         Ports : Portinfo list
         Type : CommonTypes.ComponentType
         Name : string
+        Highlight : bool
+        PortHighlight : bool
 
     }
 
@@ -70,7 +71,9 @@ type Msg =
     | Dragging of sId : CommonTypes.ComponentId * pagePos: XYPos
     | EndDragging of sId : CommonTypes.ComponentId
     | AddSymbol of compType: CommonTypes.ComponentType * pagePos : XYPos * numIn : int * numOut : int
-    | DeleteSymbol of sId:CommonTypes.ComponentId 
+    | DeleteSymbol of sIdList:CommonTypes.ComponentId list
+    | Highlight of sIdList: CommonTypes.ComponentId list
+    | HighlightPorts of sId : CommonTypes.ComponentId
     | UpdateSymbolModelWithComponent of CommonTypes.Component // Issie interface
 
 
@@ -101,7 +104,7 @@ let typeToName (compType : CommonTypes.ComponentType) =
     | CommonTypes.ComponentType.AsyncROM _ -> "A/ROM"
     | CommonTypes.ComponentType.ROM _ -> "ROM"
     | CommonTypes.ComponentType.RAM _ -> "RAM"
-    | _ -> failwithf "AHHH WHY AM I HERE?"
+    | _ -> "" //For any buses/wires
 
 
 ///Returns a tuple of float = (Height, Width)
@@ -109,10 +112,10 @@ let typeToName (compType : CommonTypes.ComponentType) =
 let getHW (botR : XYPos) (topL : XYPos) = 
     (botR.Y - topL.Y, botR.X - topL.X)
 
-let midXY (botR : XYPos) (topL : XYPos) =
+let midXY (botR : XYPos) (topL : XYPos) : XYPos =
     let midY = (botR.Y + topL.Y) / 2.
     let midX = (botR.X + topL.X) / 2.
-    (midX, midY)
+    {X = midX; Y = midY}
    
 let addXYVal (xy : XYPos) (n : float) : XYPos = 
     {X = xy.X + n; Y = xy.Y + n}
@@ -188,7 +191,8 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         Ports = List.append Inputs Outputs
         Type = compType
         Name = typeToName compType
-            
+        Highlight = false
+        PortHighlight = false
     }
 
 ///The number of possible ports on the top/bot side of the Symbol = Width / STD_HEIGHT
@@ -228,7 +232,7 @@ let testBox (port : Portinfo) (coord : XYPos) : bool =
 let init () =
     List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol CommonTypes.ComponentType.And 3 1 pos)) 
+    |> List.map (fun pos -> (CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 pos)) 
     , Cmd.none
 
 /// update function which displays symbols
@@ -236,8 +240,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     match msg with
     | AddSymbol (compType, pagePos, numIn, numOut) ->
         (CreateNewSymbol compType numIn numOut pagePos) :: model, Cmd.none
-    | DeleteSymbol sId -> 
-        List.filter (fun sym -> sym.Id <> sId) model, Cmd.none
+    | DeleteSymbol sIdList -> 
+        List.filter (fun sym -> List.contains sym.Id sIdList = false) model, Cmd.none
     | StartDragging (sId, pagePos) ->
         model
         |> List.map (fun sym ->
@@ -280,6 +284,35 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 }
         )
         , Cmd.none
+
+    | Highlight sIdList ->
+        model
+        |> List.map (fun sym ->
+            if List.contains sym.Id sIdList then 
+                { sym with
+                    Highlight = true
+                }
+            else
+                { sym with
+                    Highlight = false 
+                }
+        )
+        , Cmd.none
+
+    | HighlightPorts sId ->
+        model
+        |> List.map (fun sym ->
+            if sym.Id = sId then 
+                { sym with
+                    PortHighlight = true
+                }
+            else
+                { sym with
+                    PortHighlight = false 
+                }
+        )
+        , Cmd.none
+
     | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
     | _ -> failwithf "Not implemented"
 
@@ -308,23 +341,39 @@ let private renderObj =
                     Dragging(props.Obj.Id, posOf ev.pageX ev.pageY)
                     |> props.Dispatch
                 )
-
+            
+            ///TODO - Once Move has been sorted out we need to correct this, fine for now
             let color =
-                if props.Obj.IsDragging then
+                if props.Obj.IsDragging || props.Obj.Highlight then
                     "lightblue"
                 else
-                    "grey"
+                    "gainsboro"
+
+            ///Displace will move a port position __AWAY__ from the box. 
+            ///For inverters call with positive n
+            ///For labels call with negative n
+            let displace (n : float) (pos : XYPos) : (float * float) =
+                let x = 
+                    if pos.X = props.Obj.TopL.X then (pos.X - n)
+                    elif pos.X = props.Obj.BotR.X then (pos.X + n)
+                    else pos.X
+                let y =
+                    if pos.Y = props.Obj.TopL.Y then (pos.Y - n)
+                    elif pos.Y = props.Obj.BotR.Y then (pos.Y + n)
+                    else pos.Y
+                (x, y)
+
 
             let labels : ReactElement list = 
                 props.Obj.Ports
                 |> List.map(fun i ->
                     text[
-                        X i.Pos.X
-                        Y i.Pos.Y
+                        X ((displace -10. i.Pos) |> fst)
+                        Y ((displace -10. i.Pos) |> snd)
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
-                            FontSize "5px"
+                            FontSize "6px"
                             FontWeight "bold"
                             Fill "Black"
                         ]
@@ -338,16 +387,16 @@ let private renderObj =
                         SVGAttr.Height ((getHW props.Obj.BotR props.Obj.TopL) |> fst)
                         SVGAttr.Width ((getHW props.Obj.BotR props.Obj.TopL) |> snd)
                         SVGAttr.Fill color
-                        SVGAttr.Stroke color
+                        SVGAttr.Stroke "black"
                         SVGAttr.StrokeWidth 1][]
 
                     text[
-                        X ((midXY props.Obj.BotR props.Obj.TopL) |> fst)
-                        Y ((midXY props.Obj.BotR props.Obj.TopL) |> snd)
+                        X ((midXY props.Obj.BotR props.Obj.TopL).X)
+                        Y ((midXY props.Obj.BotR props.Obj.TopL).Y)
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
-                            FontSize "5px"
+                            FontSize "10px"
                             FontWeight "bold"
                             Fill "Black"
                         ]
@@ -359,12 +408,27 @@ let private renderObj =
                 |> List.filter(fun x -> x.Invert = true)
                 |> List.map(fun i ->
                     circle[
-                        Cx i.Pos.X
-                        Cy i.Pos.Y
-                        R 5.
-                        SVGAttr.Fill "blue"
-                        SVGAttr.Stroke "blue"
+                        Cx ((displace 3. i.Pos) |> fst)
+                        Cy ((displace 3. i.Pos) |> snd)
+                        R 3.
+                        SVGAttr.Fill color
+                        SVGAttr.Stroke "black"
                         SVGAttr.StrokeWidth 1][])
+
+            let ports =
+                if props.Obj.PortHighlight then
+                    props.Obj.Ports
+                    |> List.map(fun i ->
+                        circle[
+                            Cx ((displace 3. i.Pos) |> fst)
+                            Cy ((displace 3. i.Pos) |> snd)
+                            R 3.
+                            SVGAttr.Fill "blue"
+                            SVGAttr.Stroke "blue"
+                            SVGAttr.Opacity 0.5
+                            SVGAttr.StrokeWidth 1][])
+                else
+                    []
             
             
             g   [ 
@@ -379,7 +443,7 @@ let private renderObj =
                         |> props.Dispatch
                         document.addEventListener("mousemove", handleMouseMove.current)
                     )
-            ](displayBox@labels@drawInvert)
+            ](List.concat [displayBox; labels; drawInvert; ports])
             
     , "Circle"
     , equalsButFunctions
