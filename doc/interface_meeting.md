@@ -12,7 +12,7 @@ Message mechanism:
  - `Sheet.update` calls `BusWire.update`
  - `BusWire.update` calls `Symbol.update`
  - I think Sheet should be able to access `Symbol.update` directly without going through BusWire, but this needs some extra thought to prevent conflicts.
- - *For now* let's assume that Sheet has to access Symbol through BusWire, this is something that is very easy to change afterwards. **IMPORTANT QUESTION FOR TC**
+ - *For now* let's assume that Sheet has to access Symbol through BusWire, this is something that is very easy to change afterwards. **According to TC this is fine as long as we don't pass to Symbol a datatype defined in sheet (I think). It seems that no conflicts would arise at all from giving Sheet access to Symbol.**
 
 ## Messages
 To BusWire:
@@ -52,7 +52,7 @@ These functions will return the top-left and bottom-right corners of the boxes a
 
 Things to consider:
  - Optimisations: We pass in mouse coordinates to `getBoundingBoxes` for now, even though it may not be needed. We can delete later of course, although we may also be able to filter down the boxes based on mouseCoord.
- - Split up canvas into sections: Identify which section the coordinates are in and return bounding boxes in that section only. Consider: do we define this split in Sheet or in submodules?. Bounding boxes which overlap across sections - what do you do? **Confirm with TC - BE SPECIFIC**
+ - Split up canvas into sections: Identify which section the coordinates are in and return bounding boxes in that section only. Consider: do we define this split in Sheet or in submodules?. Bounding boxes which overlap across sections - what do you do? **According to TC, we should focus on a non-optimised version first i.e. searching through all bounding boxes, before going for an optimisation. We don't know for sure whether performance will be slow at all.**
 
  - Maybe sort list by coordinate (proximity to bounding box) - binary search.
     - Might as well just return single bounding box instead of list?
@@ -80,7 +80,8 @@ e.g. in Sheet we would send these messages:
 
  *Option 2*: Sending a message to highlight components as outlined above. Send an unhighlight message to symbol and buswire when we want to wipe everything clean - this would result in all the components being unhighlighted. When we send a highlight message, the relevant components would be set as selected - possibly through a property of symbol and buswire components. Unhighlight message would simply "unset" these properties.
 
- **OVERALL**: According to Darrick Lau, option 2 seems more viable **although we can always confirm with TC**.
+ According to Darrick Lau, option 2 seems more viable
+ **UPDATE: According to TC, option 1 seems better so it is the one that we are going to go with. We repeatedly send highlight messages to symbol/buswire as long as necessary. A component will be rendered highlighted as long as it is included in the highlight message from Sheet**
 
 
 ### Highlighting Ports
@@ -94,11 +95,11 @@ Ports should become visible when mouse is hovering in range
  - If we drag to another port, Sheet sends message to BusWire to make wire between two ports
 
 Selecting port: on mouse click down:
-Call the function `Symbol.isPort xPos yPos`
+Call the function `Symbol.isPort mouseCoord: XYPos`
 If we get `Some (portCoord: XYPos * portID: string)`, then begin drawing dotted line. If `None` don't draw - it may be another case e.g. drag select, selecting an actual component.
 
 On mouse click up:
-Call the function `Symbol.isPort xPos yPos`
+Call the function `Symbol.isPort mouseCoord: XYPos`
 If we get `Some (portCoord: XYPos * portID: string)`, tell BusWire to draw new wire. If `None` don't draw.
 In all cases stop rendering the dotted line.
 
@@ -144,21 +145,20 @@ Wires should be selectable
  - Deletes wires from model based on Id.
 
 `AddConnection of wireInfo`
- - This still needs discussion - **BRING IT UP WITH TC**
+ - **After meeting with TC, it's not apparent that we need to change anything about this. Wireinfo only needs to contain the port ID's. The buswire people can let us know if we are going to use the actual port structures instead in the wire info tuple**
  - Wire info (We would need the port IDs for sure - then based on these we could compare the widths of the two ports at either end of the connection - if they are unequal then error. Else if they are equal we know the width of the connection)
  - Look at how ISSIE does it?
 
 `Highlight of wireIdList`
  - Highlights wires in list
-- Look at how ISSIE does it? In Issie, only the ports are highlighted when you click on a wire, but I think it's ok if we change this by thinking of something better. We can certainly highlight the wire green or something (and if still uncertain **BRING IT UP WITH TC**)
+- Look at how ISSIE does it? In Issie, only the ports are highlighted when you click on a wire, but I think it's ok if we change this by thinking of something better. We can certainly highlight the wire green or something (**after discussion with TC, we found it's ok to render the wires as green or any other colour we like...it just needs to work**)
 
 `Move of wireIdList *  posX * posY`
  - Maybe this should be list of wire IDs
  - posX and posY represent a translation vector showing how the wires should be shifted, not new coords - this vector is calculated in sheet.
  - This allows for moving multiple wires in one function call
 
- `Unhighlight`
- - This will simply unhighlight everything that has been highlighted. So then when the next highlight message is sent, only the symbols in "wireIdList" will be highlighted.
+*Note*: We are not using highlight messages.
 
 # Symbol
 
@@ -208,10 +208,8 @@ Each Symbol owns its ports
 
 `HighlightPorts of symbolId`
  - Highlights ports of symbols
- - Maybe need further discussion? **CONFIRM WITH TC IF WE HAVE TIME**
+ - Maybe need further discussion? **THIS PART SEEMS FINE**
 
- `Unhighlight`
- - This will simply unhighlight everything that has been highlighted. So then when the next highlight message is sent, only the symbols in "symbolIdList" will be highlighted.
 
 # To Discuss With Dr Clarke 24/2/21:
 - Can Sheet have direct access to Symbol? What complications could arise?
@@ -221,3 +219,9 @@ Each Symbol owns its ports
 - Mechanism by which we highlight ad unhighlight components and ports - what messages do we send (we can mention the 2 options) - when do we highlight symbol ports?>
 - Check method of using GitHub + repo name
 - *Add anything else.....*
+
+**Post meeting update:** The relevant areas have been updated based on the discussion with Dr Clarke.
+
+**IMPORTANT**: Although we have specified portID and symbolID as strings everywhere, it may make sense for these ID's to actually have their own type for type safety...ISSIE actually defines all ID's as strings so I think TC may have overlooked this in making his suggestions to us about this. Maybe we could make a type for IDs but as we're coming close to the deadline we probably can let it be.
+
+*Finality*: This interface is expected to be **the final one**. No changes are desired as everyone needs to get coding. However, if a change is desired, bring it up ASAP.
