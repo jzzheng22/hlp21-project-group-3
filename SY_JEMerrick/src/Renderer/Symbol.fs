@@ -154,14 +154,6 @@ let absDiff a b =
     let diff = (posDiff a b)
     diff.X + diff.Y
 
-///Snaps the rotation to one of: 0, 90, 180, 270
-let getRot (rot : int) : int =
-    if rot >= 0 && rot < 45 then 0
-    elif rot >= 45 && rot < 135 then 90
-    elif rot >= 135 && rot < 225 then 180
-    elif rot >= 225 && rot < 315 then 270
-    elif rot >= 315 && rot < 360 then 0
-    else 0
 
 
 ///Displace will move a port position _away_ from the box.
@@ -200,6 +192,59 @@ let portPos (i : int) (n : int) (topL : XYPos) (botR : XYPos) : XYPos =
    
 let findPos (port : Portinfo) (portMap : XYPos list) : XYPos =
     List.item port.slotPos portMap
+
+///Snaps the rotation to one of: 0, 90, 180, 270
+let getRot (rot : int) : int =
+    if rot >= 0 && rot < 45 then 0
+    elif rot >= 45 && rot < 135 then 90
+    elif rot >= 135 && rot < 225 then 180
+    elif rot >= 225 && rot < 315 then 270
+    elif rot >= 315 && rot < 360 then 0
+    else 0
+
+let getRotMat (rot : int) : float list list=
+    match getRot rot with
+    | 90 -> [[0.; -1.; 0.]; [1.; 0.; 0.]; [0.; 0.; 1.]]
+    | 180 -> [[-1.; 0.; 0.]; [0.; -1.; 0.]; [0.; 0.; 1.]]
+    | 270 -> [[0.; 1.; 0.]; [-1.; 0.; 0.]; [0.; 0.; 1.]]
+    | _ -> [[1.; 0.; 0.]; [0.; 1.; 0.]; [0.; 0.; 1.]] //rotate 0 degrees
+
+
+let delHead (m : float list list) : float list list = List.map List.tail m
+
+let getCol (m : float list list) : float list = List.map List.head m
+
+///Multiplies two lists together by element, and sums the result
+let mulList (m1 : float list) (m2 : float list) : float = List.zip m1 m2 |> List.sumBy (fun (a, b) -> a*b)
+
+let rec transp (m : float list list) : float list list =
+    match m with
+    | [] -> failwithf "error"
+    | []::tl -> []
+    | tl -> getCol tl :: transp (delHead tl)
+
+let getPairs (m1 : float list) (m2 : float list list) : (float list * float list) list =
+    List.map (fun x -> (m1, x)) m2
+
+
+let multMatrix (m1 : float list list) (m2 : float list list) : float list list  =
+    let transM = transp m2
+    m1 |> List.map (fun x -> getPairs x transM) |> List.map (List.map(fun (x, y) -> mulList x y))
+    
+//I believe this rotation is working anticlockwise - check
+let rotateCoords (coord : XYPos) (rot : int) (centre : XYPos) : XYPos =
+    let coordM = [[coord.X]; [coord.Y]; [1.]]
+    let transNve = [[1.; 0.; -centre.X]; [0.; 1.; -centre.Y]; [0.; 0.; 1.]]
+    let transPve = [[1.; 0.; centre.X]; [0.; 1.; centre.Y]; [0.; 0.; 1.]]
+    let rotM = getRotMat(rot)
+    let transform = multMatrix transPve ( multMatrix rotM ( multMatrix transNve coordM) )
+    {X = transform.[0].[0]; Y = transform.[1].[0]}
+
+
+let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
+    let newTopL = {X = List.min[topL.X; botR.X]; Y = List.min[topL.Y; botR.Y]}
+    let newBotR = {X = List.max[topL.X; botR.X]; Y = List.max[topL.Y; botR.Y]}
+    (newTopL, newBotR)
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -260,7 +305,7 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (b
 ///Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut : int) (pos : XYPos) : Symbol =
     //Intermediate calculations
-
+    
     let n = List.max[numIn; numOut] |> float
     let h = STD_HEIGHT * n
     let w = HW_RATIO * h
@@ -289,10 +334,18 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         [numIn..numOut + numIn - 1]
         |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Output pos botR numOut _id compType)
     let inOut = List.append ins outs
+
+    //FOR DEMO PURPOSES ONLY - TO IT IN A MESSAGE
+    let centre = midXY pos botR
+    let rot  = 270
+    let rotTopL = rotateCoords pos rot centre
+    let rotBotR = rotateCoords botR rot centre
+    let newBox = getNewBox rotTopL rotBotR
+
     //Symbol Creation
     {
-        TopL = pos;
-        BotR = botR;
+        TopL = newBox |> fst
+        BotR = newBox |> snd
         LastDragPos = {X = 0.; Y = 0.};
         IsDragging = false;
         Id = _id
@@ -300,9 +353,9 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         Name = typeToName compType
         Highlight = false
         PortHighlight = false
-        PortMap = slots
+        PortMap = slots |> List.map (fun x -> rotateCoords x rot centre)
         PortList = inOut
-        Rotation = 180
+        Rotation = rot
     }
 
 
@@ -483,8 +536,6 @@ let private renderObj =
                     text[
                         X ((displace -10. (findPos i props.Obj.PortMap) props.Obj) |> fst)
                         Y ((displace -10. (findPos i props.Obj.PortMap) props.Obj)  |> snd)
-                        SVGAttr.Transform (sprintf "rotate (-%d, %d, %d)" props.Obj.Rotation (int ((displace -10. (findPos i props.Obj.PortMap) props.Obj) |> fst)) (int ((displace -10. (findPos i props.Obj.PortMap) props.Obj)  |> snd)))
-                        
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
@@ -510,7 +561,6 @@ let private renderObj =
                     text[
                         X ((midXY props.Obj.BotR props.Obj.TopL).X)
                         Y ((midXY props.Obj.BotR props.Obj.TopL).Y)
-                        SVGAttr.Transform (sprintf "rotate (-%d, %d, %d)" props.Obj.Rotation (int ((midXY props.Obj.BotR props.Obj.TopL).X)) (int ((midXY props.Obj.BotR props.Obj.TopL).Y)))
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
@@ -565,7 +615,6 @@ let private renderObj =
                         document.addEventListener("mousemove", handleMouseMove.current)
                     )
 
-                    SVGAttr.Transform (sprintf "rotate (%d, %d, %d)" props.Obj.Rotation (int ((midXY props.Obj.BotR props.Obj.TopL).X)) (int ((midXY props.Obj.BotR props.Obj.TopL).Y)))
                     
                     
                     
