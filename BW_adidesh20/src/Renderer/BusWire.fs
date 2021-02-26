@@ -25,6 +25,7 @@ type Wire = {
     SourcePortId: string
     TargetPortId: string
     Vertices: XYPos list
+    BoundingBoxes: (string * XYPos * XYPos) list
     }
 
 type Model = {
@@ -46,6 +47,8 @@ type Msg =
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
 
+//-------------------Helpers for functions------------------------//
+
 /// Takes Source and Target positions of a wire and returns the 
 /// vertices of the path it should follow
 ///
@@ -66,6 +69,17 @@ let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
         let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
         [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
 
+let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionId): (string * XYPos * XYPos) list =
+    let bbDist = 10. // Distance of Bounding Box Outline from wire
+    let lineToBox (startPos: XYPos) (endPos: XYPos):  XYPos * XYPos =
+        let TopL = {startPos with X = startPos.X - bbDist; Y = startPos.Y + bbDist}
+        let BotR = {endPos with X = startPos.X + bbDist; Y = endPos.Y - bbDist}
+        (TopL,BotR)
+
+    vertices
+    |> List.pairwise
+    |> List.map (fun x -> lineToBox (fst x) (snd x))
+    |> List.map (fun (topL,botR) -> ((string wID),topL,botR))
 
 /// look up wire in WireModel
 let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
@@ -111,10 +125,11 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
         |> List.map (fun w ->
             let srcPortPos = Symbol.getPortCoords model.Symbol w.SourcePortId
             let tgtPortPos = Symbol.getPortCoords model.Symbol w.TargetPortId
+            let newVertices = routeWire srcPortPos tgtPortPos
             let props = {
                 key = w.Id
                 WireP = w
-                Vertices = routeWire srcPortPos tgtPortPos
+                Vertices = newVertices
                 ColorP = model.Color.Text()
                 StrokeWidthP = "2px" }
             singleWireView props)
@@ -131,16 +146,19 @@ let init n () =
     let ports = Symbol.initPortSearch symbols 
     let outPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Output) ports).Value
     let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
+    let id = CommonTypes.ConnectionId (Helpers.uuid())
+    let vert = routeWire (Symbol.getPortCoords symbols outPort.Port.Id) (Symbol.getPortCoords symbols inPort.Port.Id)
     let testWire: Wire = 
         {
-            Id = CommonTypes.ConnectionId (Helpers.uuid())
+            Id = id
             SourcePortId = outPort.Port.Id
             TargetPortId = inPort.Port.Id
-            Vertices = routeWire (Symbol.getPortCoords symbols outPort.Port.Id) (Symbol.getPortCoords symbols inPort.Port.Id)
+            Vertices = vert
+            BoundingBoxes = singleWireBoundingBoxes vert id
         }
     [testWire]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
-
+    
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     | Symbol sMsg -> 
@@ -157,6 +175,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 /// to determine which wire (if any) to select on a mouse click
 let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId option = 
     failwith "Not implemented"
+
+let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (string * XYPos * XYPos) list =
+    wModel.WX
+    |> List.collect (fun w -> w.BoundingBoxes)
 
 //----------------------interface to Issie-----------------------//
 let extractWire (wModel: Model) (sId:CommonTypes.ComponentId) : CommonTypes.Component= 
