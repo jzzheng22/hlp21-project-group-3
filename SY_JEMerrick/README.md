@@ -32,6 +32,7 @@ TYPES:
         PortMap                     - A list of XYPos indicating the 'slots' a port may be placed into
         PortList                    - A list of Portinfo objects associated with the symbol
         Rotation                    - An int indicating how much to rotate an object
+        Scale                       - An XYPos indicating the scaling in the X and Y directions for the object
 
 
 MESSAGES:
@@ -45,6 +46,11 @@ MESSAGES:
     HighlightPorts                  - Highlights the symbol ports of a single ComponentID 
     UpdateSymbolModelWithComponent  - TODO
 
+    MESSAGES I WANT TO ADD
+    Scale
+    Rotate
+    Move
+
 
 INTERFACE FUNCTIONS:
     getPortCoords                   - Inputs(model, portId), Returns the XYPos of the portID
@@ -57,75 +63,93 @@ INTERFACE TO ISSIE
 
 
 
-CHANGELOG
+CHANGELOG (For me)
 
 24/02/21
    
     COMPLETE: 
-        INIT SYMBOL TYPE
-        INIT PORTS
-        CREATE RECTANGLE
-        PRINT I/O LABELS
-        PRINT SYMBOL TYPE
+        Init symbol type
+        Init ports
+        Create rectangle
+        Print I/o labels
+        Print symbol type
 
     ADJUSTMENTS NEEDED: 
-        PORT LABELS FULLY INSIDE THE BOX - Probably involves making a seperate function that takes in string as param
+        Port labels fully inside the box - Probably involves making a seperate function that takes in string as param
         
 
     NEXT TASKS:
-        PRINT INVERTERS
-        INTERFACE FUNCS
-        UPDATE MOVEMENT FROM DEMO LISTEN STUFF TO WITH MESSAGES
-        CHECK ALL TYPES DONE
+        Print inverters
+        Interface funcs
+        Update movement from demo listen stuff to with messages
+        Check all types done
 
 25/02/21
 
     COMPLETE:
-        PRINT INVERTERS
+        Print inverters
         INTERFACE FUNCS:
-            SYMBOL.GETPORTCOORDS
-            SYMBOL.GETBOUNDINGBOXES
-            SYMBOL.GETPORTTYPE
-            SYMBOL.ISPORT
+            Symbol.Getportcoords
+            Symbol.Getboundingboxes
+            Symbol.Getporttype
+            Symbol.Isport
         MESSAGES:
-            ADDSYMBOL
-            DELETESYMBOL
-            STARTDRAGGING/DRAGGING/ENDDRAGGING - not move right now
-            HIGHLIGHT
-            HIGHLIGHTPORTS
-        MAKE PRETTY SYMBOLS
-        MAKE INVERTERS PRINT ON THE OUTSIDE OF THE BOX RATHER THAN THE MIDDLE
-        MAKE LABELS PRINT ON THE OUTSIDE OF THE BOX RATHER THAN THE MIDDLE
+            Addsymbol
+            Deletesymbol
+            Startdragging/dragging/enddragging - not move right now
+            Highlight
+            Highlightports
+        Make pretty symbols
+        Make inverters print on the outside of the box rather than the middle
+        Make labels print on the outside of the box rather than the middle
 
 
     ADJUSTMENTS NEEDED:
         
-        MAKE CODE PRETTIER
+        Make code prettier
     
     NEXT TASKS:
-        WRITE UP CODE SPECIFICATION EXPLAINING FUNCTIONS
-        (GROUP) TALK ABOUT MOVE MESSAGE - IM NOT 100% SURE IT WILL WORK AS CURRENTLY SPECIFIED
-        PORTS - I DONT THINK XY-POSITION SHOULD NECESSARILY BE SAVED ? 
-        MAKE PORTS MANUALLY ADJUSTABLE
-        MANUAL ROTATION
-        MANUAL SCALING
+        Write up code specification explaining functions
+        (group) talk about move message - im not 100% sure it will work as currently specified
+        Ports - I dont think xy-position should necessarily be saved ? 
+        Make ports manually adjustable
+        Manual rotation
+        Manual scaling
 
 26/02/21
     
     COMPLETE:
-        SPECIFICATION WRITEUP
-        MANUALLY ADJUSTABLE PORTS & DATA ENCAPSULATION:
-            SYMBOL NOW HAS A LIST OF PORTMAP - POSSIBLE POSITIONS A PORT MAY LIE IN FOR A GIVEN SYMBOL BASED ON HEIGHT/WIDTH/NUMBER INPUTS/OUTPUTS.
-            PORTINFO NO LONGER HAS DIRECT ACCESS TO ITS POSITION, NOW HAS A INT 'SLOTPOS' WHICH INDEXES INTO A SYMBOL'S PORTMAP TO GIVE POSITION.
-            UPDATED PREVIOUS MESSAGES AND INTERFACE FUNCTIONS TO WORK WITH THIS NEW ARCHITECTURE
-            PORTINFO - BOUNDING BOX HAS BEEN REMOVED, THIS FUNCTIONALITY HAS BEEN FULLY REPLACED BY A HELPER FUNCTION 'TESTBOX' WHICH TAKES A PORT POSITION AND XYPOS AND RETURNS A BOOL = TRUE IF XYPOS IS IN THE BOUNDING BOX OF THE PORT
-        ROTATION
-
-    ADJUSTMENTS NEEDED:
-        TIDY CODE - POSSIBLY CREATE SOME HELPER FUNCS
+        Specification writeup
+        
+        Manually adjustable ports & data encapsulation:
+            Symbol now has a list of portmap - possible positions a port may lie in for a given symbol based on height/width/number inputs/outputs.
+            Portinfo no longer has direct access to its position, now has a int 'slotpos' which indexes into a symbol's portmap to give position.
+            Updated previous messages and interface functions to work with this new architecture
+            Portinfo - bounding box has been removed, this functionality has been fully replaced by a helper function 'testbox' which takes a port position and xypos and returns a bool = true if xypos is in the bounding box of the port
+            Rotation - currently only accessable in the constructor of symbol as no message has yet been made in sheet
+            Scaling - currently only accessable in the constructor of symbol as no message has yet been made in sheet
+        
+        INTERFACE FUNCS:
+            Getportcoords fix - previously never found port, has been fixed
+        
+        TEST FILE:
+            A test file has been made which contains a simplified version of the Symbol and CommonTypes types, and the interface functions to test whether they work properly.
+            Currently no known issues.
+        
+        MESSAGES:
+            Rotate added - Currently not used by sheet but a logical implementation has been completed
+            Scale added - Currently not used by sheet but a logical implementation has been completed
+    
+            
+            ADJUSTMENTS NEEDED:
+        TIDY CODE - 
+            Messages: DragPort is messy and long - maybe break it up a bit into smaller funcs?
+            Interface funcs: getPortCoords is has repetitive searches, can it be simplified?
 
     NEXT TASKS:
-        WRITE SOME STUBS TO TEST FEATURES FOR THE DEMO
-        MESSAGES: 'MOVE', 'ROTATE'
-        SCALING
+        Replace dragging messages with move
+        Write something to show port movement
+        
+        
+        
 
