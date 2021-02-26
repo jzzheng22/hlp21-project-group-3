@@ -56,7 +56,7 @@ type Symbol =
         PortMap : XYPos list
         PortList : Portinfo list
         Rotation : int
-
+        Scale : XYPos
     }
 
 
@@ -232,14 +232,19 @@ let multMatrix (m1 : float list list) (m2 : float list list) : float list list  
     m1 |> List.map (fun x -> getPairs x transM) |> List.map (List.map(fun (x, y) -> mulList x y))
     
 //I believe this rotation is working anticlockwise - check
-let rotateCoords (coord : XYPos) (rot : int) (centre : XYPos) : XYPos =
+let transCoords (coord : XYPos) (centre : XYPos) (trans : float list list) : XYPos =
     let coordM = [[coord.X]; [coord.Y]; [1.]]
     let transNve = [[1.; 0.; -centre.X]; [0.; 1.; -centre.Y]; [0.; 0.; 1.]]
     let transPve = [[1.; 0.; centre.X]; [0.; 1.; centre.Y]; [0.; 0.; 1.]]
-    let rotM = getRotMat(rot)
-    let transform = multMatrix transPve ( multMatrix rotM ( multMatrix transNve coordM) )
+    let transform = multMatrix transPve ( multMatrix trans ( multMatrix transNve coordM) )
     {X = transform.[0].[0]; Y = transform.[1].[0]}
 
+//I believe this rotation is working anticlockwise - check
+let rotateCoords (coord : XYPos) (rot : int) (centre : XYPos) : XYPos =
+    transCoords coord centre (getRotMat(rot))
+
+let scaleCoords (coord : XYPos) (scale : XYPos) (centre : XYPos) : XYPos =
+    transCoords coord centre [[scale.X; 0.; 0.]; [0.; scale.Y; 0.]; [0.; 0.; 1.]]
 
 let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
     let newTopL = {X = List.min[topL.X; botR.X]; Y = List.min[topL.Y; botR.Y]}
@@ -335,12 +340,18 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Output pos botR numOut _id compType)
     let inOut = List.append ins outs
 
-    //FOR DEMO PURPOSES ONLY - TO IT IN A MESSAGE
+    //FOR DEMO PURPOSES ONLY - THIS IS EFFECTIVELY WHAT WILL BE DONE IN A MESSAGE
     let centre = midXY pos botR
     let rot  = 270
     let rotTopL = rotateCoords pos rot centre
     let rotBotR = rotateCoords botR rot centre
-    let newBox = getNewBox rotTopL rotBotR
+    let rotSlots = slots |> List.map (fun x -> rotateCoords x rot centre)
+
+    let scale = {X = 1.0; Y = 1.0}
+    let scaleTopL = scaleCoords rotTopL scale centre
+    let scaleBotR = scaleCoords rotBotR scale centre
+    let scaleSlots = rotSlots |> List.map (fun x -> scaleCoords x scale centre)
+    let newBox = getNewBox scaleTopL scaleBotR
 
     //Symbol Creation
     {
@@ -353,9 +364,10 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         Name = typeToName compType
         Highlight = false
         PortHighlight = false
-        PortMap = slots |> List.map (fun x -> rotateCoords x rot centre)
+        PortMap = scaleSlots
         PortList = inOut
         Rotation = rot
+        Scale = scale
     }
 
 
