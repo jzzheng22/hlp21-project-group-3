@@ -251,6 +251,8 @@ let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
     let newTopL = {X = List.min[topL.X; botR.X]; Y = List.min[topL.Y; botR.Y]}
     let newBotR = {X = List.max[topL.X; botR.X]; Y = List.max[topL.Y; botR.Y]}
     (newTopL, newBotR)
+
+
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -479,9 +481,12 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                     sym
                 else
                     let centre = midXY sym.TopL sym.BotR
+                    let rotTopL = rotateCoords sym.TopL rot centre
+                    let rotBotR = rotateCoords sym.BotR rot centre
+                    let newBox = getNewBox rotTopL rotBotR
                     { sym with
-                        TopL = rotateCoords sym.TopL rot centre
-                        BotR = rotateCoords sym.BotR rot centre
+                        TopL = newBox |> fst
+                        BotR = newBox |> snd
                         PortMap = sym.PortMap |> List.map (fun x -> rotateCoords x rot centre)
                     }
             )
@@ -494,9 +499,12 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                     sym
                 else
                     let centre = midXY sym.TopL sym.BotR
+                    let scaleTopL = scaleCoords sym.TopL scale centre
+                    let scaleBotR = scaleCoords sym.BotR scale centre
+                    let newBox = getNewBox scaleTopL scaleBotR
                     { sym with
-                        TopL = scaleCoords sym.TopL scale centre
-                        BotR = scaleCoords sym.BotR scale centre
+                        TopL = newBox |> fst
+                        BotR = newBox |> snd
                         PortMap = sym.PortMap |> List.map (fun x -> scaleCoords x scale centre)
                     }
             )
