@@ -60,7 +60,9 @@ let goPastBox (src:XYPos) (sym:Symbol.Symbol) =
         makeWireSegment pos1 pos2
         makeWireSegment pos2 pos3
     ]
- 
+
+let routing (symbols: Symbol.Symbol list) (src:XYPos)=
+    findNearestBox symbols src |> goPastBox src
 //----------------------------Message Type-----------------------------------//
 
 /// Messages to update buswire model
@@ -106,16 +108,20 @@ let singleWireView =
 
 
 let view (model:Model) (dispatch: Dispatch<Msg>)=
+    let newWires= routing model.Symbol model.Symbol.[0].TopL
+    
     let wires = 
         model.WX
-        |> List.map (fun w ->
+        |> List.mapi (fun i w ->
             let props = {
                 key = w.Id
                 WireP = w
                 (*SrcP = Symbol.symbolPos model.Symbol w.SrcSymbol 
                 TgtP = Symbol. symbolPos model.Symbol w.TargetSymbol *)
-                SrcP=w.SrcPos
-                TgtP=w.TargetPos
+                SrcP=newWires.[i].SrcPos
+                TgtP=newWires.[i].TargetPos
+                //SrcP=w.SrcPos
+                //TgtP=w.TargetPos
                 ColorP = model.Color.Text()
                 StrokeWidthP = "2px" }
             singleWireView props)
