@@ -46,12 +46,17 @@ let makeWireSegment (sPos) (tPos) =
     
 
 let findNearestBox (symbols: Symbol.Symbol list) (src:XYPos) =
-    Symbol.getBoundingBoxes symbols
-    |> List.filter (fun (sym,l,r)-> (l.X>src.X && r.Y>src.Y && src.Y>l.Y)  ) 
-    |> List.minBy (fun (sym,l,r)->l)
-    |> (fun (sym,l,r)->sym)
+    let list =
+        Symbol.getBoundingBoxes symbols
+        |> List.filter (fun (sym,l,r)-> (l.X>src.X && r.Y>src.Y && src.Y>l.Y)  ) 
+    if List.isEmpty list 
+        then None
+    else 
+        List.minBy (fun (sym,l,r)->l) list
+        |> (fun (sym,l,r)->Some sym)
 
 let goPastBox (src:XYPos) (sym:Symbol.Symbol) =
+
     let pos1= {X= sym.TopL.X - float 20. ; Y=src.Y}
     let pos2= {X=pos1.X;Y=sym.BotR.Y + float 20.}
     let pos3= {X=pos2.X + float 21. ; Y=pos2.Y}
@@ -59,10 +64,29 @@ let goPastBox (src:XYPos) (sym:Symbol.Symbol) =
         makeWireSegment src pos1
         makeWireSegment pos1 pos2
         makeWireSegment pos2 pos3
+    ], pos3
+
+
+let goToTarget (src:XYPos) (tar:Symbol.Symbol) =
+    let pos1= {X= tar.TopL.X - float 20. ; Y=src.Y}
+    let pos2= {X=pos1.X;Y=tar.TopL.Y}
+    [   
+        makeWireSegment src pos1
+        makeWireSegment pos1 pos2
+        makeWireSegment pos2 tar.TopL
     ]
 
-let routing (symbols: Symbol.Symbol list) (src:XYPos)=
-    findNearestBox symbols src |> goPastBox src
+
+
+let rec routing (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol)=
+
+    match findNearestBox symbols src with
+    | None -> goToTarget src tar
+    | Some sym when sym.Id = tar.Id-> goToTarget src tar
+    | Some sym -> 
+        let tuple= goPastBox src sym
+        ( fst tuple) @ (routing (symbols) (snd tuple) tar)
+
 //----------------------------Message Type-----------------------------------//
 
 /// Messages to update buswire model
@@ -108,18 +132,19 @@ let singleWireView =
 
 
 let view (model:Model) (dispatch: Dispatch<Msg>)=
-    let newWires= routing model.Symbol model.Symbol.[0].TopL
-    
+    let newWires= routing model.Symbol model.Symbol.[0].TopL model.Symbol.[1]
+
     let wires = 
-        model.WX
-        |> List.mapi (fun i w ->
+        //model.WX
+        newWires
+        |> List.map (fun w ->
             let props = {
                 key = w.Id
                 WireP = w
                 (*SrcP = Symbol.symbolPos model.Symbol w.SrcSymbol 
                 TgtP = Symbol. symbolPos model.Symbol w.TargetSymbol *)
-                SrcP=newWires.[i].SrcPos
-                TgtP=newWires.[i].TargetPos
+                SrcP=w.SrcPos
+                TgtP=w.TargetPos
                 //SrcP=w.SrcPos
                 //TgtP=w.TargetPos
                 ColorP = model.Color.Text()
@@ -153,10 +178,10 @@ let init n () =
             TargetSymbol = s2.Id
         }
 
-    findNearestBox symbols (symbols.[0].TopL)
-    |> goPastBox (symbols.[0].TopL)
+    // findNearestBox symbols (symbols.[0].TopL)
+    // |> goPastBox (symbols.[0].TopL)
 
-  
+    routing symbols symbols.[0].TopL symbols.[1]
     //List.map (fun i -> makeRandomWire()) [1..n]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
 
