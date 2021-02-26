@@ -35,10 +35,8 @@ type Portinfo =
         NumWires: int
         Name : string
         Invert : bool
-        Box : XYPos * XYPos
         slotPos : int
     }
-
 
 
 ///Symbol is unique for each component, and shares CommonTypes.ComponentId
@@ -57,6 +55,8 @@ type Symbol =
         PortHighlight : bool
         PortMap : XYPos list
         PortList : Portinfo list
+        Rotation : int
+
     }
 
 
@@ -154,6 +154,16 @@ let absDiff a b =
     let diff = (posDiff a b)
     diff.X + diff.Y
 
+///Snaps the rotation to one of: 0, 90, 180, 270
+let getRot (rot : int) : int =
+    if rot >= 0 && rot < 45 then 0
+    elif rot >= 45 && rot < 135 then 90
+    elif rot >= 135 && rot < 225 then 180
+    elif rot >= 225 && rot < 315 then 270
+    elif rot >= 315 && rot < 360 then 0
+    else 0
+
+
 ///Displace will move a port position _away_ from the box.
 ///
 ///For inverters call with positive n.
@@ -171,13 +181,15 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
 
 
 ///Finds whether a coordinate is within a port's bounding box
-let testBox (port : Portinfo) (coord : XYPos) : bool =
-    let topL = port.Box |> fst
-    let botR = port.Box |> snd
-    if topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
-    then true
-    else false
+let testBox (portPos : XYPos) (coord : XYPos) : bool =
+    let Box = (addXYVal portPos -1., addXYVal portPos 1.);
+    let topL = Box |> fst
+    let botR = Box |> snd
+    topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
 
+let testLabelBox (portPos : XYPos) (coord : XYPos) (sym : Symbol) : bool =
+    let transl = displace -3. portPos sym
+    testBox {X = fst(transl); Y = snd(transl)} coord
 
 let portPos (i : int) (n : int) (topL : XYPos) (botR : XYPos) : XYPos = 
     let h = getHW botR topL |> fst
@@ -226,8 +238,8 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (b
         
         Name = 
             match portType with
-            | CommonTypes.PortType.Input -> sprintf "IN %i" i;
-            | CommonTypes.PortType.Output -> sprintf "OUT %i" i;
+            | CommonTypes.PortType.Input -> sprintf "IN";
+            | CommonTypes.PortType.Output -> sprintf "OUT";
         
         Invert = 
             match portType with
@@ -237,7 +249,7 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (b
                                             || compType = CommonTypes.ComponentType.Xnor -> true;
             | _ -> false;
         
-        Box = (addXYVal pos -1., addXYVal pos 1.);
+        
         slotPos = i
 
     }
@@ -290,6 +302,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         PortHighlight = false
         PortMap = slots
         PortList = inOut
+        Rotation = 45
     }
 
 
@@ -416,16 +429,13 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                                     |> List.filter (fun v -> v <> x || v <> port)
                                     |> List.append [{x with slotPos = port.slotPos}]
                                     |> List.append [{port with slotPos = i}]
+
                         | None ->   sym.PortList
                                     |> List.filter (fun v -> v <> port)
                                     |> List.append [{port with slotPos = i}]
-
-                                
-                        
                 }
         )
         , Cmd.none
-
     | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
     | _ -> failwithf "Not implemented"
 
@@ -528,10 +538,12 @@ let private renderObj =
                             Cx ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> fst)
                             Cy ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> snd)
                             R RAD
+                            
                             SVGAttr.Fill "blue"
                             SVGAttr.Stroke "blue"
                             SVGAttr.Opacity 0.5
                             SVGAttr.StrokeWidth 1][])
+
                 else
                     []
             
@@ -548,6 +560,9 @@ let private renderObj =
                         |> props.Dispatch
                         document.addEventListener("mousemove", handleMouseMove.current)
                     )
+
+                    
+                    
             ](List.concat [displayBox; labels; drawInvert; ports])
             
     , "Circle"
@@ -585,10 +600,7 @@ let portSearchID (symModel: Model) (pId : string) : Portinfo Option =
     initPortSearch symModel
     |> List.tryFind (fun port -> string(port.Port.Id) = pId)
 
-//Tries to find port object by position, returns Some(portInfo) if found, else None
-let portSearchPos (symModel: Model) (pos : XYPos) : Portinfo Option =
-    initPortSearch symModel
-    |> List.tryFind (fun port -> testBox port pos)
+
 
 
 
@@ -625,11 +637,22 @@ let getPortType (symModel: Model) (pId : string) : CommonTypes.PortType =
 
 ///Finds if a position lies on a port. Returns Some(position, portId) if found, none otherwise.
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * string) Option =
-    portSearchPos symModel pos
+    //testBox takes portPos and coord
+    //for each symbol in model
+    //for each element in symbol.PortMap
+    //index list -> (i, v)
+    //testBox fst coord
+    //if hit then find symbol.portList where el = slotPos
+    
+    symModel
+    |> List.tryFind (fun sym -> List.exists(fun v -> testBox v pos) sym.PortMap)
     |> function
-    | Some port -> Some(getPortCoords symModel (string(port)), string(port))    
+    | Some sym -> let coordIndx = 
+                        List.indexed sym.PortMap
+                        |> List.find(fun (i, v) -> testBox v pos)
+                  let port = List.find (fun x -> x.slotPos = (coordIndx |> fst)) sym.PortList
+                  Some((coordIndx |> snd), string(port.Port.Id))
     | None -> None
-
 
 
 //----------------------interface to Issie-----------------------------//
