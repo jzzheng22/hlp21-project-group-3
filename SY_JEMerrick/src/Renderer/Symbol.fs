@@ -302,7 +302,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         PortHighlight = false
         PortMap = slots
         PortList = inOut
-        Rotation = 45
+        Rotation = 180
     }
 
 
@@ -483,6 +483,8 @@ let private renderObj =
                     text[
                         X ((displace -10. (findPos i props.Obj.PortMap) props.Obj) |> fst)
                         Y ((displace -10. (findPos i props.Obj.PortMap) props.Obj)  |> snd)
+                        SVGAttr.Transform (sprintf "rotate (-%d, %d, %d)" props.Obj.Rotation (int ((displace -10. (findPos i props.Obj.PortMap) props.Obj) |> fst)) (int ((displace -10. (findPos i props.Obj.PortMap) props.Obj)  |> snd)))
+                        
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
@@ -508,12 +510,14 @@ let private renderObj =
                     text[
                         X ((midXY props.Obj.BotR props.Obj.TopL).X)
                         Y ((midXY props.Obj.BotR props.Obj.TopL).Y)
+                        SVGAttr.Transform (sprintf "rotate (-%d, %d, %d)" props.Obj.Rotation (int ((midXY props.Obj.BotR props.Obj.TopL).X)) (int ((midXY props.Obj.BotR props.Obj.TopL).Y)))
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
                             FontSize "10px"
                             FontWeight "bold"
                             Fill "Black"
+                            
                         ]
                     ][str <| sprintf "%A" props.Obj.Name]
                 ]
@@ -561,6 +565,8 @@ let private renderObj =
                         document.addEventListener("mousemove", handleMouseMove.current)
                     )
 
+                    SVGAttr.Transform (sprintf "rotate (%d, %d, %d)" props.Obj.Rotation (int ((midXY props.Obj.BotR props.Obj.TopL).X)) (int ((midXY props.Obj.BotR props.Obj.TopL).Y)))
+                    
                     
                     
             ](List.concat [displayBox; labels; drawInvert; ports])

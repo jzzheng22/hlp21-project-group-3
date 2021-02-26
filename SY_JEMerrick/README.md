@@ -13,12 +13,11 @@ STATIC VARIABLES:
 
 TYPES:
     Portinfo
-        Position                    - Location of the port on the canvas
         Port                        - From CommonTypes
         NumWires                    - Keeps track of the number of wires connected to a port 
         Name                        - Label to be printed for that port
         Invert                      - A bool which = True if the port requires an inverter
-        Box                         - The bounding box for the port 
+        slotPos                     - An int indicating the corresponding index in the PortMap
 
     Symbol
         TopL                        - The top left coordinate of the symbol
@@ -26,11 +25,13 @@ TYPES:
         LastDragPos                 - The position where dragging last occured (DO WE NEED THIS ?)
         IsDragging                  - A bool which = True if dragging 
         Id                          - The component ID associated with the symbol
-        Ports                       - A List of Portinfo ports associated with the symbol
         Type                        - The component type associated with the symbol
         Name                        - The label to be prtined for the symbol
         Highlight                   - A bool indicating which = True if the symbol should be highlighted
         PortHighlight               - A bool indicating which = True if the ports should be highlighted
+        PortMap                     - A list of XYPos indicating the 'slots' a port may be placed into
+        PortList                    - A list of Portinfo objects associated with the symbol
+        Rotation                    - An int indicating how much to rotate an object
 
 
 MESSAGES:
@@ -56,7 +57,7 @@ INTERFACE TO ISSIE
 
 
 
-OBJECTIVES TIMELINE (FOR ME)
+CHANGELOG
 
 24/02/21
    
@@ -108,3 +109,23 @@ OBJECTIVES TIMELINE (FOR ME)
         MAKE PORTS MANUALLY ADJUSTABLE
         MANUAL ROTATION
         MANUAL SCALING
+
+26/02/21
+    
+    COMPLETE:
+        SPECIFICATION WRITEUP
+        MANUALLY ADJUSTABLE PORTS & DATA ENCAPSULATION:
+            SYMBOL NOW HAS A LIST OF PORTMAP - POSSIBLE POSITIONS A PORT MAY LIE IN FOR A GIVEN SYMBOL BASED ON HEIGHT/WIDTH/NUMBER INPUTS/OUTPUTS.
+            PORTINFO NO LONGER HAS DIRECT ACCESS TO ITS POSITION, NOW HAS A INT 'SLOTPOS' WHICH INDEXES INTO A SYMBOL'S PORTMAP TO GIVE POSITION.
+            UPDATED PREVIOUS MESSAGES AND INTERFACE FUNCTIONS TO WORK WITH THIS NEW ARCHITECTURE
+            PORTINFO - BOUNDING BOX HAS BEEN REMOVED, THIS FUNCTIONALITY HAS BEEN FULLY REPLACED BY A HELPER FUNCTION 'TESTBOX' WHICH TAKES A PORT POSITION AND XYPOS AND RETURNS A BOOL = TRUE IF XYPOS IS IN THE BOUNDING BOX OF THE PORT
+        ROTATION
+
+    ADJUSTMENTS NEEDED:
+        TIDY CODE - POSSIBLY CREATE SOME HELPER FUNCS
+
+    NEXT TASKS:
+        WRITE SOME STUBS TO TEST FEATURES FOR THE DEMO
+        MESSAGES: 'MOVE', 'ROTATE'
+        SCALING
+
