@@ -86,6 +86,8 @@ type Msg =
     | Highlight of sIdList: CommonTypes.ComponentId list
     | HighlightPorts of sId : CommonTypes.ComponentId
     | DragPort of sId : CommonTypes.ComponentId * pId : string * pagePos: XYPos
+    | Rotate of sId : CommonTypes.ComponentId * rot : int
+    | Scale of sId : CommonTypes.ComponentId * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
     | UpdateSymbolModelWithComponent of CommonTypes.Component // Issie interface
 
 
@@ -342,7 +344,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
 
     //FOR DEMO PURPOSES ONLY - THIS IS EFFECTIVELY WHAT WILL BE DONE IN A MESSAGE
     let centre = midXY pos botR
-    let rot  = 270
+    let rot  = 0
     let rotTopL = rotateCoords pos rot centre
     let rotBotR = rotateCoords botR rot centre
     let rotSlots = slots |> List.map (fun x -> rotateCoords x rot centre)
@@ -501,6 +503,37 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 }
         )
         , Cmd.none
+
+        | Rotate (sId, rot) ->
+            model
+            |> List.map (fun sym ->
+                if sId <> sym.Id then
+                    sym
+                else
+                    let centre = midXY sym.TopL sym.BotR
+                    { sym with
+                        TopL = rotateCoords sym.TopL rot centre
+                        BotR = rotateCoords sym.BotR rot centre
+                        PortMap = sym.PortMap |> List.map (fun x -> rotateCoords x rot centre)
+                    }
+            )
+            , Cmd.none
+
+        | Scale (sId, scale) ->
+            model
+            |> List.map (fun sym ->
+                if sId <> sym.Id then
+                    sym
+                else
+                    let centre = midXY sym.TopL sym.BotR
+                    { sym with
+                        TopL = scaleCoords sym.TopL scale centre
+                        BotR = scaleCoords sym.BotR scale centre
+                        PortMap = sym.PortMap |> List.map (fun x -> scaleCoords x scale centre)
+                    }
+            )
+            , Cmd.none
+
     | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
     | _ -> failwithf "Not implemented"
 
@@ -677,7 +710,7 @@ let portSearchID (symModel: Model) (pId : string) : Portinfo Option =
 //TODO - REMOVE - ONLY USED BY BUSWIRE - Currently connects every input 0 to each other.
 let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos = 
     List.find (fun sym -> sym.Id = sId) symModel
-    |> (fun sym -> (findPos sym.PortList.[0] sym.PortMap))
+    |> (fun sym -> (findPos sym.PortList.[1] sym.PortMap))
 
 ///Searches through the whole model until the port is found and retruns the position of that port
 ///This would be much faster if sheet gave me the component
