@@ -12,7 +12,6 @@ open Helpers
 //------------------------------BusWire Types-----------------------------//
 //------------------------------------------------------------------------//
 
-
 /// type for buswires
 /// for demo only. The real wires will
 /// connect to Ports - not symbols, where each symbol has
@@ -23,8 +22,9 @@ open Helpers
 /// component coordinates are held in some other way, is up to groups.
 type Wire = {
     Id: CommonTypes.ConnectionId 
-    SrcSymbol: CommonTypes.ComponentId
-    TargetSymbol: CommonTypes.ComponentId
+    SourcePortId: string
+    TargetPortId: string
+    Vertices: XYPos list
     }
 
 type Model = {
@@ -46,12 +46,17 @@ type Msg =
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
 
-
+/// Takes Source and Target positions of a wire and returns the 
+/// vertices of the path it should follow
+let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
+    [sourcePos;targetPos]
 
 
 /// look up wire in WireModel
-let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire =
-    failwithf "Not impelmented"
+let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
+    wModel.WX
+    |> List.tryFind (fun wire -> wire.Id = wId)
+
 
 type WireRenderProps = {
     key : CommonTypes.ConnectionId
@@ -60,6 +65,9 @@ type WireRenderProps = {
     TgtP: XYPos
     ColorP: string
     StrokeWidthP: string }
+
+
+
 
 /// react virtual DOM SVG for one wire
 /// In general one wire will be multiple (right-angled) segments.
@@ -84,8 +92,8 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
             let props = {
                 key = w.Id
                 WireP = w
-                SrcP = Symbol.symbolPos model.Symbol w.SrcSymbol 
-                TgtP = Symbol. symbolPos model.Symbol w.TargetSymbol 
+                SrcP = Symbol.getPortCoords model.Symbol w.SourcePortId
+                TgtP = Symbol. getPortCoords model.Symbol w.TargetPortId
                 ColorP = model.Color.Text()
                 StrokeWidthP = "2px" }
             singleWireView props)
@@ -99,20 +107,17 @@ let init n () =
     let symbols, cmd = Symbol.init()
     let symIds = List.map (fun (sym:Symbol.Symbol) -> sym.Id) symbols
     let rng = System.Random 0
-    let makeRandomWire() =
-        let n = symIds.Length
-        let s1,s2 =
-            match rng.Next(0,n-1), rng.Next(0,n-2) with
-            | r1,r2 when r1 = r2 -> 
-                symbols.[r1],symbols.[n-1] // prevents wire target and source being same
-            | r1,r2 -> 
-                symbols.[r1],symbols.[r2]
+    let ports = Symbol.initPortSearch symbols 
+    let outPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Output) ports).Value
+    let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
+    let testWire: Wire = 
         {
-            Id=CommonTypes.ConnectionId (uuid())
-            SrcSymbol = s1.Id
-            TargetSymbol = s2.Id
+            Id = CommonTypes.ConnectionId (Helpers.uuid())
+            SourcePortId = outPort.Port.Id
+            TargetPortId = inPort.Port.Id
+            Vertices = routeWire (Symbol.getPortCoords symbols outPort.Port.Id) (Symbol.getPortCoords symbols inPort.Port.Id)
         }
-    List.map (fun i -> makeRandomWire()) [1..n]
+    [testWire]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
 
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
