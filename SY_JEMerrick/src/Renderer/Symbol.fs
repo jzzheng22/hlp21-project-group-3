@@ -46,8 +46,6 @@ type Symbol =
     {
         TopL: XYPos
         BotR: XYPos
-        LastDragPos : XYPos
-        IsDragging : bool
         Id : CommonTypes.ComponentId
         Type : CommonTypes.ComponentType
         Name : string
@@ -360,8 +358,6 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     {
         TopL = newBox |> fst
         BotR = newBox |> snd
-        LastDragPos = {X = 0.; Y = 0.};
-        IsDragging = false;
         Id = _id
         Type = compType
         Name = typeToName compType
@@ -394,46 +390,17 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     | Delete sIdList -> 
         List.filter (fun sym -> List.contains sym.Id sIdList = false) model, Cmd.none
 
-    | StartDragging (sId, pagePos) ->
+    | Move (compList, translate) ->
         model
         |> List.map (fun sym ->
-            if sId <> sym.Id then
-                sym
-            else
+            if List.contains sym.Id compList then
                 { sym with
-                    LastDragPos = pagePos
-                    IsDragging = true
+                    TopL = posAdd sym.TopL translate
+                    BotR = posAdd sym.BotR translate
+                    PortMap = sym.PortMap |> List.map (fun x -> posAdd x translate)
                 }
-        )
-        , Cmd.none
-
-    | Dragging (rank, pagePos) ->
-        model
-        |> List.map (fun sym ->
-            if rank <> sym.Id then
-                sym
             else
-                let diff = posDiff pagePos sym.LastDragPos
-                { sym with
-                    TopL = posAdd sym.TopL diff
-                    BotR = posAdd sym.BotR diff
-                    LastDragPos = pagePos
-                    PortMap =
-                        sym.PortMap
-                        |> List.map (fun x -> posAdd x diff)
-                }
-        )
-        , Cmd.none
-
-    | EndDragging sId ->
-        model
-        |> List.map (fun sym ->
-            if sId <> sym.Id then 
                 sym
-            else
-                { sym with
-                    IsDragging = false 
-                }
         )
         , Cmd.none
 
@@ -558,18 +525,10 @@ type private RenderObjProps =
 let private renderObj =
     FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
         fun (props : RenderObjProps) ->
-            let handleMouseMove =
-                Hooks.useRef(fun (ev : Types.Event) ->
-                    let ev = ev :?> Types.MouseEvent
-                    // x,y coordinates here do not compensate for transform in Sheet
-                    // and are wrong unless zoom=1.0 MouseMsg coordinates are correctly compensated.
-                    Dragging(props.Obj.Id, posOf ev.pageX ev.pageY)
-                    |> props.Dispatch
-                )
-            
+                       
             ///TODO - Once Move has been sorted out we need to correct this, fine for now
             let color =
-                if props.Obj.IsDragging || props.Obj.Highlight then
+                if props.Obj.Highlight then
                     "lightblue"
                 else
                     "gainsboro"
@@ -648,23 +607,7 @@ let private renderObj =
                     []
             
             
-            g   [ //TODO UPDATE THIS MOVEMENT WHEN DECIDED PROPERLY
-                    OnMouseUp (fun ev -> 
-                        document.removeEventListener("mousemove", handleMouseMove.current)
-                        EndDragging props.Obj.Id
-                        |> props.Dispatch
-                    )
-                    OnMouseDown (fun ev -> 
-                        // See note above re coords wrong if zoom <> 1.0
-                        StartDragging (props.Obj.Id, posOf ev.pageX ev.pageY)
-                        |> props.Dispatch
-                        document.addEventListener("mousemove", handleMouseMove.current)
-                    )
-
-                    
-                    
-                    
-            ](List.concat [displayBox; labels; drawInvert; ports])
+            g[](List.concat [displayBox; labels; drawInvert; ports])
             
     , "Circle"
     , equalsButFunctions
