@@ -716,7 +716,7 @@ let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos =
 ///This would be much faster if sheet gave me the component
 let getPortCoords (symModel: Model) (pId : string) : XYPos = 
     symModel
-    |> List.tryFind(fun sym -> List.contains pId (List.map (fun x -> string(x)) sym.PortList))
+    |> List.tryFind(fun sym -> List.contains pId (List.map (fun x -> string(x.Port.Id)) sym.PortList))
     |> function
     | Some sym -> (findPos (List.find (fun x -> string(x.Port.Id) = pId) sym.PortList) sym.PortMap)
     | None -> failwithf "ERROR: Couldn't find port"
