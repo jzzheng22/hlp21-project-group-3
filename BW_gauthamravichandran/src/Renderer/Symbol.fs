@@ -6,30 +6,68 @@ open Elmish
 open Elmish.React
 open Helpers
 
+
+
+
 //------------------------------------------------------------------------//
 //-------------------------------Symbol Types-----------------------------//
 //------------------------------------------------------------------------//
 
 
-/// Model to generate one symbol (skeleton). Id is a unique Id 
-/// for the symbol shared with Issie Component type.
-/// The real type will obviously be much larger.
-/// Complex information that never changes (other than Id) should 
-/// probably not be here, but looked up via some function
-/// from a more compact form, so that comparison of two Symbols to
-/// determine are they the same is fast.
-type Symbol =
+
+//Static variables
+let STD_HEIGHT = 30.
+let HW_RATIO = 0.95
+let RAD = 3.
+
+
+
+/// PortInfo extends the CommonTypes.Port
+///
+/// Pos: XYPos of the port on the canvas
+///
+/// Port: The original Port type from CommonTypes.Port
+///
+/// Placement: Int indicating the position on that side the port is placed in going in ascending order where horizontals would be left->right, and verticals top->bottom
+type Portinfo = 
     {
         Pos: XYPos
+        Port: CommonTypes.Port
+        NumWires: int
+        Name : string
+        Invert : bool
+        Box : XYPos * XYPos
+    }
+
+
+
+///Symbol is unique for each component, and shares CommonTypes.ComponentId
+///
+///Two positions TopL, BotR completely define the shape (all shapes are rectangular)
+type Symbol =
+    {
+        TopL: XYPos
+        BotR: XYPos
         LastDragPos : XYPos
         IsDragging : bool
         Id : CommonTypes.ComponentId
+        Ports : Portinfo list
+        Type : CommonTypes.ComponentType
+        Name : string
+        Highlight : bool
+        PortHighlight : bool
+
     }
 
 
 type Model = Symbol list
 
+
+
+//---------------------------------------------------------------------------//
 //----------------------------Message Type-----------------------------------//
+//---------------------------------------------------------------------------//
+
 
 /// Messages to update symbol model
 /// These are OK for the demo - but possibly not the correct messages for
@@ -43,57 +81,213 @@ type Msg =
     /// coords not adjusted for top-level zoom
     | Dragging of sId : CommonTypes.ComponentId * pagePos: XYPos
     | EndDragging of sId : CommonTypes.ComponentId
-    | AddCircle of XYPos // used by demo code to add a circle
-    | DeleteSymbol of sId:CommonTypes.ComponentId 
+    | AddSymbol of compType: CommonTypes.ComponentType * pagePos : XYPos * numIn : int * numOut : int
+    | DeleteSymbol of sIdList:CommonTypes.ComponentId list
+    | Highlight of sIdList: CommonTypes.ComponentId list
+    | HighlightPorts of sId : CommonTypes.ComponentId
     | UpdateSymbolModelWithComponent of CommonTypes.Component // Issie interface
 
 
-//---------------------------------helper types and functions----------------//
 
 
 
-let posDiff a b =
-    {X=a.X-b.X; Y=a.Y-b.Y}
+//---------------------------------------------------------------------------//
+//------------------------------helper functions-----------------------------//
+//---------------------------------------------------------------------------//
 
-let posAdd a b =
-    {X=a.X+b.X; Y=a.Y+b.Y}
+
+
+
+///Takes a component type and returns the corresponding symbol label/title/name as a string
+let typeToName (compType : CommonTypes.ComponentType) : string =
+    match compType with
+    | CommonTypes.ComponentType.Constant _ -> "1" //This is a buffer right?
+    | CommonTypes.ComponentType.Not -> "1"
+    | CommonTypes.ComponentType.And -> "&"
+    | CommonTypes.ComponentType.Or -> ">="
+    | CommonTypes.ComponentType.Xor -> "=1"
+    | CommonTypes.ComponentType.Nand -> "&"
+    | CommonTypes.ComponentType.Nor -> "|"
+    | CommonTypes.ComponentType.Xnor -> "=1"
+    | CommonTypes.ComponentType.Decode4 -> "Decode"
+    | CommonTypes.ComponentType.Mux2 -> "MUX"
+    | CommonTypes.ComponentType.Demux2 -> "DMUX"
+    | CommonTypes.ComponentType.NbitsAdder _ -> "Σ"
+    | CommonTypes.ComponentType.Custom x -> x.Name
+    | CommonTypes.ComponentType.DFF -> "DFF"
+    | CommonTypes.ComponentType.DFFE -> "DFFE"
+    | CommonTypes.ComponentType.Register _ -> "SRG"
+    | CommonTypes.ComponentType.RegisterE _ -> "SRGE"
+    | CommonTypes.ComponentType.AsyncROM _ -> "A/ROM"
+    | CommonTypes.ComponentType.ROM _ -> "ROM"
+    | CommonTypes.ComponentType.RAM _ -> "RAM"
+    | _ -> "" //For any buses/wires
+
+
+
+///Returns a tuple of float = (Height, Width) from two coordinates
+let getHW (botR : XYPos) (topL : XYPos) = (botR.Y - topL.Y, botR.X - topL.X)
+
+///Finds the midpoint of two coordinates
+let midXY (botR : XYPos) (topL : XYPos) : XYPos =
+    let midY = (botR.Y + topL.Y) / 2.
+    let midX = (botR.X + topL.X) / 2.
+    {X = midX; Y = midY}
+
+///Adds a float value onto an XYPos
+let addXYVal (xy : XYPos) (n : float) : XYPos = {X = xy.X + n; Y = xy.Y + n}
+
+///The number of possible ports on the top/bot side of the Symbol = Width / STD_HEIGHT
+let numPortsHorizontal (sym : Symbol) : int = int((sym.BotR.X - sym.TopL.X)/STD_HEIGHT)
+
+///The number of possible ports on the left/right side of the Symbol = Height / STD_HEIGHT
+let numPortsVertical (sym : Symbol) : int = int((sym.TopL.Y - sym.BotR.Y)/STD_HEIGHT)
+
+let posDiff a b = {X=a.X-b.X; Y=a.Y-b.Y}
+
+let posAdd a b = {X=a.X+b.X; Y=a.Y+b.Y}
 
 let posOf x y = {X=x;Y=y}
 
+///Displace will move a port position _away_ from the box.
+///
+///For inverters call with positive n.
+///For labels call with negative n.
+let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
+    let x = 
+        if pos.X = sym.TopL.X then (pos.X - n)
+        elif pos.X = sym.BotR.X then (pos.X + n)
+        else pos.X
+    let y =
+        if pos.Y = sym.TopL.Y then (pos.Y - n)
+        elif pos.Y = sym.BotR.Y then (pos.Y + n)
+        else pos.Y
+    (x, y)
 
-//-----------------------------Skeleton Model Type for symbols----------------//
+
+///Finds whether a coordinate is within a port's bounding box
+let testBox (port : Portinfo) (coord : XYPos) : bool =
+    let topL = port.Box |> fst
+    let botR = port.Box |> snd
+    if topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
+    then true
+    else false
 
 
+
+//---------------------------------------------------------------------------//
+//----------------------helper initialisation funcs--------------------------//
+//---------------------------------------------------------------------------//
+
+
+
+/// Creates Symbol.PortInfo object. 
+///
+/// i : Index of the port (e.g. INPUT1 : i = 0).
+/// port : the Port from commontypes to convert.
+/// topL : the top left of the symbol associated with the port.
+/// botR : the bottom right of the symbol associated with the port.
+/// n : the total number of ports on the symbol associated with the port.
+let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : int) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) : Portinfo = 
+    
+    //Intermediate calculations needed
+    let h = getHW botR topL |> fst
+    let portPosY = topL.Y + (h * float(i + 1) / float(n + 1))
+    let pos =
+        match portType with
+        | CommonTypes.PortType.Input -> { X = topL.X; Y = portPosY};
+        | CommonTypes.PortType.Output -> { X = botR.X; Y = portPosY};
+    
+
+    //Object creation
+    {   
+        
+        Pos = pos
+            
+        Port = {
+            Id = Helpers.uuid();
+            PortNumber = Some i
+            PortType = portType
+            HostId = string(compId)
+        };
+
+        NumWires = 0;
+        
+        Name = 
+            match portType with
+            | CommonTypes.PortType.Input -> sprintf "IN %i" i;
+            | CommonTypes.PortType.Output -> sprintf "OUT %i" i;
+        
+        Invert = 
+            match portType with
+            | CommonTypes.PortType.Output when compType = CommonTypes.ComponentType.Not
+                                            || compType = CommonTypes.ComponentType.Nand
+                                            || compType = CommonTypes.ComponentType.Nor
+                                            || compType = CommonTypes.ComponentType.Xnor -> true;
+            | _ -> false;
+        
+        Box = (addXYVal pos -1., addXYVal pos 1.)
+    }
+
+
+
+
+///Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
+let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut : int) (pos : XYPos) : Symbol =
+    
+    //Intermediate calculations
+
+    let n = List.max[numIn; numOut] |> float
+    let h = STD_HEIGHT * n
+    let w = HW_RATIO * h
+    let botR = {X = pos.X + w; Y = pos.Y + h}
+    
+    let _id = CommonTypes.ComponentId (Helpers.uuid())
+    
+    let Inputs = 
+        [0..numIn - 1]
+        |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Input pos botR numIn _id compType)
+    let Outputs = 
+        [0..numOut - 1]
+        |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Output pos botR numOut _id compType)
+
+    //Symbol Creation
+    {
+        TopL = pos;
+        BotR = botR;
+        LastDragPos = {X = 0.; Y = 0.};
+        IsDragging = false;
+        Id = _id
+        Ports = List.append Inputs Outputs
+        Type = compType
+        Name = typeToName compType
+        Highlight = false
+        PortHighlight = false
+    }
 
 
 //-----------------------Skeleton Message type for symbols---------------------//
 
-/// Symbol creation: a unique Id is given to the symbol, found from uuid.
-/// The parameters of this function must be enough to specify the symbol completely
-/// in its initial form. This is called by the AddSymbol message and need not be exposed.
-let createNewSymbol (pos:XYPos) =
-    {
-        Pos = pos
-        LastDragPos = {X=0. ; Y=0.} // initial value can always be this
-        IsDragging = false // initial value can always be this
-        Id = CommonTypes.ComponentId (Helpers.uuid()) // create a unique id for this symbol
-    }
 
-
-/// Dummy function for test. The real init would probably have no symbols.
+/// Dummy function for test. Creates 4 NAND gates with 2 input, 1 output.
 let init () =
-    List.allPairs [1..14] [1..14]
-    |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map createNewSymbol
+    [
+    CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=100.;Y=300.}
+    CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=700.;Y=300.}
+    CreateNewSymbol CommonTypes.ComponentType.Demux2 10 1 {X=300.;Y=100.}
+    ]
     , Cmd.none
+
 
 /// update function which displays symbols
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     match msg with
-    | AddCircle pos -> 
-        createNewSymbol pos :: model, Cmd.none
-    | DeleteSymbol sId -> 
-        List.filter (fun sym -> sym.Id <> sId) model, Cmd.none
+    | AddSymbol (compType, pagePos, numIn, numOut) ->
+        (CreateNewSymbol compType numIn numOut pagePos) :: model, Cmd.none
+
+    | DeleteSymbol sIdList -> 
+        List.filter (fun sym -> List.contains sym.Id sIdList = false) model, Cmd.none
+
     | StartDragging (sId, pagePos) ->
         model
         |> List.map (fun sym ->
@@ -115,7 +309,11 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
             else
                 let diff = posDiff pagePos sym.LastDragPos
                 { sym with
-                    Pos = posAdd sym.Pos diff
+                    TopL = posAdd sym.TopL diff
+                    BotR = posAdd sym.BotR diff
+                    Ports = 
+                        sym.Ports
+                        |> List.map (fun y -> {y with Pos = posAdd y.Pos diff})
                     LastDragPos = pagePos
                 }
         )
@@ -132,60 +330,159 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 }
         )
         , Cmd.none
+
+    | Highlight sIdList ->
+        model
+        |> List.map (fun sym ->
+            if List.contains sym.Id sIdList then 
+                { sym with
+                    Highlight = true
+                }
+            else
+                { sym with
+                    Highlight = false 
+                }
+        )
+        , Cmd.none
+
+    | HighlightPorts sId ->
+        model
+        |> List.map (fun sym ->
+            if sym.Id = sId then 
+                { sym with
+                    PortHighlight = true
+                }
+            else
+                { sym with
+                    PortHighlight = false 
+                }
+        )
+        , Cmd.none
+
     | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
     | _ -> failwithf "Not implemented"
 
+
+
+//---------------------------------------------------------------------------------//
 //----------------------------View Function for Symbols----------------------------//
+//---------------------------------------------------------------------------------//
+
 
 /// Input to react component (which does not re-evaluate when inputs stay the same)
 /// This generates View (react virtual DOM SVG elements) for one symbol
-type private RenderCircleProps =
+type private RenderObjProps =
     {
-        Circle : Symbol // name works for the demo!
+        Obj : Symbol // name works for the demo!
         Dispatch : Dispatch<Msg>
         key: string // special field used by react to detect whether lists have changed, set to symbol Id
     }
 
 /// View for one symbol with caching for efficient execution when input does not change
-let private renderCircle =
-    FunctionComponent.Of(
-        fun (props : RenderCircleProps) ->
+let private renderObj =
+    FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
+        fun (props : RenderObjProps) ->
             let handleMouseMove =
                 Hooks.useRef(fun (ev : Types.Event) ->
                     let ev = ev :?> Types.MouseEvent
                     // x,y coordinates here do not compensate for transform in Sheet
                     // and are wrong unless zoom=1.0 MouseMsg coordinates are correctly compensated.
-                    Dragging(props.Circle.Id, posOf ev.pageX ev.pageY)
+                    Dragging(props.Obj.Id, posOf ev.pageX ev.pageY)
                     |> props.Dispatch
                 )
-
+            
+            ///TODO - Once Move has been sorted out we need to correct this, fine for now
             let color =
-                if props.Circle.IsDragging then
+                if props.Obj.IsDragging || props.Obj.Highlight then
                     "lightblue"
                 else
-                    "grey"
+                    "gainsboro"
 
-            circle
-                [ 
+            
+
+            let labels : ReactElement list = 
+                props.Obj.Ports
+                |> List.map(fun i ->
+                    text[
+                        X ((displace -10. i.Pos props.Obj) |> fst)
+                        Y ((displace -10. i.Pos props.Obj) |> snd)
+                        Style[
+                            TextAnchor "middle"
+                            DominantBaseline "middle"
+                            FontSize "6px"
+                            FontWeight "bold"
+                            Fill "Black"
+                        ]
+                    ][str <| sprintf "%s" i.Name])
+
+            let displayBox : ReactElement list =
+                [
+                    rect[
+                        X props.Obj.TopL.X
+                        Y props.Obj.TopL.Y
+                        Rx 0.75
+                        Ry 0.75
+                        SVGAttr.Height ((getHW props.Obj.BotR props.Obj.TopL) |> fst)
+                        SVGAttr.Width ((getHW props.Obj.BotR props.Obj.TopL) |> snd)
+                        SVGAttr.Fill color
+                        SVGAttr.Stroke "black"
+                        SVGAttr.StrokeWidth 0.5][]
+
+                    text[
+                        X ((midXY props.Obj.BotR props.Obj.TopL).X)
+                        Y ((midXY props.Obj.BotR props.Obj.TopL).Y)
+                        Style[
+                            TextAnchor "middle"
+                            DominantBaseline "middle"
+                            FontSize "10px"
+                            FontWeight "bold"
+                            Fill "Black"
+                        ]
+                    ][str <| sprintf "%A" props.Obj.Name]
+                ]
+            
+            let drawInvert =
+                props.Obj.Ports
+                |> List.filter(fun x -> x.Invert = true)
+                |> List.map(fun i ->
+                    circle[
+                        Cx ((displace 3. i.Pos props.Obj) |> fst)
+                        Cy ((displace 3. i.Pos props.Obj) |> snd)
+                        R RAD
+                        SVGAttr.Fill color
+                        SVGAttr.Stroke "black"
+                        SVGAttr.StrokeWidth 0.5][])
+
+            let ports =
+                if props.Obj.PortHighlight then
+                    props.Obj.Ports
+                    |> List.map(fun i ->
+                        circle[
+                            Cx ((displace 3. i.Pos props.Obj) |> fst)
+                            Cy ((displace 3. i.Pos props.Obj) |> snd)
+                            R RAD
+                            SVGAttr.Fill "blue"
+                            SVGAttr.Stroke "blue"
+                            SVGAttr.Opacity 0.5
+                            SVGAttr.StrokeWidth 1][])
+                else
+                    []
+            
+            
+            g   [ //TODO UPDATE THIS MOVEMENT WHEN DECIDED PROPERLY
                     OnMouseUp (fun ev -> 
                         document.removeEventListener("mousemove", handleMouseMove.current)
-                        EndDragging props.Circle.Id
+                        EndDragging props.Obj.Id
                         |> props.Dispatch
                     )
                     OnMouseDown (fun ev -> 
                         // See note above re coords wrong if zoom <> 1.0
-                        StartDragging (props.Circle.Id, posOf ev.pageX ev.pageY)
+                        StartDragging (props.Obj.Id, posOf ev.pageX ev.pageY)
                         |> props.Dispatch
                         document.addEventListener("mousemove", handleMouseMove.current)
                     )
-                    Cx props.Circle.Pos.X
-                    Cy props.Circle.Pos.Y
-                    R 20.
-                    SVGAttr.Fill color
-                    SVGAttr.Stroke color
-                    SVGAttr.StrokeWidth 1
-                ]
-                [ ]
+            ](List.concat [displayBox; labels; drawInvert; ports])
+            
     , "Circle"
     , equalsButFunctions
     )
@@ -193,10 +490,10 @@ let private renderCircle =
 /// View function for symbol layer of SVG
 let view (model : Model) (dispatch : Msg -> unit) = 
     model
-    |> List.map (fun ({Id = CommonTypes.ComponentId id} as circle) ->
-        renderCircle 
+    |> List.map (fun ({Id = CommonTypes.ComponentId id} as shape) ->
+        renderObj 
             {
-                Circle = circle
+                Obj = shape
                 Dispatch = dispatch
                 key = id
             }
@@ -204,28 +501,65 @@ let view (model : Model) (dispatch : Msg -> unit) =
     |> ofList
 
 
+
+
+
+//---------------Helpers for interface functions--------------------//
+
+
+///An exhaustive search through the model, which returns the Portinfo object corresponding to an input string port ID
+let initPortSearch (symModel: Model) : Portinfo list = 
+    symModel
+    |> List.map(fun sym -> sym.Ports)
+    |> List.concat
+
+//Tries to find port object by portID, returns Some(portInfo) if found, else None
+let portSearchID (symModel: Model) (pId : string) : Portinfo Option =
+    initPortSearch symModel
+    |> List.tryFind (fun port -> string(port.Port.Id) = pId)
+
+//Tries to find port object by position, returns Some(portInfo) if found, else None
+let portSearchPos (symModel: Model) (pos : XYPos) : Portinfo Option =
+    initPortSearch symModel
+    |> List.tryFind (fun port -> testBox port pos)
+
+
+
+
 //---------------Other interface functions--------------------//
 
+//TODO - REMOVE - ONLY USED BY BUSWIRE - Currently connects every input 0 to each other.
 let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos = 
     List.find (fun sym -> sym.Id = sId) symModel
-    |> (fun sym -> sym.Pos)
+    |> (fun sym -> sym.Ports.[0].Pos)
 
+///Searches through the whole model until the port is found and retruns the position of that port
+///This would be much faster if sheet gave me the component
+let getPortCoords (symModel: Model) (pId : string) : XYPos = 
+    portSearchID symModel pId
+    |> function
+    | Some port -> port.Pos
+    | None -> failwithf "ERROR: Couldn't find port"
+        
+///Returns all symbols in the model in the form (ID, bounding box topLeft, bounding box botRight)
+let getBoundingBoxes (symModel : Model)  : (Symbol * XYPos * XYPos) list =
+    symModel
+    |> List.map (fun sym -> (sym, sym.TopL, sym.BotR))
 
+///Finds the portType of a specific port
+let getPortType (symModel: Model) (pId : string) : CommonTypes.PortType =
+    portSearchID symModel pId
+    |> function
+    | Some port -> port.Port.PortType
+    | None -> failwithf "ERROR: Couldn't find port"
 
-/// Update the symbol with matching componentId to comp, or add a new symbol based on comp.
-let updateSymbolModelWithComponent (symModel: Model) (comp:CommonTypes.Component) =
-    failwithf "Not Implemented"
-
-/// Return the output Buswire width (in bits) if this can be calculated based on known
-/// input wire widths, for the symbol wId. The types used here are possibly wrong, since
-/// this calculation is based on ports, and the skeleton code does not implement ports or
-/// port ids. If This is done the inputs could be expressed in terms of port Ids.
-let calculateOutputWidth 
-        (wId: CommonTypes.ConnectionId) 
-        (outputPortNumber: int) 
-        (inputPortWidths: int option list) : int option =
-    failwithf "Not implemented"
-
+///Finds if a position lies on a port. Returns Some(position, portId) if found, none otherwise.
+let isPort (symModel : Model) (pos : XYPos) : (XYPos * string) Option =
+    portSearchPos symModel pos
+    |> function
+    | Some port -> Some(port.Pos, string(port.Port.Id))
+    | None -> None
+    
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 

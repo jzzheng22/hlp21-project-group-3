@@ -26,13 +26,41 @@ type Wire = {
     SrcSymbol: CommonTypes.ComponentId
     TargetSymbol: CommonTypes.ComponentId
     }
+type WireSegment = {
+    Id: CommonTypes.ConnectionId 
+    SrcPos: XYPos
+    TargetPos: XYPos
+    }
 
 type Model = {
     Symbol: Symbol.Model
-    WX: Wire list
+    WX: WireSegment list
     Color: CommonTypes.HighLightColor
     }
+let makeWireSegment (sPos) (tPos) = 
+    {
+        Id=CommonTypes.ConnectionId (uuid())
+        SrcPos=sPos
+        TargetPos=tPos
+    }
+    
 
+let findNearestBox (symbols: Symbol.Symbol list) (src:XYPos) =
+    Symbol.getBoundingBoxes symbols
+    |> List.filter (fun (sym,l,r)-> (l.X>src.X && r.Y>src.Y && src.Y>l.Y)  ) 
+    |> List.minBy (fun (sym,l,r)->l)
+    |> (fun (sym,l,r)->sym)
+
+let goPastBox (src:XYPos) (sym:Symbol.Symbol) =
+    let pos1= {X= sym.TopL.X - float 20. ; Y=src.Y}
+    let pos2= {X=pos1.X;Y=sym.BotR.Y + float 20.}
+    let pos3= {X=pos2.X + float 21. ; Y=pos2.Y}
+    [   
+        makeWireSegment src pos1
+        makeWireSegment pos1 pos2
+        makeWireSegment pos2 pos3
+    ]
+ 
 //----------------------------Message Type-----------------------------------//
 
 /// Messages to update buswire model
@@ -55,7 +83,7 @@ let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire =
 
 type WireRenderProps = {
     key : CommonTypes.ConnectionId
-    WireP: Wire
+    WireP: WireSegment
     SrcP: XYPos 
     TgtP: XYPos
     ColorP: string
@@ -84,8 +112,10 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
             let props = {
                 key = w.Id
                 WireP = w
-                SrcP = Symbol.symbolPos model.Symbol w.SrcSymbol 
-                TgtP = Symbol. symbolPos model.Symbol w.TargetSymbol 
+                (*SrcP = Symbol.symbolPos model.Symbol w.SrcSymbol 
+                TgtP = Symbol. symbolPos model.Symbol w.TargetSymbol *)
+                SrcP=w.SrcPos
+                TgtP=w.TargetPos
                 ColorP = model.Color.Text()
                 StrokeWidthP = "2px" }
             singleWireView props)
@@ -95,10 +125,14 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
 /// dummy init for testing: real init would probably start with no wires.
 /// this initialisation is not realistic - ports are not used
 /// this initialisation depends on details of Symbol.Model type.
+    /// 
+
+
 let init n () =
     let symbols, cmd = Symbol.init()
     let symIds = List.map (fun (sym:Symbol.Symbol) -> sym.Id) symbols
     let rng = System.Random 0
+
     let makeRandomWire() =
         let n = symIds.Length
         let s1,s2 =
@@ -112,8 +146,15 @@ let init n () =
             SrcSymbol = s1.Id
             TargetSymbol = s2.Id
         }
-    List.map (fun i -> makeRandomWire()) [1..n]
+
+    findNearestBox symbols (symbols.[0].TopL)
+    |> goPastBox (symbols.[0].TopL)
+
+  
+    //List.map (fun i -> makeRandomWire()) [1..n]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
+
+
 
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
