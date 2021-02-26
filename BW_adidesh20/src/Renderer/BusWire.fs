@@ -48,8 +48,23 @@ type Msg =
 
 /// Takes Source and Target positions of a wire and returns the 
 /// vertices of the path it should follow
+///
+/// NOTE: Currently only supports inputs on left, outputs on right
 let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
-    [sourcePos;targetPos]
+    let diff = Symbol.posDiff targetPos sourcePos
+
+    if diff.X >= 0. then // Three Segement Case
+        let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+        let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+        [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+
+    else // Five Segment Case
+        let xOffset = 15. // Length of Horizontal line coming out of/going into port
+        let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+        let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+        let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X - (2.*xOffset)}
+        let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
+        [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
 
 
 /// look up wire in WireModel
@@ -61,39 +76,45 @@ let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
 type WireRenderProps = {
     key : CommonTypes.ConnectionId
     WireP: Wire
-    SrcP: XYPos 
-    TgtP: XYPos
+    Vertices: XYPos list
     ColorP: string
     StrokeWidthP: string }
-
-
 
 
 /// react virtual DOM SVG for one wire
 /// In general one wire will be multiple (right-angled) segments.
 
-let singleWireView = 
+let singleWireView =        
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
-            line [
-                X1 props.SrcP.X
-                Y1 props.SrcP.Y
-                X2 props.TgtP.X
-                Y2 props.TgtP.Y
-                // Qualify these props to avoid name collision with CSSProp
-                SVGAttr.Stroke props.ColorP
-                SVGAttr.StrokeWidth props.StrokeWidthP ] [])
+            let singleSegmentView (segPos: XYPos*XYPos) =
+                let SrcP = fst segPos
+                let TgtP = snd segPos
+                line [
+                    X1 SrcP.X
+                    Y1 SrcP.Y
+                    X2 TgtP.X
+                    Y2 TgtP.Y
+                    // Qualify these props to avoid name collision with CSSProp
+                    SVGAttr.Stroke props.ColorP
+                    SVGAttr.StrokeWidth props.StrokeWidthP ] []
+            
+            List.pairwise props.Vertices
+            |> List.map singleSegmentView
+            |> ofList)
+
 
 
 let view (model:Model) (dispatch: Dispatch<Msg>)=
     let wires = 
         model.WX
         |> List.map (fun w ->
+            let srcPortPos = Symbol.getPortCoords model.Symbol w.SourcePortId
+            let tgtPortPos = Symbol.getPortCoords model.Symbol w.TargetPortId
             let props = {
                 key = w.Id
                 WireP = w
-                SrcP = Symbol.getPortCoords model.Symbol w.SourcePortId
-                TgtP = Symbol. getPortCoords model.Symbol w.TargetPortId
+                Vertices = routeWire srcPortPos tgtPortPos
                 ColorP = model.Color.Text()
                 StrokeWidthP = "2px" }
             singleWireView props)

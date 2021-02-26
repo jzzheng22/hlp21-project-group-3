@@ -271,7 +271,8 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
 
 /// Dummy function for test. Creates 4 NAND gates with 2 input, 1 output.
 let init () =
-    List.allPairs [1..2] [1..2]
+    //List.allPairs [1;5] [5;7]
+    [(1,1);(3,5)]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
     |> List.map (fun pos -> (CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 pos)) 
     , Cmd.none
