@@ -698,6 +698,13 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * string) Option =
                   Some((coordIndx |> snd), string(port.Port.Id))
     | None -> None
 
+//Returns a list of Port Ids for a given symbol
+let getPortIds (model : Model) (sId : string) : string list = 
+    model
+    |> List.tryFind (fun sym -> string(sym.Id) = sId)
+    |> function
+    | Some sym -> List.map (fun x -> x.Port.Id) sym.PortList
+    | None -> failwithf "Error, could not find symbol"
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 

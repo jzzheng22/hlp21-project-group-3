@@ -57,7 +57,7 @@ INTERFACE FUNCTIONS:
     getBoundingBoxes                - Returns a list of bounding boxes in the form (ComponentID, TopLeftCoordinate, BotRightCoordinate)
     getPortType                     - Takes a model and portID, Returns whether a port is input/output
     isPort                          - Takes a model, XYpos and returns Some(XYPos, PortID) if the position was on a port, or None otherwise
-
+    getPortIds                      - Inputs(model, symbolID), returns list of portIDs
 INTERFACE TO ISSIE
     TODO
 
@@ -131,6 +131,7 @@ CHANGELOG (For me)
         
         INTERFACE FUNCS:
             Getportcoords fix - previously never found port, has been fixed
+            GetPortIds added
         
         TEST FILE:
             A test file has been made which contains a simplified version of the Symbol and CommonTypes types, and the interface functions to test whether they work properly.
@@ -139,15 +140,16 @@ CHANGELOG (For me)
         MESSAGES:
             Rotate added - Currently not used by sheet but a logical implementation has been completed
             Scale added - Currently not used by sheet but a logical implementation has been completed
+            Move added
+            Dragging, IsDragging, StopDragging - All removed
     
-            
-            ADJUSTMENTS NEEDED:
+    ADJUSTMENTS NEEDED:
         TIDY CODE - 
             Messages: DragPort is messy and long - maybe break it up a bit into smaller funcs?
-            Interface funcs: getPortCoords is has repetitive searches, can it be simplified?
+                Interface funcs: getPortCoords is has repetitive searches, can it be simplified?
 
     NEXT TASKS:
-        Replace dragging messages with move
+        
         Write something to show port movement
         Interface to ISSIE
         
