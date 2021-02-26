@@ -36,6 +36,7 @@ type Portinfo =
         Name : string
         Invert : bool
         slotPos : int
+        width : int
     }
 
 
@@ -285,9 +286,9 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (b
             PortNumber = Some i
             PortType = portType
             HostId = string(compId)
-        };
+        }
 
-        NumWires = 0;
+        NumWires = 0
         
         Name = 
             match portType with
@@ -304,7 +305,7 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (b
         
         
         slotPos = i
-
+        width = 1
     }
 
 
@@ -713,6 +714,12 @@ let getPortIds (model : Model) (sId : string) : string list =
     |> function
     | Some sym -> List.map (fun x -> x.Port.Id) sym.PortList
     | None -> failwithf "Error, could not find symbol"
+
+let getPortWidth (model : Model) (pId : string) : int =
+    portSearchID model pId
+    |> function
+    | Some port -> port.width
+    | None -> failwithf "ERROR: Couldn't find port"
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
