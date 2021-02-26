@@ -81,8 +81,9 @@ type Msg =
     /// coords not adjusted for top-level zoom
     | Dragging of sId : CommonTypes.ComponentId * pagePos: XYPos
     | EndDragging of sId : CommonTypes.ComponentId
-    | AddSymbol of compType: CommonTypes.ComponentType * pagePos : XYPos * numIn : int * numOut : int
-    | DeleteSymbol of sIdList:CommonTypes.ComponentId list
+    | Move of sIDList : CommonTypes.ComponentId list * pagePos : XYPos
+    | Add of compType: CommonTypes.ComponentType * pagePos : XYPos * numIn : int * numOut : int
+    | Delete of sIdList : CommonTypes.ComponentId list
     | Highlight of sIdList: CommonTypes.ComponentId list
     | HighlightPorts of sId : CommonTypes.ComponentId
     | DragPort of sId : CommonTypes.ComponentId * pId : string * pagePos: XYPos
@@ -342,7 +343,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Output pos botR numOut _id compType)
     let inOut = List.append ins outs
 
-    //FOR DEMO PURPOSES ONLY - THIS IS EFFECTIVELY WHAT WILL BE DONE IN A MESSAGE
+    //-------------- FOR DEMO PURPOSES ONLY - THIS IS AN EXACT COPY OF THE MESSAGES ---------------//
     let centre = midXY pos botR
     let rot  = 0
     let rotTopL = rotateCoords pos rot centre
@@ -355,7 +356,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let scaleSlots = rotSlots |> List.map (fun x -> scaleCoords x scale centre)
     let newBox = getNewBox scaleTopL scaleBotR
 
-    //Symbol Creation
+    // ------- Symbol Creation ------ ///
     {
         TopL = newBox |> fst
         BotR = newBox |> snd
@@ -387,10 +388,10 @@ let init () =
 /// update function which displays symbols
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     match msg with
-    | AddSymbol (compType, pagePos, numIn, numOut) ->
+    | Add (compType, pagePos, numIn, numOut) ->
         (CreateNewSymbol compType numIn numOut pagePos) :: model, Cmd.none
 
-    | DeleteSymbol sIdList -> 
+    | Delete sIdList -> 
         List.filter (fun sym -> List.contains sym.Id sIdList = false) model, Cmd.none
 
     | StartDragging (sId, pagePos) ->
@@ -638,9 +639,9 @@ let private renderObj =
                             Cy ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> snd)
                             R RAD
                             
-                            SVGAttr.Fill "blue"
-                            SVGAttr.Stroke "blue"
-                            SVGAttr.Opacity 0.5
+                            SVGAttr.Fill "deepskyblue"
+                            SVGAttr.Stroke "deepskyblue"
+                            SVGAttr.Opacity 0.4
                             SVGAttr.StrokeWidth 1][])
 
                 else
