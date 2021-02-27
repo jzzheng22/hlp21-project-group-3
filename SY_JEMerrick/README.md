@@ -156,5 +156,27 @@ CHANGELOG (For me)
         Write something to show port movement
         Interface to ISSIE
         
-        
+27/02/21
+    
+    COMPLETE:
 
+        COMMON TYPES - Added PortId type.
+
+        INTERFACE FUNCS -
+            Changed all string input/outputs to relevant ComponentId or PortId types.
+        
+        SYMBOL -
+            Added a new attribute 'SymbolType' which has generic(ish) categories for different component types to fit into
+            Fixed a bug where if the inputs < ouputs, some outputs would be drawn on the left instead of the right - this has been resolved.
+
+        PORTS -
+            Added a new type 'genericPort' which determines the type of label and position that a port will be assigned based on the categories: IO/Select/Carry/Enable
+
+        DRAWING - 
+            Added most extra shapes (Inputs, Outputs, Mux, MergeWire, Splitwire, Adder )
+    
+    ADJUSTMENTS NEEDED:
+        Ports/shape of Input/Output symbols are not quite right
+        Drawing function is very long and needs splitting up
+
+    NEXT TASKS:

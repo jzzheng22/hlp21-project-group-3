@@ -173,6 +173,10 @@ let absDiff a b =
     let diff = (posDiff a b)
     diff.X + diff.Y
 
+let fstTri (a, _, _) = a
+let sndTri (_, a, _) = a
+let trdTri (_, _, a) = a
+
 let fstQuad (a, _, _, _) = a
 let sndQuad (_, a, _, _) = a
 let trdQuad (_, _, a, _) = a
@@ -306,7 +310,7 @@ let CreatePortInfo (i : int) (num : int) (portType : CommonTypes.PortType Option
         
         Name = 
             match genPort with
-            | Select -> sprintf "S %d" num
+            | Select -> sprintf "S%d" num
             | Carry -> match portType with 
                        | Some CommonTypes.PortType.Input -> sprintf "Cin" 
                        | Some CommonTypes.PortType.Output -> sprintf "Cout" 
@@ -336,7 +340,16 @@ let CreatePortInfo (i : int) (num : int) (portType : CommonTypes.PortType Option
 let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut : int) (pos : XYPos) : Symbol =
     //Intermediate calculations
     let info = typeToInfo compType
-    let n = List.max[numIn; numOut] |> float
+
+    let (left, right, bot) = //no symbols require extra ports on the top
+        match fouQuad info with
+        | Mux -> (0, 0, log2 numIn)
+        | Adder -> (1, 1, 0)
+        | FF -> (1, 0, 0)
+        | _ -> (0, 0, 0) //Logic, memory, wires, IO do not require extra ports
+
+
+    let n = List.max[numIn + left; numOut + right] |> float
     let h = STD_HEIGHT * n
     let w = HW_RATIO * h
     let botR = {X = pos.X + w; Y = pos.Y + h}
@@ -358,24 +371,32 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         |> List.map (fun i -> {X = (portPos i (int(n)) pos botR).X; Y = botR.Y})
     let slots = List.concat [l; r; t; b]
 
+    let outi = (max numIn (int n))
     //Making ports
     let ins = 
         [0..numIn - 1]
-        |> List.map(fun x -> CreatePortInfo x x (Some CommonTypes.PortType.Input) InOut pos botR _id compType (info |> sndQuad))
+        |> List.map(fun x -> CreatePortInfo (x) x (Some CommonTypes.PortType.Input) InOut pos botR _id compType (info |> sndQuad))
     
     let outs = 
         [0..numOut - 1]
-        |> List.map(fun x -> CreatePortInfo (x + numIn) x (Some CommonTypes.PortType.Output) InOut pos botR _id compType (info |> trdQuad))
+        |> List.map(fun x -> CreatePortInfo (x + outi + left) x (Some CommonTypes.PortType.Output) InOut pos botR _id compType (info |> trdQuad))
     
-    let (top, bot) = 
-        match fouQuad info with
-        | Mux -> (0, log2 numIn)
-        | Adder -> (1, 1)
-        | FF -> (0, 1)
-        | _ -> (0, 0) //Logic, memory, wires, IO do not require ports on top/bot
-    
+    let posLeft = numIn
+    let posRight = posLeft + left + numOut 
+    let posBot = List.length l + List.length r + List.length t
 
-    let inOut = List.append ins outs
+    let makeLeft pType = List.map(fun x -> CreatePortInfo (x + posLeft) x (Some CommonTypes.PortType.Input) pType pos botR _id compType (info |> trdQuad)) [0 .. left - 1]
+    let makeRight pType = List.map(fun x -> CreatePortInfo (x + posRight) x (Some CommonTypes.PortType.Output) pType pos botR _id compType (info |> trdQuad)) [0 .. right - 1]
+    let makeBot pType = List.map(fun x -> CreatePortInfo (x + posBot) x (Some CommonTypes.PortType.Input) pType pos botR _id compType (info |> trdQuad)) [0 .. bot - 1]
+
+    let (leftPort, rightPort, topPort) =
+        match fouQuad info with
+        | Mux ->  ([], [], makeBot Select)
+        | Adder -> (makeLeft Carry, makeRight Carry, [])
+        | FF -> (makeLeft Enable, [], [])
+        | _ -> ([],[],[])
+    
+    let inOut = List.concat [ins; leftPort; outs; rightPort; topPort]
 
     //-------------- FOR DEMO PURPOSES ONLY - THIS IS AN EXACT COPY OF THE MESSAGES ---------------//
     let centre = midXY pos botR
@@ -571,10 +592,16 @@ let private renderObj =
                        
             ///TODO - Once Move has been sorted out we need to correct this, fine for now
             let color =
-                if props.Obj.Highlight then
-                    "lightblue"
-                else
-                    "gainsboro"
+                match props.Obj.genericType with
+                | Wires -> if props.Obj.Highlight then
+                                "red"
+                            else
+                                "darkgrey"
+                | _ -> if props.Obj.Highlight then
+                                "lightblue"
+                            else
+                                "gainsboro"
+                
 
             
 
@@ -592,6 +619,42 @@ let private renderObj =
                             Fill "Black"
                         ]
                     ][str <| sprintf "%s" i.Name])
+
+            let wires : ReactElement list =
+            //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
+                props.Obj.PortList
+                |> List.map(fun i ->
+                    polyline[
+                        Points (sprintf "%f,%f %f,%f %f,%f" ((findPos i props.Obj.PortMap).X) ((findPos i props.Obj.PortMap).Y) ((midXY props.Obj.BotR props.Obj.TopL).X) ((findPos i props.Obj.PortMap).Y) ((midXY props.Obj.BotR props.Obj.TopL).X) ((midXY props.Obj.BotR props.Obj.TopL).Y))
+                        Style[
+                            Stroke color
+                            Fill "none"
+                        ]
+                    ][])
+
+            let triangles : ReactElement list =
+                //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
+                    props.Obj.PortList
+                    |> List.map(fun i ->
+                        polygon[
+                            Points (sprintf "%f,%f %f,%f %f,%f" ((findPos i props.Obj.PortMap).X) ((findPos i props.Obj.PortMap).Y + RAD) ((findPos i props.Obj.PortMap).X + RAD) ((findPos i props.Obj.PortMap).Y) ((findPos i props.Obj.PortMap).X) ((findPos i props.Obj.PortMap).Y - RAD))
+                            Style[
+                                Stroke color
+                                Fill color
+                            ]
+                        ][])
+            
+            let io : ReactElement list =
+                [
+                    polygon[
+                        Points (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" (props.Obj.TopL.X) ((midXY props.Obj.BotR props.Obj.TopL).Y - RAD) props.Obj.TopL.X ((midXY props.Obj.BotR props.Obj.TopL).Y + RAD) ((midXY props.Obj.BotR props.Obj.TopL).X + RAD) ((midXY props.Obj.BotR props.Obj.TopL).Y + RAD) (props.Obj.BotR.X) (midXY props.Obj.BotR props.Obj.TopL).Y ((midXY props.Obj.BotR props.Obj.TopL).X + RAD) ((midXY props.Obj.BotR props.Obj.TopL).Y - RAD))
+                        Style[
+                            Stroke "black"
+                            Fill color
+                            StrokeWidth 0.5
+                        ]
+                    ][]
+                ]
 
             let displayBox : ReactElement list =
                 [
@@ -649,8 +712,13 @@ let private renderObj =
                 else
                     []
             
+            let symDraw = 
+                match props.Obj.genericType with
+                | Wires -> List.concat [wires; triangles]
+                | IO -> io
+                | _ -> displayBox
             
-            g[](List.concat [displayBox; labels; drawInvert; ports])
+            g[](List.concat [symDraw; labels; drawInvert; ports])
             
     , "Circle"
     , equalsButFunctions
