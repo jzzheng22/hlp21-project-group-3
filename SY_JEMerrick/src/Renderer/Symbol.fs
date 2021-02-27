@@ -734,8 +734,6 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
 
 
-
-
 //---------------Helpers for interface functions--------------------//
 
 
@@ -755,7 +753,7 @@ let portSearchID (symModel: Model) (pId : string) : Portinfo Option =
 
 
 
-//---------------Other interface functions--------------------//
+//-----------------------Interface functions--------------------//
 
 //TODO - REMOVE - ONLY USED BY BUSWIRE - Currently connects every input 0 to each other.
 let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos = 
@@ -797,7 +795,7 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * CommonTypes.PortId) Optio
     |> function
     | Some sym -> let coordIndx = 
                         List.indexed sym.PortMap
-                        |> List.find(fun (i, v) -> testBox v pos)
+                        |> List.find(fun (_, v) -> testBox v pos)
                   let port = List.find (fun x -> x.slotPos = (coordIndx |> fst)) sym.PortList
                   Some((coordIndx |> snd), CommonTypes.PortId port.Port.Id)
     | None -> None
