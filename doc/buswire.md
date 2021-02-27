@@ -47,7 +47,7 @@ Note: `CommonTypes.ConnectionId` is a Wire ID
 `DeleteWires of CommonTypes.ConnectionId list`
  - Deletes wires from model based on ID.
 
-`AddWire of (string * string)`
+`AddWire of (CommonTypes.PortId * CommonTypes.PortId)`
  - Create connection between two ports, whose IDs are supplied in the message
  - The order of ports does not matter, as long as one of the ports is an input and the other is an output
  - BusWire's handling of this message incorporates wire validation, protecting against:

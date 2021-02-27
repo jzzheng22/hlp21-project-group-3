@@ -25,7 +25,7 @@ type Wire = {
     SourcePortId: CommonTypes.PortId
     TargetPortId: CommonTypes.PortId
     Vertices: XYPos list
-    BoundingBoxes: (string * XYPos * XYPos) list
+    BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
     Width: int
     Highlight: bool
     }
@@ -76,7 +76,7 @@ let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
         [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
 
 /// Calculates and returns a list of bounding boxes for all the segments of a wire
-let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionId): (string * XYPos * XYPos) list =
+let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionId): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     let bbDist = 10. // Distance of Bounding Box Outline from wire
     let lineToBox (startPos: XYPos) (endPos: XYPos):  XYPos * XYPos =
         let TopL = {startPos with X = startPos.X - bbDist; Y = startPos.Y + bbDist}
@@ -86,7 +86,7 @@ let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionI
     vertices
     |> List.pairwise
     |> List.map (fun x -> lineToBox (fst x) (snd x))
-    |> List.map (fun (topL,botR) -> ((string wID),topL,botR))
+    |> List.map (fun (topL,botR) ->  (wID,topL,botR))
 
 
 /// look up wire in WireModel
@@ -319,7 +319,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId option = 
     failwith "Not implemented"
 
-let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (string * XYPos * XYPos) list =
+let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     wModel.WX
     |> List.collect (fun w -> w.BoundingBoxes)
 
