@@ -154,6 +154,12 @@ let midXY (botR : XYPos) (topL : XYPos) : XYPos =
     let midX = (botR.X + topL.X) / 2.
     {X = midX; Y = midY}
 
+let midSym (sym : Symbol) : XYPos = midXY sym.BotR sym.TopL
+
+let midSymX (sym : Symbol) : float = (midSym sym).X 
+
+let midSymY (sym : Symbol) : float = (midSym sym).Y
+
 ///Adds a float value onto an XYPos
 let addXYVal (xy : XYPos) (n : float) : XYPos = {X = xy.X + n; Y = xy.Y + n}
 
@@ -270,7 +276,7 @@ let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
 
 //Generic transformation function that takes in a transformation function, symbol and transformation
 let trans func sym trans =
-    let centre = midXY sym.TopL sym.BotR
+    let centre = midSym sym
     let rotTopL = func sym.TopL trans centre
     let rotBotR = func sym.BotR trans centre
     let newBox = getNewBox rotTopL rotBotR
@@ -576,8 +582,7 @@ type private RenderObjProps =
 let private renderObj =
     FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
         fun (props : RenderObjProps) ->
-                       
-            ///TODO - Once Move has been sorted out we need to correct this, fine for now
+
             let color =
                 match props.Obj.genericType with
                 | Wires -> if props.Obj.Highlight then
@@ -609,7 +614,7 @@ let private renderObj =
                 props.Obj.PortList
                 |> List.map(fun i ->
                     polyline[
-                        Points (sprintf "%f,%f %f,%f %f,%f" ((findPos i props.Obj.PortMap).X) ((findPos i props.Obj.PortMap).Y) ((midXY props.Obj.BotR props.Obj.TopL).X) ((findPos i props.Obj.PortMap).Y) ((midXY props.Obj.BotR props.Obj.TopL).X) ((midXY props.Obj.BotR props.Obj.TopL).Y))
+                        Points (sprintf "%f,%f %f,%f %f,%f" ((findPos i props.Obj.PortMap).X) ((findPos i props.Obj.PortMap).Y) (midSymX props.Obj) ((findPos i props.Obj.PortMap).Y) (midSymX props.Obj) (midSymY props.Obj))
                         Style[
                             Stroke color
                             Fill "none"
@@ -631,7 +636,7 @@ let private renderObj =
             let io : ReactElement list =
                 [
                     polygon[
-                        Points (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" (props.Obj.TopL.X) ((midXY props.Obj.BotR props.Obj.TopL).Y - RAD) props.Obj.TopL.X ((midXY props.Obj.BotR props.Obj.TopL).Y + RAD) ((midXY props.Obj.BotR props.Obj.TopL).X + RAD) ((midXY props.Obj.BotR props.Obj.TopL).Y + RAD) (props.Obj.BotR.X) (midXY props.Obj.BotR props.Obj.TopL).Y ((midXY props.Obj.BotR props.Obj.TopL).X + RAD) ((midXY props.Obj.BotR props.Obj.TopL).Y - RAD))
+                        Points (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" (props.Obj.TopL.X) (midSymY props.Obj - RAD) props.Obj.TopL.X (midSymY props.Obj + RAD) (midSymX props.Obj + RAD) (midSymY props.Obj + RAD) (props.Obj.BotR.X) (midSymY props.Obj) (midSymX props.Obj + RAD) (midSymY props.Obj - RAD))
                         Style[
                             Stroke "black"
                             Fill color
@@ -654,8 +659,8 @@ let private renderObj =
                         SVGAttr.StrokeWidth 0.5][]
 
                     text[
-                        X ((midXY props.Obj.BotR props.Obj.TopL).X)
-                        Y ((midXY props.Obj.BotR props.Obj.TopL).Y)
+                        X (midSymX props.Obj)
+                        Y (midSymY props.Obj)
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
