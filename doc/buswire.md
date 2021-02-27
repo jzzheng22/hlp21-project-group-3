@@ -57,9 +57,10 @@ Note: `CommonTypes.ConnectionId` is a Wire ID
    - <i> These rules are fairly easy to add so talk to Aditya if you want more </i>
  
 
-`Highlight of CommonTypes.ConnectionId list`
- - Highlights wires in list
- - Not implemented yet, need to decide what exactly to highlight
+`HighlightWires of CommonTypes.ConnectionId list`
+ - Highlights wires specified in the list
+   - Highlights the source and target ports of the wire
+ - Same functionality as highlighting a Symbol (need to send a Highlight message with an empty list to unhighlight everything)
 
 `Move of wireIdList *  XYPos`
  - XYPos is translation vector
