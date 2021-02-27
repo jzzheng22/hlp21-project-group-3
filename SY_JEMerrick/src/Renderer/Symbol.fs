@@ -102,31 +102,34 @@ type Msg =
 
 
 ///Takes a component type and returns the corresponding symbol label/title/name as a string
-let typeToName (compType : CommonTypes.ComponentType) : string =
+let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int) =
     match compType with
-    | CommonTypes.ComponentType.Constant _ -> "1" //This is a buffer right?
-    | CommonTypes.ComponentType.Not -> "1"
-    | CommonTypes.ComponentType.And -> "&"
-    | CommonTypes.ComponentType.Or -> ">="
-    | CommonTypes.ComponentType.Xor -> "=1"
-    | CommonTypes.ComponentType.Nand -> "&"
-    | CommonTypes.ComponentType.Nor -> "|"
-    | CommonTypes.ComponentType.Xnor -> "=1"
-    | CommonTypes.ComponentType.Decode4 -> "Decode"
-    | CommonTypes.ComponentType.Mux2 -> "MUX"
-    | CommonTypes.ComponentType.Demux2 -> "DMUX"
-    | CommonTypes.ComponentType.NbitsAdder _ -> "Σ"
-    | CommonTypes.ComponentType.Custom x -> x.Name
-    | CommonTypes.ComponentType.DFF -> "DFF"
-    | CommonTypes.ComponentType.DFFE -> "DFFE"
-    | CommonTypes.ComponentType.Register _ -> "SRG"
-    | CommonTypes.ComponentType.RegisterE _ -> "SRGE"
-    | CommonTypes.ComponentType.AsyncROM _ -> "A/ROM"
-    | CommonTypes.ComponentType.ROM _ -> "ROM"
-    | CommonTypes.ComponentType.RAM _ -> "RAM"
-    | _ -> "" //For any buses/wires
-
-
+    | CommonTypes.ComponentType.Constant (x, y) -> ((string(y)), x, x) //This is a buffer right?
+    | CommonTypes.ComponentType.Not -> ("1", 1, 1)
+    | CommonTypes.ComponentType.And -> ("&", 1, 1)
+    | CommonTypes.ComponentType.Or -> (">=", 1, 1)
+    | CommonTypes.ComponentType.Xor -> ("=1", 1, 1)
+    | CommonTypes.ComponentType.Nand -> ("&", 1, 1)
+    | CommonTypes.ComponentType.Nor -> ("|", 1, 1)
+    | CommonTypes.ComponentType.Xnor -> ("=1", 1, 1)
+    | CommonTypes.ComponentType.Decode4 -> ("Decode", 1, 1)
+    | CommonTypes.ComponentType.Mux2 -> ("MUX", 1, 1)
+    | CommonTypes.ComponentType.Demux2 -> ("DMUX" , 1, 1)
+    | CommonTypes.ComponentType.NbitsAdder x -> ("Σ", x, x) //TODO CHECK
+    | CommonTypes.ComponentType.Custom x -> (x.Name, 1, 1)
+    | CommonTypes.ComponentType.DFF -> ("DFF", 1, 1)
+    | CommonTypes.ComponentType.DFFE -> ("DFFE", 1, 1)
+    | CommonTypes.ComponentType.Register x -> ("SRG", x, x)
+    | CommonTypes.ComponentType.RegisterE x -> ("SRGE", x, x)
+    | CommonTypes.ComponentType.AsyncROM x -> ("A/ROM", x.AddressWidth, x.WordWidth)
+    | CommonTypes.ComponentType.ROM x -> ("ROM", x.AddressWidth, x.WordWidth)
+    | CommonTypes.ComponentType.RAM x -> ("RAM", x.AddressWidth, x.WordWidth)
+    | CommonTypes.ComponentType.Input x -> ("IN", x, x) //For any buses/wires
+    | CommonTypes.ComponentType.Output x -> ("OUT", x, x) 
+    | CommonTypes.ComponentType.IOLabel -> ("", 0, 0) 
+    | CommonTypes.ComponentType.BusSelection (x, y) -> ("", x, y)
+    | CommonTypes.ComponentType.MergeWires -> ("", 0, 0)
+    | CommonTypes.ComponentType.SplitWire x -> ("", x, x)
 
 ///Returns a tuple of float = (Height, Width) from two coordinates
 let getHW (botR : XYPos) (topL : XYPos) = (botR.Y - topL.Y, botR.X - topL.X)
@@ -156,7 +159,9 @@ let absDiff a b =
     let diff = (posDiff a b)
     diff.X + diff.Y
 
-
+let fstTri ((a : string), (b : int), (c : int)) = a
+let sndTri ((a : string), (b : int), (c : int)) = b
+let trdTri ((a : string), (b : int), (c : int)) = c
 
 ///Displace will move a port position _away_ from the box.
 ///
@@ -267,16 +272,7 @@ let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
 /// topL : the top left of the symbol associated with the port.
 /// botR : the bottom right of the symbol associated with the port.
 /// n : the total number of ports on the symbol associated with the port.
-let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (botR : XYPos) (n : int) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) : Portinfo = 
-    
-    //Intermediate calculations needed
-        
-
-    let pos =
-        match portType with
-        | CommonTypes.PortType.Input -> { X = topL.X; Y = (portPos i n topL botR).Y};
-        | CommonTypes.PortType.Output -> { X = botR.X; Y = (portPos i n topL botR).Y};
-    
+let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (botR : XYPos) (n : int) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) (w : int) : Portinfo = 
 
     //Object creation
     {   
@@ -305,7 +301,7 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (b
         
         
         slotPos = i
-        width = 1
+        width = w
     }
 
 
@@ -314,7 +310,7 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (topL : XYPos) (b
 ///Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut : int) (pos : XYPos) : Symbol =
     //Intermediate calculations
-    
+    let info = typeToInfo compType
     let n = List.max[numIn; numOut] |> float
     let h = STD_HEIGHT * n
     let w = HW_RATIO * h
@@ -338,10 +334,10 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let slots = List.concat [l; r; t; b]
     let ins = 
         [0..numIn - 1]
-        |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Input pos botR numIn _id compType)
+        |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Input pos botR numIn _id compType (info |> sndTri))
     let outs = 
         [numIn..numOut + numIn - 1]
-        |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Output pos botR numOut _id compType)
+        |> List.map(fun x -> CreatePortInfo x CommonTypes.PortType.Output pos botR numOut _id compType (info |> trdTri))
     let inOut = List.append ins outs
 
     //-------------- FOR DEMO PURPOSES ONLY - THIS IS AN EXACT COPY OF THE MESSAGES ---------------//
@@ -363,7 +359,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         BotR = newBox |> snd
         Id = _id
         Type = compType
-        Name = typeToName compType
+        Name = info |> fstTri
         Highlight = false
         PortHighlight = false
         PortMap = scaleSlots

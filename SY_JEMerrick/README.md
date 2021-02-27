@@ -18,6 +18,7 @@ TYPES:
         Name                        - Label to be printed for that port
         Invert                      - A bool which = True if the port requires an inverter
         slotPos                     - An int indicating the corresponding index in the PortMap
+        width                       - A width indicating the wire/bus width into the component
 
     Symbol
         TopL                        - The top left coordinate of the symbol
@@ -129,6 +130,8 @@ CHANGELOG (For me)
             Rotation - currently only accessable in the constructor of symbol as no message has yet been made in sheet
             Scaling - currently only accessable in the constructor of symbol as no message has yet been made in sheet
         
+        Added buswidth
+
         INTERFACE FUNCS:
             Getportcoords fix - previously never found port, has been fixed
             GetPortIds added
@@ -149,7 +152,7 @@ CHANGELOG (For me)
                 Interface funcs: getPortCoords is has repetitive searches, can it be simplified?
 
     NEXT TASKS:
-        
+        IMPORTANT - Wire width stuff and Wire merge symbols need to be done.
         Write something to show port movement
         Interface to ISSIE
         
