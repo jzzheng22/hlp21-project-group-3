@@ -37,6 +37,7 @@ type Portinfo =
         Name : string
         Invert : bool
         Box : XYPos * XYPos
+        width: int
     }
 
 
@@ -227,6 +228,8 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) topL botR (n : in
             | _ -> false;
         
         Box = (addXYVal pos -1., addXYVal pos 1.)
+
+        width = 1
     }
 
 
@@ -559,6 +562,11 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * string) Option =
     | Some port -> Some(port.Pos, string(port.Port.Id))
     | None -> None
     
+let getPortWidth (model : Model) (pId : string) : int =
+    portSearchID model pId
+    |> function
+    | Some port -> port.width
+    | None -> failwithf "ERROR: Couldn't find port"
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 

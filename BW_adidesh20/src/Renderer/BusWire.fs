@@ -26,6 +26,7 @@ type Wire = {
     TargetPortId: string
     Vertices: XYPos list
     BoundingBoxes: (string * XYPos * XYPos) list
+    Width: int
     }
 
 type Model = {
@@ -43,11 +44,13 @@ type Model = {
 /// for highlighting, width inference, etc
 type Msg =
     | Symbol of Symbol.Msg
-    | AddWire of (CommonTypes.ConnectionId * CommonTypes.ConnectionId)
+    | AddWire of (string * string)
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
 
 //-------------------Helpers for functions------------------------//
+
+
 
 /// Takes Source and Target positions of a wire and returns the 
 /// vertices of the path it should follow
@@ -69,6 +72,7 @@ let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
         let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
         [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
 
+/// Calculates and returns a list of bounding boxes for all the segments of a wire
 let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionId): (string * XYPos * XYPos) list =
     let bbDist = 10. // Distance of Bounding Box Outline from wire
     let lineToBox (startPos: XYPos) (endPos: XYPos):  XYPos * XYPos =
@@ -81,16 +85,33 @@ let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionI
     |> List.map (fun x -> lineToBox (fst x) (snd x))
     |> List.map (fun (topL,botR) -> ((string wID),topL,botR))
 
+
 /// look up wire in WireModel
 let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
     wModel.WX
     |> List.tryFind (fun wire -> wire.Id = wId)
 
+let makeNewWire (model: Model) (srcPortId: string) (tgtPortId: string) (width: int): Wire = 
+    let wId = CommonTypes.ConnectionId (Helpers.uuid())
+    let newVertices = routeWire (Symbol.getPortCoords model.Symbol srcPortId) (Symbol.getPortCoords model.Symbol tgtPortId)
+    let newBB = singleWireBoundingBoxes newVertices wId
+  
+    {
+        Id = wId
+        SourcePortId = srcPortId
+        TargetPortId = tgtPortId
+        Vertices = newVertices
+        BoundingBoxes = newBB
+        Width = width
+    }
+
+//----------------Render/View Functions----------------//
 
 type WireRenderProps = {
     key : CommonTypes.ConnectionId
     WireP: Wire
     Vertices: XYPos list
+    Width: int
     ColorP: string
     StrokeWidthP: string }
 
@@ -112,9 +133,24 @@ let singleWireView =
                     // Qualify these props to avoid name collision with CSSProp
                     SVGAttr.Stroke props.ColorP
                     SVGAttr.StrokeWidth props.StrokeWidthP ] []
+            let widthAnnotation = 
+                let textPos = Symbol.posAdd props.Vertices.Head {X = 5. ; Y = 5.}
+                text [
+                    X textPos.X
+                    Y textPos.Y
+                    Style [
+                        TextAnchor "middle"
+                        DominantBaseline "hanging"
+                        FontSize "10px"
+                        FontWeight "Bold"
+                        Fill "Black"
+                    ]
+                ] [str <| sprintf "%i" props.Width]   
             
-            List.pairwise props.Vertices
-            |> List.map singleSegmentView
+            let segments =
+                List.pairwise props.Vertices
+                |> List.map singleSegmentView
+            widthAnnotation::segments
             |> ofList)
 
 
@@ -123,13 +159,11 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
     let wires = 
         model.WX
         |> List.map (fun w ->
-            let srcPortPos = Symbol.getPortCoords model.Symbol w.SourcePortId
-            let tgtPortPos = Symbol.getPortCoords model.Symbol w.TargetPortId
-            let newVertices = routeWire srcPortPos tgtPortPos
             let props = {
                 key = w.Id
                 WireP = w
-                Vertices = newVertices
+                Vertices = w.Vertices
+                Width = w.Width
                 ColorP = model.Color.Text()
                 StrokeWidthP = "2px" }
             singleWireView props)
@@ -148,23 +182,81 @@ let init n () =
     let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
     let id = CommonTypes.ConnectionId (Helpers.uuid())
     let vert = routeWire (Symbol.getPortCoords symbols outPort.Port.Id) (Symbol.getPortCoords symbols inPort.Port.Id)
+    let bb = singleWireBoundingBoxes vert id
     let testWire: Wire = 
         {
             Id = id
             SourcePortId = outPort.Port.Id
             TargetPortId = inPort.Port.Id
             Vertices = vert
-            BoundingBoxes = singleWireBoundingBoxes vert id
+            BoundingBoxes = bb
+            Width = Symbol.getPortWidth symbols outPort.Port.Id
         }
     [testWire]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
+
+//-------------------Helpers for Update Function-------------------//
+// WIRE RULES: Must have signature Model->Wire->bool
+
+/// Checks if a wire connects an Output Port to an Input Port
+let ruleOutToIn (model: Model) (wire: Wire) : bool = 
+    match Symbol.getPortType model.Symbol wire.SourcePortId , Symbol.getPortType model.Symbol wire.TargetPortId with 
+    | CommonTypes.Output , CommonTypes.Input -> true
+    | _ , _ -> false
+
+/// Checks if a new wire does not already exist in the model
+let ruleUnique (model: Model) (wire: Wire) : bool =
+    model.WX
+    |> List.filter (fun w -> w.SourcePortId = wire.SourcePortId && w.TargetPortId = wire.TargetPortId)
+    |> List.isEmpty
+
+/// Checks if the Width of the Source Port is equal to that of the Target Port
+let ruleWidthEquality (model: Model) (wire: Wire) : bool =
+    if Symbol.getPortWidth model.Symbol wire.SourcePortId = Symbol.getPortWidth model.Symbol wire.TargetPortId then 
+        true
+    else 
+        false
+
+let wireRuleList =
+    [
+        ruleOutToIn;
+        ruleUnique;
+        ruleWidthEquality
+    ]
     
+/// Verifies if a supplied wire is compliant with the rules for wires.
+/// Returns wire wrapped in a Wire Option if it is compliant, otherwise returns None.
+let verifyWire (model: Model) (wire: Wire): Wire option = 
+    wireRuleList 
+    |> List.map (fun f -> f model wire)
+    |> List.contains false
+    |> function true -> None | false -> Some wire
+
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     | Symbol sMsg -> 
         let sm,sCmd = Symbol.update sMsg model.Symbol
-        {model with Symbol=sm}, Cmd.map Symbol sCmd
-    | AddWire _ -> failwithf "Not implemented"
+        let wList = 
+            model.WX
+            |> List.map (fun w -> 
+                let newVertices = routeWire (Symbol.getPortCoords model.Symbol w.SourcePortId) (Symbol.getPortCoords model.Symbol w.TargetPortId)
+                let newBB = singleWireBoundingBoxes newVertices w.Id
+                {w with 
+                    Vertices = newVertices
+                    BoundingBoxes = newBB })
+        {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
+
+    | AddWire (portId1,portId2) ->
+        let unverifiedWire =
+            match Symbol.getPortType model.Symbol portId1 , Symbol.getPortType model.Symbol portId2 with
+            | CommonTypes.Output , CommonTypes.Input -> makeNewWire model portId1 portId2 (Symbol.getPortWidth model.Symbol portId1) // Wire was drawn from Output to Input
+            | CommonTypes.Input , CommonTypes.Output -> makeNewWire model portId2 portId1 (Symbol.getPortWidth model.Symbol portId2) // Wire was drawn from Input to Output
+            | _ , _ -> makeNewWire model portId1 portId2 (Symbol.getPortWidth model.Symbol portId1) // Invalid port combination, will be caught by verifyWire
+            
+        match unverifiedWire |> (verifyWire model) with
+        | Some w -> {model with WX = w::model.WX}, Cmd.none
+        | None -> model, Cmd.none
+
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
 
