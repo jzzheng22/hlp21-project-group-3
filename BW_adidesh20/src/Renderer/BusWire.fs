@@ -22,11 +22,12 @@ open Helpers
 /// component coordinates are held in some other way, is up to groups.
 type Wire = {
     Id: CommonTypes.ConnectionId 
-    SourcePortId: string
-    TargetPortId: string
+    SourcePortId: CommonTypes.PortId
+    TargetPortId: CommonTypes.PortId
     Vertices: XYPos list
-    BoundingBoxes: (string * XYPos * XYPos) list
+    BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
     Width: int
+    Highlight: bool
     }
 
 type Model = {
@@ -44,7 +45,7 @@ type Model = {
 /// for highlighting, width inference, etc
 type Msg =
     | Symbol of Symbol.Msg
-    | AddWire of (string * string)
+    | AddWire of (CommonTypes.PortId * CommonTypes.PortId)
     | DeleteWires of CommonTypes.ConnectionId list
     | HighlightWires of CommonTypes.ConnectionId list
     | SetColor of CommonTypes.HighLightColor
@@ -75,7 +76,7 @@ let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
         [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
 
 /// Calculates and returns a list of bounding boxes for all the segments of a wire
-let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionId): (string * XYPos * XYPos) list =
+let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionId): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     let bbDist = 10. // Distance of Bounding Box Outline from wire
     let lineToBox (startPos: XYPos) (endPos: XYPos):  XYPos * XYPos =
         let TopL = {startPos with X = startPos.X - bbDist; Y = startPos.Y + bbDist}
@@ -85,7 +86,7 @@ let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionI
     vertices
     |> List.pairwise
     |> List.map (fun x -> lineToBox (fst x) (snd x))
-    |> List.map (fun (topL,botR) -> ((string wID),topL,botR))
+    |> List.map (fun (topL,botR) ->  (wID,topL,botR))
 
 
 /// look up wire in WireModel
@@ -94,7 +95,7 @@ let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
     |> List.tryFind (fun wire -> wire.Id = wId)
 
 /// Creates a new wire 
-let makeNewWire (model: Model) (srcPortId: string) (tgtPortId: string) (width: int): Wire = 
+let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: CommonTypes.PortId) (width: int): Wire = 
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
     let newVertices = routeWire (Symbol.getPortCoords model.Symbol srcPortId) (Symbol.getPortCoords model.Symbol tgtPortId)
     let newBB = singleWireBoundingBoxes newVertices wId
@@ -106,6 +107,7 @@ let makeNewWire (model: Model) (srcPortId: string) (tgtPortId: string) (width: i
         Vertices = newVertices
         BoundingBoxes = newBB
         Width = width
+        Highlight = false
     }
 
 //----------------Render/View Functions----------------//
@@ -115,13 +117,13 @@ type WireRenderProps = {
     WireP: Wire
     Vertices: XYPos list
     Width: int
+    Highlight: bool
     ColorP: string
     StrokeWidthP: string }
 
 
 /// react virtual DOM SVG for one wire
 /// In general one wire will be multiple (right-angled) segments.
-
 let singleWireView =        
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
@@ -149,11 +151,38 @@ let singleWireView =
                         Fill "Black"
                     ]
                 ] [str <| sprintf "%i" props.Width]   
+            let highlightCircles =
+                    let srcPortPos = List.head props.Vertices
+                    let tgtPortPos = List.last props.Vertices
+                    if props.Highlight = false then
+                        []
+                    else
+                        [
+                        circle [
+                           Cx srcPortPos.X
+                           Cy srcPortPos.Y
+                           R 3.
+
+                           SVGAttr.Fill "deepskyblue"
+                           SVGAttr.Stroke "deepskyblue"
+                           SVGAttr.Opacity 0.4
+                           SVGAttr.StrokeWidth 1][]
+                           ;
+                        circle [
+                            Cx tgtPortPos.X
+                            Cy tgtPortPos.Y
+                            R 3.
+
+                            SVGAttr.Fill "deepskyblue"
+                            SVGAttr.Stroke "deepskyblue"
+                            SVGAttr.Opacity 0.4
+                            SVGAttr.StrokeWidth 1][]
+                        ]
             
             let segments =
                 List.pairwise props.Vertices
                 |> List.map singleSegmentView
-            widthAnnotation::segments
+            (widthAnnotation::segments)@highlightCircles
             |> ofList)
 
 
@@ -167,6 +196,7 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
                 WireP = w
                 Vertices = w.Vertices
                 Width = w.Width
+                Highlight = w.Highlight
                 ColorP = model.Color.Text()
                 StrokeWidthP = "2px" }
             singleWireView props)
@@ -184,16 +214,17 @@ let init n () =
     let outPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Output) ports).Value
     let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
     let id = CommonTypes.ConnectionId (Helpers.uuid())
-    let vert = routeWire (Symbol.getPortCoords symbols outPort.Port.Id) (Symbol.getPortCoords symbols inPort.Port.Id)
+    let vert = routeWire (Symbol.getPortCoords symbols (CommonTypes.PortId outPort.Port.Id)) (Symbol.getPortCoords symbols (CommonTypes.PortId inPort.Port.Id))
     let bb = singleWireBoundingBoxes vert id
     let testWire: Wire = 
         {
             Id = id
-            SourcePortId = outPort.Port.Id
-            TargetPortId = inPort.Port.Id
+            SourcePortId = CommonTypes.PortId outPort.Port.Id
+            TargetPortId = CommonTypes.PortId inPort.Port.Id
             Vertices = vert
             BoundingBoxes = bb
-            Width = Symbol.getPortWidth symbols outPort.Port.Id
+            Width = Symbol.getPortWidth symbols (CommonTypes.PortId outPort.Port.Id)
+            Highlight = false
         }
     [testWire]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
@@ -266,7 +297,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             |> List.filter (fun w -> List.contains w.Id wIdList = false)
         {model with WX = wList}, Cmd.none
 
-    | HighlightWires wIdList -> failwithf "not implemented" // Need to discuss with Symbol what is needed
+    | HighlightWires wIdList -> 
+        let wList =
+            model.WX
+            |> List.map (fun w ->
+                if List.contains w.Id wIdList then
+                    {w with Highlight = true}
+                else 
+                    {w with Highlight = false}
+            )
+        {model with WX = wList}, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
@@ -279,7 +319,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId option = 
     failwith "Not implemented"
 
-let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (string * XYPos * XYPos) list =
+let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     wModel.WX
     |> List.collect (fun w -> w.BoundingBoxes)
 

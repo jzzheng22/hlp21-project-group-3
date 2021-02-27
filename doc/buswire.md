@@ -35,12 +35,19 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
 
 ## Messages
 
+### <b> BusWire Sends to Symbol</b>
+`HighlightPortList of CommonTypes.PortId list` 
+ - Sends a list of PortIds to Symbol that must be highlighted 
+ - Sent when the wire is highlighted
+
+### <b> BusWire Receives from Sheet</b>
+
 Note: `CommonTypes.ConnectionId` is a Wire ID
 
 `DeleteWires of CommonTypes.ConnectionId list`
  - Deletes wires from model based on ID.
 
-`AddWire of (string * string)`
+`AddWire of (CommonTypes.PortId * CommonTypes.PortId)`
  - Create connection between two ports, whose IDs are supplied in the message
  - The order of ports does not matter, as long as one of the ports is an input and the other is an output
  - BusWire's handling of this message incorporates wire validation, protecting against:
@@ -50,9 +57,10 @@ Note: `CommonTypes.ConnectionId` is a Wire ID
    - <i> These rules are fairly easy to add so talk to Aditya if you want more </i>
  
 
-`Highlight of CommonTypes.ConnectionId list`
- - Highlights wires in list
- - Not implemented yet, need to decide what exactly to highlight
+`HighlightWires of CommonTypes.ConnectionId list`
+ - Highlights wires specified in the list
+   - Highlights the source and target ports of the wire
+ - Same functionality as highlighting a Symbol (need to send a Highlight message with an empty list to unhighlight everything)
 
 `Move of wireIdList *  XYPos`
  - XYPos is translation vector
