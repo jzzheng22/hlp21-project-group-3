@@ -45,6 +45,8 @@ type Model = {
 type Msg =
     | Symbol of Symbol.Msg
     | AddWire of (string * string)
+    | DeleteWires of CommonTypes.ConnectionId list
+    | HighlightWires of CommonTypes.ConnectionId list
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
 
@@ -91,6 +93,7 @@ let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
     wModel.WX
     |> List.tryFind (fun wire -> wire.Id = wId)
 
+/// Creates a new wire 
 let makeNewWire (model: Model) (srcPortId: string) (tgtPortId: string) (width: int): Wire = 
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
     let newVertices = routeWire (Symbol.getPortCoords model.Symbol srcPortId) (Symbol.getPortCoords model.Symbol tgtPortId)
@@ -131,7 +134,7 @@ let singleWireView =
                     X2 TgtP.X
                     Y2 TgtP.Y
                     // Qualify these props to avoid name collision with CSSProp
-                    SVGAttr.Stroke props.ColorP
+                    SVGAttr.Stroke (if props.Width = 1 then props.ColorP else "purple")
                     SVGAttr.StrokeWidth props.StrokeWidthP ] []
             let widthAnnotation = 
                 let textPos = Symbol.posAdd props.Vertices.Head {X = 5. ; Y = 5.}
@@ -239,7 +242,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wList = 
             model.WX
             |> List.map (fun w -> 
-                let newVertices = routeWire (Symbol.getPortCoords model.Symbol w.SourcePortId) (Symbol.getPortCoords model.Symbol w.TargetPortId)
+                let newVertices = routeWire (Symbol.getPortCoords sm w.SourcePortId) (Symbol.getPortCoords sm w.TargetPortId)
                 let newBB = singleWireBoundingBoxes newVertices w.Id
                 {w with 
                     Vertices = newVertices
@@ -253,9 +256,17 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             | CommonTypes.Input , CommonTypes.Output -> makeNewWire model portId2 portId1 (Symbol.getPortWidth model.Symbol portId2) // Wire was drawn from Input to Output
             | _ , _ -> makeNewWire model portId1 portId2 (Symbol.getPortWidth model.Symbol portId1) // Invalid port combination, will be caught by verifyWire
             
-        match unverifiedWire |> (verifyWire model) with
+        match verifyWire model unverifiedWire with
         | Some w -> {model with WX = w::model.WX}, Cmd.none
         | None -> model, Cmd.none
+
+    | DeleteWires wIdList -> 
+        let wList =
+            model.WX
+            |> List.filter (fun w -> List.contains w.Id wIdList = false)
+        {model with WX = wList}, Cmd.none
+
+    | HighlightWires wIdList -> failwithf "not implemented" // Need to discuss with Symbol what is needed
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
