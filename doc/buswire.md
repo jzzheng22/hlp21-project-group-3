@@ -36,10 +36,10 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
 ## Messages
 
 ### <b> BusWire Sends to Symbol</b>
-`HighlightPortList of CommonTypes.PortId lists` 
+`HighlightPortList of CommonTypes.PortId list` 
  - Sends a list of PortIds to Symbol that must be highlighted 
  - Sent when the wire is highlighted
- 
+
 ### <b> BusWire Receives from Sheet</b>
 
 Note: `CommonTypes.ConnectionId` is a Wire ID
