@@ -290,6 +290,12 @@ let trans func sym trans =
 let log2 (n : int) : int =
     (log(float n) / log(2.)) |> ceil |> int
 
+let displaceN (sym : Symbol) (i : Portinfo) (n : float) : (float * float) =
+    displace n (findPos i sym.PortMap) sym
+
+let displaceNX (sym : Symbol) (i : Portinfo) (n : float) : float = displaceN sym i n |> fst
+
+let displaceNY (sym : Symbol) (i : Portinfo) (n : float) : float = displaceN sym i n |> snd
 
 
 //---------------------------------------------------------------------------//
@@ -598,8 +604,8 @@ let private renderObj =
                 props.Obj.PortList
                 |> List.map(fun i ->
                     text[
-                        X ((displace -10. (findPos i props.Obj.PortMap) props.Obj) |> fst)
-                        Y ((displace -10. (findPos i props.Obj.PortMap) props.Obj)  |> snd)
+                        X (displaceNX props.Obj i -10.)
+                        Y (displaceNY props.Obj i -10.)
                         Style[
                             TextAnchor "middle"
                             DominantBaseline "middle"
@@ -677,8 +683,8 @@ let private renderObj =
                 |> List.filter(fun x -> x.Invert = true)
                 |> List.map(fun i ->
                     circle[
-                        Cx ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> fst)
-                        Cy ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> snd)
+                        Cx (displaceNX props.Obj i 3.)
+                        Cy (displaceNY props.Obj i 3.)
                         R RAD
                         SVGAttr.Fill color
                         SVGAttr.Stroke "black"
@@ -689,8 +695,8 @@ let private renderObj =
                     props.Obj.PortList
                     |> List.map(fun i ->
                         circle[
-                            Cx ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> fst)
-                            Cy ((displace 3. (findPos i props.Obj.PortMap) props.Obj) |> snd)
+                            Cx (displaceNX props.Obj i 3.)
+                            Cy (displaceNY props.Obj i 3.)
                             R RAD
                             
                             SVGAttr.Fill "deepskyblue"
