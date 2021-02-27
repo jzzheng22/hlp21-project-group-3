@@ -131,9 +131,9 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int * Sy
     | CommonTypes.ComponentType.Demux2 -> ("DMUX" , 1, 1, Mux)
     | CommonTypes.ComponentType.NbitsAdder x -> ("Σ", x, x, Adder) //TODO CHECK
     | CommonTypes.ComponentType.Custom x -> (x.Name, 1, 1, LogMem)
-    | CommonTypes.ComponentType.DFF -> ("DFF", 1, 1, FF)
+    | CommonTypes.ComponentType.DFF -> ("DFF", 1, 1, LogMem)
     | CommonTypes.ComponentType.DFFE -> ("DFFE", 1, 1, FF)
-    | CommonTypes.ComponentType.Register x -> ("SRG", x, x, FF) //Check generic type
+    | CommonTypes.ComponentType.Register x -> ("SRG", x, x, LogMem) //Check generic type
     | CommonTypes.ComponentType.RegisterE x -> ("SRGE", x, x, FF) //Check generic type
     | CommonTypes.ComponentType.AsyncROM x -> ("A/ROM", x.AddressWidth, x.WordWidth, LogMem)
     | CommonTypes.ComponentType.ROM x -> ("ROM", x.AddressWidth, x.WordWidth, LogMem)
@@ -172,15 +172,6 @@ let posOf x y = {X=x;Y=y}
 let absDiff a b = 
     let diff = (posDiff a b)
     diff.X + diff.Y
-
-let fstTri (a, _, _) = a
-let sndTri (_, a, _) = a
-let trdTri (_, _, a) = a
-
-let fstQuad (a, _, _, _) = a
-let sndQuad (_, a, _, _) = a
-let trdQuad (_, _, a, _) = a
-let fouQuad (_, _, _, a) = a
 
 ///Displace will move a port position _away_ from the box.
 ///
@@ -273,13 +264,15 @@ let scaleCoords (coord : XYPos) (scale : XYPos) (centre : XYPos) : XYPos =
     transCoords coord centre [[scale.X; 0.; 0.]; [0.; scale.Y; 0.]; [0.; 0.; 1.]]
 
 let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
-    let newTopL = {X = List.min[topL.X; botR.X]; Y = List.min[topL.Y; botR.Y]}
-    let newBotR = {X = List.max[topL.X; botR.X]; Y = List.max[topL.Y; botR.Y]}
+    let newTopL = {X = min topL.X botR.X; Y = min topL.Y botR.Y}
+    let newBotR = {X = max topL.X botR.X; Y = max topL.Y botR.Y}
     (newTopL, newBotR)
 
-///
+///Finds the log base 2 of an int and rounds up to the nearest int
 let log2 (n : int) : int =
     (log(float n) / log(2.)) |> ceil |> int
+
+
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -293,16 +286,13 @@ let log2 (n : int) : int =
 /// topL : the top left of the symbol associated with the port.
 /// botR : the bottom right of the symbol associated with the port.
 /// n : the total number of ports on the symbol associated with the port.
-let CreatePortInfo (i : int) (num : int) (portType : CommonTypes.PortType Option) (genPort : genericPort) (topL : XYPos) (botR : XYPos) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) (w : int) : Portinfo = 
+let CreatePortInfo (i : int) (num : int) (portType : CommonTypes.PortType) (genPort : genericPort) (topL : XYPos) (botR : XYPos) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) (w : int) : Portinfo = 
     //Object creation
     {      
         Port = {
             Id = Helpers.uuid()
             PortNumber = Some i
-            PortType = 
-                match portType with
-                | Some x -> x
-                | None -> CommonTypes.PortType.Input; //All other port types (select, enable) are inputs
+            PortType =  portType
             HostId = string(compId)
         }
 
@@ -312,21 +302,19 @@ let CreatePortInfo (i : int) (num : int) (portType : CommonTypes.PortType Option
             match genPort with
             | Select -> sprintf "S%d" num
             | Carry -> match portType with 
-                       | Some CommonTypes.PortType.Input -> sprintf "Cin" 
-                       | Some CommonTypes.PortType.Output -> sprintf "Cout" 
-                       | _ -> "C" //Shouldn't happen
+                       | CommonTypes.PortType.Input -> sprintf "Cin" 
+                       | CommonTypes.PortType.Output -> sprintf "Cout" 
             | Enable -> sprintf "En"
             | _ -> match portType with 
-                    | Some CommonTypes.PortType.Input -> sprintf "IN %d" num
-                    | Some CommonTypes.PortType.Output -> sprintf "OUT %d" num 
-                    | _ -> "IO" //Shoudln't happen
+                    | CommonTypes.PortType.Input -> sprintf "IN %d" num
+                    | CommonTypes.PortType.Output -> sprintf "OUT %d" num 
 
         Invert = 
             match portType with
-            | Some CommonTypes.PortType.Output when compType = CommonTypes.ComponentType.Not
-                                                 || compType = CommonTypes.ComponentType.Nand
-                                                 || compType = CommonTypes.ComponentType.Nor
-                                                 || compType = CommonTypes.ComponentType.Xnor -> true;
+            | CommonTypes.PortType.Output when compType = CommonTypes.ComponentType.Not
+                                            || compType = CommonTypes.ComponentType.Nand
+                                            || compType = CommonTypes.ComponentType.Nor
+                                            || compType = CommonTypes.ComponentType.Xnor -> true;
             | _ -> false;
         
         slotPos = i
@@ -334,22 +322,25 @@ let CreatePortInfo (i : int) (num : int) (portType : CommonTypes.PortType Option
     }
 
 
-
+let makePort (offset : int) (range : int) (topL : XYPos) (botR : XYPos) (port : CommonTypes.PortType) (_id : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) (width : int) (pType : genericPort) = 
+    List.map(fun x -> CreatePortInfo (x + offset) x port pType topL botR _id compType width) [0 .. range - 1]
 
 ///Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut : int) (pos : XYPos) : Symbol =
-    //Intermediate calculations
+    
+    //Getting type info for symbol/port construction
     let info = typeToInfo compType
+    let (name, wIn, wOut, symType) = info
 
     let (left, right, bot) = //no symbols require extra ports on the top
-        match fouQuad info with
+        match symType with
         | Mux -> (0, 0, log2 numIn)
         | Adder -> (1, 1, 0)
         | FF -> (1, 0, 0)
         | _ -> (0, 0, 0) //Logic, memory, wires, IO do not require extra ports
 
-
-    let n = List.max[numIn + left; numOut + right] |> float
+    //Intermediate calculations
+    let n = max (numIn + left) (numOut + right) |> float
     let h = STD_HEIGHT * n
     let w = HW_RATIO * h
     let botR = {X = pos.X + w; Y = pos.Y + h}
@@ -371,34 +362,28 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         |> List.map (fun i -> {X = (portPos i (int(n)) pos botR).X; Y = botR.Y})
     let slots = List.concat [l; r; t; b]
 
-    let outi = (max numIn (int n))
     //Making ports
-    let ins = 
-        [0..numIn - 1]
-        |> List.map(fun x -> CreatePortInfo (x) x (Some CommonTypes.PortType.Input) InOut pos botR _id compType (info |> sndQuad))
+
+    let outi = (max numIn (int n))
     
-    let outs = 
-        [0..numOut - 1]
-        |> List.map(fun x -> CreatePortInfo (x + outi + left) x (Some CommonTypes.PortType.Output) InOut pos botR _id compType (info |> trdQuad))
-    
-    let posLeft = numIn
-    let posRight = posLeft + left + numOut 
+    let ins = makePort 0 numIn pos botR CommonTypes.PortType.Input _id compType wIn InOut
+    let outs = makePort (outi + left) numOut pos botR CommonTypes.PortType.Output _id compType wOut InOut
+
+    let posRight = numIn + left + numOut 
     let posBot = List.length l + List.length r + List.length t
 
-    let makeLeft pType = List.map(fun x -> CreatePortInfo (x + posLeft) x (Some CommonTypes.PortType.Input) pType pos botR _id compType (info |> trdQuad)) [0 .. left - 1]
-    let makeRight pType = List.map(fun x -> CreatePortInfo (x + posRight) x (Some CommonTypes.PortType.Output) pType pos botR _id compType (info |> trdQuad)) [0 .. right - 1]
-    let makeBot pType = List.map(fun x -> CreatePortInfo (x + posBot) x (Some CommonTypes.PortType.Input) pType pos botR _id compType (info |> trdQuad)) [0 .. bot - 1]
-
     let (leftPort, rightPort, topPort) =
-        match fouQuad info with
-        | Mux ->  ([], [], makeBot Select)
-        | Adder -> (makeLeft Carry, makeRight Carry, [])
-        | FF -> (makeLeft Enable, [], [])
+        match symType with
+        | Mux ->  ([], [], makePort posBot bot pos botR CommonTypes.PortType.Input _id compType wIn Select)
+        | Adder -> ((makePort numIn bot pos botR CommonTypes.PortType.Input _id compType wIn Carry), (makePort posRight bot pos botR CommonTypes.PortType.Output _id compType wOut Carry), [])
+        | FF -> ((makePort numIn bot pos botR CommonTypes.PortType.Input _id compType wIn Enable), [], [])
         | _ -> ([],[],[])
     
     let inOut = List.concat [ins; leftPort; outs; rightPort; topPort]
 
+    //---------------------------------------------------------------------------------------------//
     //-------------- FOR DEMO PURPOSES ONLY - THIS IS AN EXACT COPY OF THE MESSAGES ---------------//
+    //---------------------------------------------------------------------------------------------//
     let centre = midXY pos botR
     let rot  = 0
     let rotTopL = rotateCoords pos rot centre
@@ -411,20 +396,23 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let scaleSlots = rotSlots |> List.map (fun x -> scaleCoords x scale centre)
     let newBox = getNewBox scaleTopL scaleBotR
 
+    //---------------------------------------------------------------------------------------------//
+    //---------------------------------------------------------------------------------------------//
+
     // ------- Symbol Creation ------ ///
     {
-        TopL = newBox |> fst
+        TopL = newBox |> fst //only the demo for rotation/scaling, without demo: TopL = pos, and BotR = botR.
         BotR = newBox |> snd
         Id = _id
         Type = compType
-        Name = info |> fstQuad
+        Name = name
         Highlight = false
         PortHighlight = false
         PortMap = scaleSlots
         PortList = inOut
         Rotation = rot
         Scale = scale
-        genericType = info |> fouQuad
+        genericType = symType
     }
 
 
@@ -435,7 +423,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
 let init () =
     List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 pos)) 
+    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Output 1) 1 1 pos)) 
     , Cmd.none
 
 
