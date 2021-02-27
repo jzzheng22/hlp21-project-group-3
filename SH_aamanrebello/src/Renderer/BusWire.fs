@@ -45,6 +45,9 @@ type Msg =
     | AddWire of (CommonTypes.ConnectionId * CommonTypes.ConnectionId)
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
+    | HighlightConnection of wireIdList: CommonTypes.ConnectionId list
+    | MoveConnection of wireIdList : CommonTypes.ConnectionId list * pagePos : XYPos
+    | AddConnection of wireInfo : (CommonTypes.PortId * CommonTypes.PortId)
 
 
 
@@ -123,7 +126,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     | AddWire _ -> failwithf "Not implemented"
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
-
+    | HighlightConnection ls ->
+        printf "Highlight message sent to wire\n" 
+        model, Cmd.none
+    | MoveConnection (ls, vec) -> 
+        printf "wire move request of vector: %A\n" vec
+        model, Cmd.none
+    | AddConnection (p1, p2) -> 
+        printf "request to create new wire."
+        model, Cmd.none
+        
 //---------------Other interface functions--------------------//
 
 /// Given a point on the canvas, returns the wire ID of a wire within a few pixels
@@ -144,8 +156,8 @@ let updateSymbolModelWithComponent (symModel: Model) (comp:CommonTypes.Component
     failwithf "Not Implemented"
 
 
-
-    
-
-
+///Stub to test sheet in Wire
+let getBoundingBoxes (wireModel : Model) (startCoord : XYPos) : (CommonTypes.ConnectionId * XYPos * XYPos) list =
+    wireModel.WX
+    |> List.map (fun sym -> (sym.Id, {X = 0.0; Y = 0.0}, {X = 10.0; Y = 10.0}))
 
