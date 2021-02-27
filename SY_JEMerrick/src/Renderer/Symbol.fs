@@ -268,9 +268,22 @@ let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
     let newBotR = {X = max topL.X botR.X; Y = max topL.Y botR.Y}
     (newTopL, newBotR)
 
+//Generic transformation function that takes in a transformation function, symbol and transformation
+let trans func sym trans =
+    let centre = midXY sym.TopL sym.BotR
+    let rotTopL = func sym.TopL trans centre
+    let rotBotR = func sym.BotR trans centre
+    let newBox = getNewBox rotTopL rotBotR
+    { sym with
+        TopL = newBox |> fst
+        BotR = newBox |> snd
+        PortMap = sym.PortMap |> List.map (fun x -> func x trans centre)
+    }
+
 ///Finds the log base 2 of an int and rounds up to the nearest int
 let log2 (n : int) : int =
     (log(float n) / log(2.)) |> ceil |> int
+
 
 
 //---------------------------------------------------------------------------//
@@ -347,7 +360,8 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     
     let _id = CommonTypes.ComponentId (Helpers.uuid())
 
-    //Making slot position list
+    // ---- Making portMap ---- //
+
     let l = 
         [0..int(n) - 1]
         |> List.map (fun i -> {X = pos.X; Y = (portPos i (int(n)) pos botR).Y})
@@ -362,13 +376,17 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         |> List.map (fun i -> {X = (portPos i (int(n)) pos botR).X; Y = botR.Y})
     let slots = List.concat [l; r; t; b]
 
-    //Making ports    
+    // ---- Making symbol's ports ---- //
+
+    //First make the generic input output ports with labels IN0...INn,  OUT0 .. OUTn
     let ins = makePort 0 numIn pos botR CommonTypes.PortType.Input _id compType wIn InOut
     let outs = makePort (n |> int) numOut pos botR CommonTypes.PortType.Output _id compType wOut InOut
 
+    //Calculate the index required for any component specific ports - for left ports index starts from numIn:
     let posRight = numIn + left + numOut 
     let posBot = List.length l + List.length r + List.length t
 
+    //Create any component specific ports
     let (leftPort, rightPort, topPort) =
         match symType with
         | Mux ->  ([], [], makePort posBot bot pos botR CommonTypes.PortType.Input _id compType wIn Select)
@@ -376,10 +394,11 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         | FF -> ((makePort numIn left pos botR CommonTypes.PortType.Input _id compType wIn Enable), [], [])
         | _ -> ([],[],[])
     
-    let inOut = List.concat [ins; leftPort; outs; rightPort; topPort]
+    //Concatenate the generic IN/OUT ports and the component specifc ports to get the full symbol portList
+    
 
     //---------------------------------------------------------------------------------------------//
-    //-------------- FOR DEMO PURPOSES ONLY - THIS IS AN EXACT COPY OF THE MESSAGES ---------------//
+    //----FOR DEMO PURPOSES ONLY - THIS IS AN EXACT COPY OF THE TRANS FUNCTION USED IN MESSAGES----//
     //---------------------------------------------------------------------------------------------//
     let centre = midXY pos botR
     let rot  = 0
@@ -395,6 +414,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
 
     //---------------------------------------------------------------------------------------------//
     //---------------------------------------------------------------------------------------------//
+    //---------------------------------------------------------------------------------------------//
 
     // ------- Symbol Creation ------ ///
     {
@@ -405,8 +425,8 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         Name = name
         Highlight = false
         PortHighlight = false
-        PortMap = scaleSlots
-        PortList = inOut
+        PortMap = scaleSlots //only the demo for rotation/scaling, without demo: PortMap = slots.
+        PortList = List.concat [ins; leftPort; outs; rightPort; topPort]
         Rotation = rot
         Scale = scale
         genericType = symType
@@ -420,7 +440,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
 let init () =
     List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.NbitsAdder 1) 2 1 pos)) 
+    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 pos)) 
     , Cmd.none
 
 
@@ -496,10 +516,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                             |> List.minBy (snd)
                             |> fst
                         
-                        //If some element in PortList x  has x.slotPos = i
-                        //Swap x and port which means:
-                        //Make x.slotPos = port.slotPos
-                        
+                        //If some element in PortList x has slotPos = i (i.e. it is inside the position we want to move the port to)
+                        //Swap x and port (i.e. Make x.slotPos = port.slotPos)
                         sym.PortList
                         |> List.tryFind (fun x -> x.slotPos = i)
                         |> function
@@ -521,17 +539,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 if sId <> sym.Id then
                     sym
                 else
-                    let centre = midXY sym.TopL sym.BotR
-                    let rotTopL = rotateCoords sym.TopL rot centre
-                    let rotBotR = rotateCoords sym.BotR rot centre
-                    let newBox = getNewBox rotTopL rotBotR
-                    { sym with
-                        TopL = newBox |> fst
-                        BotR = newBox |> snd
-                        PortMap = sym.PortMap |> List.map (fun x -> rotateCoords x rot centre)
-                    }
-            )
-            , Cmd.none
+                    trans rotateCoords sym rot
+        )
+        , Cmd.none
 
         | Scale (sId, scale) ->
             model
@@ -539,17 +549,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 if sId <> sym.Id then
                     sym
                 else
-                    let centre = midXY sym.TopL sym.BotR
-                    let scaleTopL = scaleCoords sym.TopL scale centre
-                    let scaleBotR = scaleCoords sym.BotR scale centre
-                    let newBox = getNewBox scaleTopL scaleBotR
-                    { sym with
-                        TopL = newBox |> fst
-                        BotR = newBox |> snd
-                        PortMap = sym.PortMap |> List.map (fun x -> scaleCoords x scale centre)
-                    }
-            )
-            , Cmd.none
+                    trans scaleCoords sym scale
+        )
+        , Cmd.none
 
     | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
     | _ -> failwithf "Not implemented"
@@ -587,9 +589,6 @@ let private renderObj =
                             else
                                 "gainsboro"
                 
-
-            
-
             let labels : ReactElement list = 
                 props.Obj.PortList
                 |> List.map(fun i ->
