@@ -22,28 +22,48 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
  - `(id: string * topleft: XYPos * bottomright: XYPos)`
  - Initially just return all wires
 
+ - Returns a flat list
+   - Each wire has one ID but multiple bounding boxes 
+   - A single WireID may appear multiple times accompanying a different bounding box of the wire
+
+    string  | XYPos  | XYPos  |   
+    |---------|--------|--------|
+    | WireID 1 | TopL 1A | BotR 1A |   
+    | WireID 1 | TopL 1B | BotR 1B |   
+    | WireID 2 | Top L2  | Bot R2  |   
+    | WireID 3 | Top L3  | Bot R3
+
 ## Messages
 
-`Delete of wireIdList`
+Note: `CommonTypes.ConnectionId` is a Wire ID
+
+`DeleteWires of CommonTypes.ConnectionId list`
  - Deletes wires from model based on ID.
 
-`AddConnection of wireInfo`
- - Create connection between two ports
- - Need to check widths of both ports to see if they are equal/unequal
- - Look at how ISSIE does it?
+`AddWire of (string * string)`
+ - Create connection between two ports, whose IDs are supplied in the message
+ - The order of ports does not matter, as long as one of the ports is an input and the other is an output
+ - BusWire's handling of this message incorporates wire validation, protecting against:
+   - Port type mismatch (trying to connect input to input, output to output)
+   - Wire duplication (trying to draw a wire that already exists)
+   - Port width mismatch (target port has different width to source port)
+   - <i> These rules are fairly easy to add so talk to Aditya if you want more </i>
+ 
 
-`Highlight of wireIdList`
+`Highlight of CommonTypes.ConnectionId list`
  - Highlights wires in list
- - Look at how ISSIE does it? 
- - In Issie, only the ports are highlighted when you click on a wire
+ - Not implemented yet, need to decide what exactly to highlight
 
 `Move of wireIdList *  XYPos`
  - XYPos is translation vector
+ - Not implemented yet, will do when incorporating manual routing
+
+
 
 ## BusWire needs to be able to receive these:
  - Add connections (from Sheet and ISSIE)
  - Delete connections (from Sheet)
- - Move connection segment (from Sheet)
+ - Move connection segment (from Sheet) -> WILL HAPPEN WHEN MANUAL ROUTING IS CONFIGURED
  - Highlight connections (from Sheet and ISSIE)
  - Init canvas (from ISSIE)
 

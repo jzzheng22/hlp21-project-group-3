@@ -33,7 +33,7 @@ let displaySvgWithZoom (zoom:float) (svgReact: ReactElement) (dispatch: Dispatch
     /// Dispatch a BusWire MouseMsg message
     /// the screen mouse coordinates are compensated for the zoom transform
     let mouseOp op (ev:Types.MouseEvent) = 
-        dispatch <| Wire (BusWire.MouseMsg {Op = op ; Pos = { X = ev.x / zoom ; Y = ev.y / zoom}})
+        dispatch <| Wire (BusWire.MouseMsg {Op = op ; Pos = { X = ev.clientX / zoom ; Y = ev.clientY / zoom}})
     div [ Style 
             [ 
                 Height "100vh" 
@@ -70,12 +70,7 @@ let displaySvgWithZoom (zoom:float) (svgReact: ReactElement) (dispatch: Dispatch
 
                     svgReact // the application code
 
-                    polygon [ // a demo svg polygon triangle written on top of the application
-                        SVGAttr.Points "10,10 900,900 10,900"
-                        SVGAttr.StrokeWidth "5px"
-                        SVGAttr.Stroke "Black"
-                        SVGAttr.FillOpacity 0.1
-                        SVGAttr.Fill "Blue"] []
+                    
                 ]
             ]
         ]
