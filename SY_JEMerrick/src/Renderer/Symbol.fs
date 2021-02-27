@@ -362,12 +362,9 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         |> List.map (fun i -> {X = (portPos i (int(n)) pos botR).X; Y = botR.Y})
     let slots = List.concat [l; r; t; b]
 
-    //Making ports
-
-    let outi = (max numIn (int n))
-    
+    //Making ports    
     let ins = makePort 0 numIn pos botR CommonTypes.PortType.Input _id compType wIn InOut
-    let outs = makePort (outi + left) numOut pos botR CommonTypes.PortType.Output _id compType wOut InOut
+    let outs = makePort (n |> int) numOut pos botR CommonTypes.PortType.Output _id compType wOut InOut
 
     let posRight = numIn + left + numOut 
     let posBot = List.length l + List.length r + List.length t
@@ -375,8 +372,8 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let (leftPort, rightPort, topPort) =
         match symType with
         | Mux ->  ([], [], makePort posBot bot pos botR CommonTypes.PortType.Input _id compType wIn Select)
-        | Adder -> ((makePort numIn bot pos botR CommonTypes.PortType.Input _id compType wIn Carry), (makePort posRight bot pos botR CommonTypes.PortType.Output _id compType wOut Carry), [])
-        | FF -> ((makePort numIn bot pos botR CommonTypes.PortType.Input _id compType wIn Enable), [], [])
+        | Adder -> ((makePort numIn left pos botR CommonTypes.PortType.Input _id compType wIn Carry), (makePort posRight right pos botR CommonTypes.PortType.Output _id compType wOut Carry), [])
+        | FF -> ((makePort numIn left pos botR CommonTypes.PortType.Input _id compType wIn Enable), [], [])
         | _ -> ([],[],[])
     
     let inOut = List.concat [ins; leftPort; outs; rightPort; topPort]
@@ -423,7 +420,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
 let init () =
     List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Output 1) 1 1 pos)) 
+    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.NbitsAdder 1) 2 1 pos)) 
     , Cmd.none
 
 
