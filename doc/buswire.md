@@ -21,6 +21,7 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
  - Returns list containing IDs, and bounding box coords of wires
  - `(id: string * topleft: XYPos * bottomright: XYPos)`
  - Initially just return all wires
+
  - Returns a flat list
    - Each wire has one ID but multiple bounding boxes 
    - A single WireID may appear multiple times accompanying a different bounding box of the wire
@@ -34,7 +35,7 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
 
 ## Messages
 
-<i>Note: `CommonTypes.ConnectionId` is a Wire ID</i>
+Note: `CommonTypes.ConnectionId` is a Wire ID
 
 `DeleteWires of CommonTypes.ConnectionId list`
  - Deletes wires from model based on ID.
@@ -56,6 +57,8 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
 `Move of wireIdList *  XYPos`
  - XYPos is translation vector
  - Not implemented yet, will do when incorporating manual routing
+
+
 
 ## BusWire needs to be able to receive these:
  - Add connections (from Sheet and ISSIE)
