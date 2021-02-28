@@ -26,7 +26,39 @@ type Msg =
     | SelectPort of (XYPos * CommonTypes.PortId)
     | SelectComponents of (XYPos * CommonTypes.ComponentId list)
     | SelectWires of (XYPos * CommonTypes.ConnectionId list)
+    | SelectMultiple of XYPos
 
+
+let inBoundingBox point box =
+    match box with
+    | _, topL, botR ->
+        let leftX = topL.X
+        let rightX = botR.X
+        let topY = topL.Y
+        let botY = botR.Y
+        point.X > leftX && point.X < rightX && point.Y > botY && point.Y < topY
+
+let getID tuple =
+    let id, _, _ = tuple
+    id
+
+let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
+    let symbolIDList = 
+        Symbol.getBoundingBoxes model.Symbol mousePos
+        |> List.filter (inBoundingBox mousePos)
+    if not (List.isEmpty symbolIDList) then
+        let symbolIDList' = List.map getID symbolIDList
+        dispatch <| SelectComponents (mousePos, symbolIDList')
+
+    else
+        let wireIDList = 
+            BusWire.getBoundingBoxes model.Wire mousePos
+            |> List.filter (inBoundingBox mousePos)
+        if not (List.isEmpty wireIDList) then
+            let wireIDList' = List.map getID wireIDList
+            dispatch <| SelectWires (mousePos, wireIDList')
+        else
+            dispatch <| SelectMultiple mousePos
 
 /// This function zooms an SVG canvas by transforming its content and altering its size.
 /// Currently the zoom expands based on top left corner. Better would be to collect dimensions
@@ -53,13 +85,9 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
 
             match Symbol.isPort model.Symbol mousePos with
             | Some (portCoords, portId) -> dispatch <| SelectPort (portCoords, portId)
-            | None -> 
-                let symbolList = Symbol.getBoundingBoxes model.Symbol mousePos
-                if List.isEmpty symbolList then
-                  
-                failwithf "asdf"
-            
-            (mouseOp Down ev))
+            | None -> selectElements model mousePos dispatch
+          )
+            // (mouseOp Down ev))
           OnMouseUp (fun ev -> (mouseOp Up ev))
           OnMouseMove (fun ev -> mouseOp (if mDown ev then Drag else Move) ev)
         ]
@@ -132,6 +160,7 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
         failwithf "Not implemented"
     | SelectComponents scMsg -> failwithf "Not implemented"
     | SelectWires swMsg -> failwithf "Not implemented"
+    | SelectMultiple smMsg -> failwithf "Not implemented"
 
 let init() = 
     let model,cmds = (BusWire.init 400)()
