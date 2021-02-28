@@ -26,12 +26,13 @@ type Model = {
     SelectedComponentIDs: CommonTypes.ComponentId list
     SelectedWireIDs: CommonTypes.ConnectionId list
     SelectedPort: CommonTypes.PortId option
+    AddKey: int
     Zoom: float
     }
 
 //Keyboard messages (see Renderer.fs)
 type KeyboardMsg =
-    | CtrlS | AltC | AltV | AltZ | AltShiftZ | DEL | ZoomCanvasIn | ZoomCanvasOut
+    | CtrlS | AltC | AltV | AltZ | AltShiftZ | DEL | ZoomCanvasIn | ZoomCanvasOut | AltA
     
 //The message type
 type Msg =
@@ -65,6 +66,8 @@ let obtainID (data: (string * XYPos * XYPos)) =
 let obtainCorners (data: (string * XYPos * XYPos)) =
     let id, topLeft, bottomRight = data 
     (topLeft, bottomRight)
+
+
 
 //Bool function that determines whether a point is within a bounding box. The bounding box is a tuple of 
 //(topleft corner, bottomright corner)
@@ -114,6 +117,13 @@ let boxEncloses (encloser: (XYPos * XYPos)) (enclosed: (string * XYPos * XYPos))
 //Function to check if two lists have elements in common 
 let hasCommon ls1 ls2 = 
     Set.isEmpty (Set.intersect (Set.ofList ls1) (Set.ofList ls2)) |> not   
+
+
+//Function that translates the addKey value of model to an initial position for adding a symbol
+let iniPos zoom addkey =
+    let yOffset = float (addkey%10)
+    let xOffset = float (addkey/10)
+    {X = (10.0 + 90.0*xOffset)*zoom; Y = (10.0 + 90.0*yOffset)*zoom}
 
 
     
@@ -209,13 +219,12 @@ let backgroundGrid zoom  =
     ]
 
 
-
  /// this will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None)
 
 /// This function zooms an SVG canvas by transforming its content and altering its size.
 /// Currently the zoom expands based on top left corner. Better would be to collect dimensions
-/// current scroll position, and chnage scroll position to keep centre of screen a fixed point.
+/// current scroll position, and chnage scroll position to keep centre of screen a fixed point
 let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: ReactElement option) (dispatch: Dispatch<Msg>)=
     
     let zoom = model.Zoom
@@ -335,12 +344,10 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                             match List.tryFind (pointInBoundingBox mousePos) stringIdBoxes with 
                             //We get something then highlight the symbol ports.
                             | Some a ->
-                                printfn "Gotcha!"
                                 let symid, tl, br = a 
                                 WireMsg (BusWire.Symbol (Symbol.HighlightPorts (CommonTypes.ComponentId symid))) |> dispatch
-                            //Else just return unit.
-                            | None ->
-                                printfn "Nothing" 
+                            //Else highlight nothing.
+                            | None -> 
                                 WireMsg (BusWire.Symbol (Symbol.HighlightPorts (CommonTypes.ComponentId ""))) |> dispatch
 
                             if mDown ev 
@@ -374,7 +381,7 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
 let view (model:Model) (dispatch : Msg -> unit) =
 
     WireMsg (BusWire.Symbol (Symbol.Highlight model.SelectedComponentIDs)) |> dispatch
-    WireMsg (BusWire.HighlightConnection model.SelectedWireIDs) |> dispatch           
+    WireMsg (BusWire.HighlightWires model.SelectedWireIDs) |> dispatch           
      
     let wDispatch wMsg = dispatch (WireMsg wMsg)
     //Get components from wire and symbol
@@ -397,6 +404,23 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     //Zooming out
     | KeyPress ZoomCanvasOut -> 
         ({model with Zoom = model.Zoom/1.25}, Cmd.none)
+    | KeyPress DEL -> 
+        match model.SelectionType with 
+        | ComponentSymbol -> 
+            printfn "CASE 1"
+            let wModel, wCmd = BusWire.update (BusWire.Symbol (Symbol.Delete model.SelectedComponentIDs)) model.Wire
+            {model with Wire = wModel}, Cmd.map WireMsg wCmd
+        | ComponentWire -> 
+            printfn "CASE 2"
+            let wModel, wCmd = BusWire.update (BusWire.DeleteWires model.SelectedWireIDs) model.Wire
+            {model with Wire = wModel}, Cmd.map WireMsg wCmd
+        | _ -> 
+            printfn "NOTHING"
+            model, Cmd.none
+    //To test adding an and symbol
+    | KeyPress AltA -> 
+        let wModel, wCmd = BusWire.update (BusWire.Symbol (Symbol.Add (CommonTypes.ComponentType.And, (iniPos model.Zoom model.AddKey), 2, 1))) model.Wire
+        {model with Wire = wModel; AddKey = (model.AddKey + 1)%100}, Cmd.map WireMsg wCmd
     //Printing performace stats
     | KeyPress AltShiftZ -> 
         printStats() // print and reset the performance statistics in dev tools window
@@ -472,7 +496,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             {model with Wire = wmodel; SelectBoxCurrent = point}, Cmd.map WireMsg wCmd
         //This corresponds to a wire being moved
         | ComponentWire ->
-            let wModel, wCmd = BusWire.update (BusWire.MoveConnection (model.SelectedWireIDs, vector)) model.Wire
+            let wModel, wCmd = BusWire.update (BusWire.MoveWires (model.SelectedWireIDs, vector)) model.Wire
             {model with Wire = wModel; SelectBoxCurrent = point}, Cmd.map WireMsg wCmd
         //Otherwise we don't need to dispatch any messages to Symbol/BusWire components
         | _ ->
@@ -486,13 +510,14 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             match (Symbol.isPort (model.Wire.Symbol) endPoint) with 
             //If we get a port, create a wire between the ports.
             | Some a ->
+                printfn "Case 1 - IN PORT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                 let endportcoord, endportid = a
                 let startportid = 
                     match model.SelectedPort with 
                     | Some port -> 
                         port 
                     | None -> failwithf "Unexpected case in selection type port - unable to create connection."
-                let wModel, wCmd = BusWire.update (BusWire.AddConnection (startportid, endportid)) model.Wire
+                let wModel, wCmd = BusWire.update (BusWire.AddWire (startportid, endportid)) model.Wire
                 {model with
                      Wire = wModel;
                      SelectBoxStart = origin;
@@ -503,6 +528,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                      SelectedPort = None}, Cmd.none
             //Else revert to default.
             | None ->
+                printfn "Case 2 - OUT OF PORT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                 {model with
                     SelectBoxStart = origin;
                     SelectBoxCurrent = origin;
@@ -521,13 +547,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |> List.filter (boxEncloses draggedBox)
                 |> List.map (obtainID >> CommonTypes.ComponentId)
             //If we get something then we move to ComponentSymbol state with the selected symbols.
+            let selectedWires =
+                BusWire.getBoundingBoxes (model.Wire) endPoint
+                |> List.map (fun (a,b,c) -> a)
             if not (List.isEmpty selectedSymbols) then 
                 {model with
                     SelectBoxStart = origin;
                     SelectBoxCurrent = origin;
                     SelectionType = ComponentSymbol;
                     SelectedComponentIDs = selectedSymbols;
-                    SelectedWireIDs = [];
+                    SelectedWireIDs = selectedWires;
                     SelectedPort = None}, Cmd.none 
             //Otherwise we have nothing
             else 
@@ -553,5 +582,6 @@ let init() =
         SelectedComponentIDs = []
         SelectedWireIDs = []
         SelectedPort = None
+        AddKey = 0
         Zoom = 1.0
     }, Cmd.map WireMsg cmds

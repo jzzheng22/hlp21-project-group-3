@@ -450,11 +450,11 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
 
 /// Dummy function for test. Creates 4 NAND gates with 2 input, 1 output.
 let init () =
-    List.allPairs [1..2] [1..2]
+    [(2,2);(4,4)]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
     |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 pos)) 
     , Cmd.none
-
+    
 
 /// update function which displays symbols
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
