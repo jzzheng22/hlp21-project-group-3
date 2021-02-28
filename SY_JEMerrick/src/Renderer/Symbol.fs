@@ -844,7 +844,8 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * CommonTypes.PortId) Optio
     |>initPortSearch
     |> List.tryFind (fun (v, k) -> testBox v pos)
     |> function
-    | Some(v, k) -> Some(v, (CommonTypes.PortId (getPortId k)))
+    | Some(v, Some k) -> Some(v, (CommonTypes.PortId (k.Port.Id)))
+    | Some(v, None) -> None
     | None -> None
 
 //Returns a list of Port Ids for a given symbol
