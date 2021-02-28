@@ -92,7 +92,7 @@ type Msg =
     | Delete of sIdList : CommonTypes.ComponentId list
     | Highlight of sIdList: CommonTypes.ComponentId list
     | HighlightPorts of sId : CommonTypes.ComponentId
-    | DragPort of sId : CommonTypes.ComponentId * pId : string * pagePos: XYPos
+    | DragPort of sId : CommonTypes.ComponentId * pId : CommonTypes.PortId * pagePos: XYPos
     | Rotate of sId : CommonTypes.ComponentId * rot : int
     | Scale of sId : CommonTypes.ComponentId * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
     | UpdateSymbolModelWithComponent of CommonTypes.Component // Issie interface
@@ -190,14 +190,14 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
-    let Box = (addXYVal portPos -5., addXYVal portPos 5.);
+    let Box = (addXYVal portPos -7., addXYVal portPos 7.);
     let topL = Box |> fst
     let botR = Box |> snd
     topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
 
 let testLabelBox (portPos : XYPos) (coord : XYPos) (sym : Symbol) : bool =
     let transl = displace -5. portPos sym
-    testBox {X = fst transl; Y = snd transl} coord
+    testBox {X = fst transl; Y = portPos.Y} coord
 
 let portPos (i : int) (n : int) (topL : XYPos) (botR : XYPos) : XYPos = 
     let h = getHW botR topL |> fst
@@ -561,7 +561,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         )
         , Cmd.none
 
-    (*| DragPort (sId, pId, pagePos) ->
+    | DragPort (sId, pId, pagePos) ->
         model
         |> List.map (fun sym ->
             if sId <> sym.Id then
@@ -569,35 +569,30 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
             else
                 let diff = pagePos
                 { sym with
-                    PortList =
-                        let PortIndx = List.indexed sym.PortList
+                    PortMap =
 
                         //The port we are moving
-                        let port = List.find (fun x -> string(x.Port.Id) = pId) sym.PortList
+                        let port = 
+                            sym.PortMap
+                            |> Map.toList
+                            |> List.find (fun (v, k) -> getPortId k  = string pId)
 
                         //The index we want to move the port to is the one closest to the mouse
-                        let i = 
-                            List.map (fun x -> absDiff pagePos x) sym.PortMap
-                            |> List.indexed
-                            |> List.minBy (snd)
-                            |> fst
-                        
-                        //If some element in PortList x has slotPos = i (i.e. it is inside the position we want to move the port to)
-                        //Swap x and port (i.e. Make x.slotPos = port.slotPos)
-                        sym.PortList
-                        |> List.tryFind (fun x -> x.slotPos = i)
+                        sym.PortMap
+                        |> Map.toList
+                        |> List.map (fun (v, k) -> (absDiff pagePos v, (v, k)))
+                        |> List.minBy fst
+                        |> snd
                         |> function
-                        | Some x -> sym.PortList
-                                    |> List.filter (fun v -> v <> x || v <> port)
-                                    |> List.append [{x with slotPos = port.slotPos}]
-                                    |> List.append [{port with slotPos = i}]
-
-                        | None ->   sym.PortList
-                                    |> List.filter (fun v -> v <> port)
-                                    |> List.append [{port with slotPos = i}]
+                        | (k, Some x) -> sym.PortMap
+                                        |> Map.change k (fun _ -> Some(port |> snd))
+                                        |> Map.change (port |> fst) (fun _ -> Some (Some x))
+                        | (k, None) -> sym.PortMap
+                                        |> Map.change k (fun _ -> Some(port |> snd))
+                                        |> Map.change (port |> fst) (fun _ -> None)
                 }
         )
-        , Cmd.none*)
+        , Cmd.none
 
         | Rotate (sId, rot) ->
             model
