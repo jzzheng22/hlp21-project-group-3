@@ -196,7 +196,7 @@ let testBox (portPos : XYPos) (coord : XYPos) : bool =
     topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
 
 let testLabelBox (portPos : XYPos) (coord : XYPos) (sym : Symbol) : bool =
-    let transl = displace -3. portPos sym
+    let transl = displace -5. portPos sym
     testBox {X = fst transl; Y = snd transl} coord
 
 let portPos (i : int) (n : int) (topL : XYPos) (botR : XYPos) : XYPos = 
