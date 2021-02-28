@@ -231,25 +231,27 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
 let init n () =
     let symbols, cmd = Symbol.init()
     let symIds = List.map (fun (sym:Symbol.Symbol) -> sym.Id) symbols
-    let rng = System.Random 0
-    let ports = Symbol.initPortSearch symbols 
-    let outPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Output) ports).Value
-    let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
-    let id = CommonTypes.ConnectionId (Helpers.uuid())
-    let vert = routeWire (Symbol.getPortCoords symbols (CommonTypes.PortId outPort.Port.Id)) (Symbol.getPortCoords symbols (CommonTypes.PortId inPort.Port.Id))
-    let bb = singleWireBoundingBoxes vert id
-    let testWire: Wire = 
-        {
-            Id = id
-            SourcePortId = CommonTypes.PortId outPort.Port.Id
-            TargetPortId = CommonTypes.PortId inPort.Port.Id
-            Vertices = vert
-            BoundingBoxes = bb
-            Width = Symbol.getPortWidth symbols (CommonTypes.PortId outPort.Port.Id)
-            Highlight = false
-        }
-    [testWire]
-    |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
+    //let rng = System.Random 0
+    //let ports = Symbol.initPortSearch symbols 
+    //let outPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Output) ports).Value
+    //let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
+    //let id = CommonTypes.ConnectionId (Helpers.uuid())
+    //let vert = routeWire (Symbol.getPortCoords symbols (CommonTypes.PortId outPort.Port.Id)) (Symbol.getPortCoords symbols (CommonTypes.PortId inPort.Port.Id))
+    //let bb = singleWireBoundingBoxes vert id
+    //let testWire: Wire = 
+    //    {
+    //        Id = id
+    //        SourcePortId = CommonTypes.PortId outPort.Port.Id
+    //        TargetPortId = CommonTypes.PortId inPort.Port.Id
+    //        Vertices = vert
+    //        BoundingBoxes = bb
+    //        Width = Symbol.getPortWidth symbols (CommonTypes.PortId outPort.Port.Id)
+    //        Highlight = false
+    //    }
+    //[testWire]
+    //|> (fun wires -> 
+    {WX=[];Symbol=symbols; Color=CommonTypes.Red},Cmd.none
+    //)
 
 //-------------------Helpers for Update Function-------------------//
 // WIRE RULES: Must have signature Model->Wire->bool
@@ -303,12 +305,13 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
     | AddWire (portId1,portId2) ->
+        printfn "PART 1!!!\n"
         let unverifiedWire =
             match Symbol.getPortType model.Symbol portId1 , Symbol.getPortType model.Symbol portId2 with
             | CommonTypes.Output , CommonTypes.Input -> makeNewWire model portId1 portId2 (Symbol.getPortWidth model.Symbol portId1) // Wire was drawn from Output to Input
             | CommonTypes.Input , CommonTypes.Output -> makeNewWire model portId2 portId1 (Symbol.getPortWidth model.Symbol portId2) // Wire was drawn from Input to Output
             | _ , _ -> makeNewWire model portId1 portId2 (Symbol.getPortWidth model.Symbol portId1) // Invalid port combination, will be caught by verifyWire
-            
+        printfn "PART 2!!!\n" 
         match verifyWire model unverifiedWire with
         | Some w -> {model with WX = w::model.WX}, Cmd.none
         | None -> model, Cmd.none
@@ -342,9 +345,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId option = 
     failwith "Not implemented"
 
+/// Returns all bounding boxes for all wire segments in the wire model
 let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     wModel.WX
     |> List.collect (fun w -> w.BoundingBoxes)
+
+/// Returns a list of wire IDs connected to the supplied ports
+let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =
+    wModel.WX
+    |> List.filter (fun w -> List.contains w.SourcePortId portIds || List.contains w.TargetPortId portIds)
+    |> List.map (fun w -> w.Id)
     
 
 
@@ -358,10 +368,5 @@ let extractWires (wModel: Model) : CommonTypes.Component list =
 /// Update the symbol with matching componentId to comp, or add a new symbol based on comp.
 let updateSymbolModelWithComponent (symModel: Model) (comp:CommonTypes.Component) =
     failwithf "Not Implemented"
-
-
-
-    
-
 
 
