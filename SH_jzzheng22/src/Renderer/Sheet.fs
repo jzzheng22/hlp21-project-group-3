@@ -14,6 +14,10 @@ type Model = {
     SelectedPorts: CommonTypes.PortId list
     SelectedComponents: CommonTypes.ComponentId list
     SelectedWires: CommonTypes.ConnectionId list
+    DragStartPos: XYPos
+    // DragEndPos: XYPos
+    DraggingPos: bool * XYPos
+    MousePos: XYPos
     }
 
 type KeyboardMsg =
@@ -26,8 +30,12 @@ type Msg =
     | SelectPort of (XYPos * CommonTypes.PortId)
     | SelectComponents of (XYPos * CommonTypes.ComponentId list)
     | SelectWires of (XYPos * CommonTypes.ConnectionId list)
-    | SelectMultiple of XYPos
+    | SelectDragStart of XYPos
+    | SelectDragEnd of (bool * XYPos)
+    | SelectDragging of (bool * XYPos)
+    | MouseMove of XYPos
 
+let origin = {X = 0.; Y = 0.}
 
 let inBoundingBox point box =
     match box with
@@ -36,7 +44,7 @@ let inBoundingBox point box =
         let rightX = botR.X
         let topY = topL.Y
         let botY = botR.Y
-        point.X > leftX && point.X < rightX && point.Y > botY && point.Y < topY
+        point.X >= leftX && point.X <= rightX && point.Y >= botY && point.Y <= topY
 
 let getID tuple =
     let id, _, _ = tuple
@@ -58,7 +66,10 @@ let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
             let wireIDList' = List.map getID wireIDList
             dispatch <| SelectWires (mousePos, wireIDList')
         else
-            dispatch <| SelectMultiple mousePos
+            dispatch <| SelectDragStart mousePos
+
+let selectDragging (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
+    failwithf "Not implemented"
 
 /// This function zooms an SVG canvas by transforming its content and altering its size.
 /// Currently the zoom expands based on top left corner. Better would be to collect dimensions
@@ -88,8 +99,25 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             | None -> selectElements model mousePos dispatch
           )
             // (mouseOp Down ev))
-          OnMouseUp (fun ev -> (mouseOp Up ev))
-          OnMouseMove (fun ev -> mouseOp (if mDown ev then Drag else Move) ev)
+          OnMouseUp (fun ev -> 
+            let coordX = ev.clientX / model.Zoom
+            let coordY = ev.clientY / model.Zoom
+            let mousePos = {X = coordX; Y = coordY}
+            dispatch <| SelectDragEnd (false, mousePos)
+          )
+            // (mouseOp Up ev))
+          OnMouseMove (fun ev -> 
+            let coordX = ev.clientX / model.Zoom
+            let coordY = ev.clientY / model.Zoom
+            let mousePos = {X = coordX; Y = coordY}
+            let symbolIDList = 
+                Symbol.getBoundingBoxes model.Symbol mousePos
+                |> List.filter (inBoundingBox mousePos)
+            if not (List.isEmpty symbolIDList) then
+                dispatch <| Symbol (Symbol.HighlightPorts (model.SelectedComponents))
+            if mDown ev then // Drag
+                dispatch <| SelectDragging (true, mousePos)
+            )
         ]
         [ svg
             [ Style 
@@ -156,11 +184,25 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
         printfn "Key:%A" c
         model, Cmd.ofMsg (Wire <| BusWire.SetColor c)
     | SelectPort spMsg -> 
-        let mousePos, portId = spMsg
-        failwithf "Not implemented"
-    | SelectComponents scMsg -> failwithf "Not implemented"
-    | SelectWires swMsg -> failwithf "Not implemented"
-    | SelectMultiple smMsg -> failwithf "Not implemented"
+        let _, portID = spMsg
+        {model with SelectedPorts = [portID]}, Cmd.none
+    | SelectComponents scMsg -> 
+        let _, componentIDList = scMsg
+        {model with SelectedComponents = componentIDList}, Cmd.none
+    | SelectWires swMsg -> 
+        let _, wireIDList = swMsg
+        {model with SelectedWires = wireIDList}, Cmd.none
+    | SelectDragStart dragMsg -> 
+        {model with DragStartPos = dragMsg}, Cmd.none
+    | SelectDragEnd dragMsg ->
+        {model with DraggingPos = dragMsg}, Cmd.none
+    | SelectDragging dragMsg ->
+        {model with DraggingPos = dragMsg}, Cmd.none
+    | MouseMove moveMsg ->
+        {model with MousePos = moveMsg}, Cmd.none
+
+
+
 
 let init() = 
     let model,cmds = (BusWire.init 400)()
@@ -171,4 +213,8 @@ let init() =
         SelectedPorts = []
         SelectedComponents = []
         SelectedWires = []
+        DragStartPos = origin
+        // DragEndPos = origin
+        DraggingPos = false, origin
+        MousePos = origin
     }, Cmd.map Wire cmds
