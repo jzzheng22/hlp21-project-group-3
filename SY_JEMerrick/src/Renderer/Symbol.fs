@@ -119,19 +119,19 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int * Sy
     | CommonTypes.ComponentType.Nand -> ("&", 1, 1, LogMem)
     | CommonTypes.ComponentType.Nor -> ("|", 1, 1, LogMem)
     | CommonTypes.ComponentType.Xnor -> ("=1", 1, 1, LogMem)
-    | CommonTypes.ComponentType.Decode4 -> ("Decode", 1, 1, LogMem) //Check generic type
+    | CommonTypes.ComponentType.Decode4 -> ("Decode", 1, 1, LogMem)
     | CommonTypes.ComponentType.Mux2 -> ("MUX", 1, 1, Mux)
     | CommonTypes.ComponentType.Demux2 -> ("DMUX" , 1, 1, Mux)
-    | CommonTypes.ComponentType.NbitsAdder x -> ("Σ", x, x, Adder) //TODO CHECK
+    | CommonTypes.ComponentType.NbitsAdder x -> ("Σ", x, x, Adder)
     | CommonTypes.ComponentType.Custom x -> (x.Name, 1, 1, LogMem)
     | CommonTypes.ComponentType.DFF -> ("DFF", 1, 1, LogMem)
     | CommonTypes.ComponentType.DFFE -> ("DFFE", 1, 1, FF)
-    | CommonTypes.ComponentType.Register x -> ("SRG", x, x, LogMem) //Check generic type
-    | CommonTypes.ComponentType.RegisterE x -> ("SRGE", x, x, FF) //Check generic type
+    | CommonTypes.ComponentType.Register x -> ("SRG", x, x, LogMem)
+    | CommonTypes.ComponentType.RegisterE x -> ("SRGE", x, x, FF) 
     | CommonTypes.ComponentType.AsyncROM x -> ("A/ROM", x.AddressWidth, x.WordWidth, LogMem)
     | CommonTypes.ComponentType.ROM x -> ("ROM", x.AddressWidth, x.WordWidth, LogMem)
     | CommonTypes.ComponentType.RAM x -> ("RAM", x.AddressWidth, x.WordWidth, LogMem)
-    | CommonTypes.ComponentType.Input x -> ("IN", x, x, IO) //For any buses/wires
+    | CommonTypes.ComponentType.Input x -> ("IN", x, x, IO) 
     | CommonTypes.ComponentType.Output x -> ("OUT", x, x, IO) 
     | CommonTypes.ComponentType.IOLabel -> ("", 0, 0, IO) //Check generic type WHAT IS THIS?? 
     | CommonTypes.ComponentType.BusSelection (x, y) -> ("", x, y, Wires)
@@ -681,6 +681,7 @@ let private renderObj =
                             FontSize "6px"
                             FontWeight "bold"
                             Fill "Black"
+                            UserSelect UserSelectOptions.None
                         ]
                     ][str <| sprintf "%s" (getPortName k)])
 
@@ -744,6 +745,7 @@ let private renderObj =
                             FontSize "10px"
                             FontWeight "bold"
                             Fill "Black"
+                            UserSelect UserSelectOptions.None
                             
                         ]
                     ][str <| sprintf "%A" props.Obj.Name]
@@ -833,7 +835,7 @@ let getPortCoords (symModel: Model) (pId : CommonTypes.PortId) : XYPos =
     |> List.tryFind (fun (v, k) -> k = pId)
     |> function
     | Some x -> x |> fst
-    | None -> failwithf "Error couldn't find portID 1"
+    | None -> failwithf "Error in getPortCoords: couldn't find portID"
 
         
 ///Returns all symbols in the model in the form (ID, bounding box topLeft, bounding box botRight)
@@ -849,7 +851,7 @@ let getPortType (symModel: Model) (pId : CommonTypes.PortId) : CommonTypes.PortT
     |> function
     | Some (Some k, _, _) -> k.Port.PortType
     | Some (_, _, _) ->  failwithf "Unexpected error in getPortType"
-    | None -> failwithf "Error couldn't find portID 2"
+    | None -> failwithf "Error in getPortType: couldn't find portID"
 
 ///Finds if a position lies on a port. Returns Some(position, portId) if found, none otherwise.
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * CommonTypes.PortId) Option =
@@ -876,7 +878,7 @@ let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int =
     |> function
     | Some (Some k, _, _) -> k.width
     | Some (_, _, _) ->  failwithf "Unexpected error in getPortWidth"
-    | None -> failwithf "Error couldn't find portID 3"
+    | None -> failwithf "Error in getPortWidth: couldn't find portID"
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
