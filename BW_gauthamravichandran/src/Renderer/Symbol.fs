@@ -274,6 +274,8 @@ let init () =
     [
     CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=100.;Y=300.}
     CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=700.;Y=300.}
+    CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=100.;Y=500.}
+    CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=700.;Y=500.}
     //CreateNewSymbol CommonTypes.ComponentType.Demux2 7 1 {X=200.;Y=200.}
     //CreateNewSymbol CommonTypes.ComponentType.Demux2 7 1 {X=500.;Y=300.}
     ]
@@ -530,9 +532,9 @@ let portSearchPos (symModel: Model) (pos : XYPos) : Portinfo Option =
 //---------------Other interface functions--------------------//
 
 //TODO - REMOVE - ONLY USED BY BUSWIRE - Currently connects every input 0 to each other.
-let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos = 
+let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : Symbol = 
     List.find (fun sym -> sym.Id = sId) symModel
-    |> (fun sym -> sym.Ports.[0].Pos)
+
 
 ///Searches through the whole model until the port is found and retruns the position of that port
 ///This would be much faster if sheet gave me the component

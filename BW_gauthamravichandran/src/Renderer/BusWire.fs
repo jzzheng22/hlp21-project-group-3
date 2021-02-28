@@ -21,21 +21,24 @@ open Helpers
 /// NB - how you define Ports for drawing - whether they correspond to
 /// a separate datatype and Id, or whether port offsets from
 /// component coordinates are held in some other way, is up to groups.
-type Wire = {
-    Id: CommonTypes.ConnectionId 
-    SrcSymbol: CommonTypes.ComponentId
-    TargetSymbol: CommonTypes.ComponentId
-    }
+
 type WireSegment = {
     Id: CommonTypes.ConnectionId 
     SrcPos: XYPos
     TargetPos: XYPos
     BB: XYPos * XYPos
     }
+type Wire = {
+    Id: CommonTypes.ConnectionId 
+    SrcSymbol: CommonTypes.ComponentId
+    TargetSymbol: CommonTypes.ComponentId
+
+    Segments: WireSegment list
+    }
 
 type Model = {
     Symbol: Symbol.Model
-    WX: WireSegment list
+    WX: Wire list
     Color: CommonTypes.HighLightColor
     }
 
@@ -137,6 +140,16 @@ let rec routing (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol)=
         ( fst tuple) @ (routing (symbols) (snd tuple) tar)
 *)
     goToTarget  src tar
+
+let makeWire (src:Symbol.Symbol) (tar:Symbol.Symbol) (symbols: Symbol.Symbol list) =
+    
+    let segments = routing symbols src.BotR tar
+    {
+    Id= CommonTypes.ConnectionId (uuid()) 
+    SrcSymbol= src.Id
+    TargetSymbol= tar.Id
+    Segments= segments
+    }
 //----------------------------Message Type-----------------------------------//
 
 /// Messages to update buswire model
@@ -182,26 +195,26 @@ let singleWireView =
 
 
 let view (model:Model) (dispatch: Dispatch<Msg>)=
-    let newWires= routing model.Symbol model.Symbol.[0].BotR model.Symbol.[1]
 
     let wires = 
-        //model.WX
-        newWires
+        model.WX
+
         |> List.map (fun w ->
-            let props = {
-                key = w.Id
-                WireP = w
-                (*SrcP = Symbol.symbolPos model.Symbol w.SrcSymbol 
-                TgtP = Symbol. symbolPos model.Symbol w.TargetSymbol *)
-                SrcP=w.SrcPos
-                TgtP=w.TargetPos
-                //SrcP=w.SrcPos
-                //TgtP=w.TargetPos
-                ColorP = model.Color.Text()
-                StrokeWidthP = "2px" }
-            singleWireView props)
+            List.map (fun segment->               
+                let props = {
+                    key = w.Id
+                    WireP = segment
+                    (*SrcP = Symbol.symbolPos model.Symbol w.SrcSymbol 
+                    TgtP = Symbol. symbolPos model.Symbol w.TargetSymbol *)
+                    SrcP=segment.SrcPos
+                    TgtP=segment.TargetPos
+                    //SrcP=w.SrcPos
+                    //TgtP=w.TargetPos
+                    ColorP = model.Color.Text()
+                    StrokeWidthP = "2px" }
+                singleWireView props) w.Segments)
     let symbols = Symbol.view model.Symbol (fun sMsg -> dispatch (Symbol sMsg))
-    g [] [(g [] wires); symbols]
+    g [] [(g [] (List.concat wires)); symbols]
 
 /// dummy init for testing: real init would probably start with no wires.
 /// this initialisation is not realistic - ports are not used
@@ -213,7 +226,7 @@ let init n () =
     let symbols, cmd = Symbol.init()
     let symIds = List.map (fun (sym:Symbol.Symbol) -> sym.Id) symbols
     let rng = System.Random 0
-
+    (*
     let makeRandomWire() =
         let n = symIds.Length
         let s1,s2 =
@@ -227,11 +240,16 @@ let init n () =
             SrcSymbol = s1.Id
             TargetSymbol = s2.Id
         }
+        *)
 
     // findNearestBox symbols (symbols.[0].TopL)
     // |> goPastBox (symbols.[0].TopL)
 
-    routing symbols symbols.[0].BotR symbols.[1]
+    [
+        makeWire  symbols.[0] symbols.[1] symbols
+        makeWire  symbols.[2] symbols.[3] symbols
+    
+    ]
     //List.map (fun i -> makeRandomWire()) [1..n]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
 
@@ -241,7 +259,13 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     | Symbol sMsg -> 
         let sm,sCmd = Symbol.update sMsg model.Symbol
-        {model with Symbol=sm}, Cmd.map Symbol sCmd
+        let wires = 
+            model.WX
+            |> List.map (fun w ->
+                let segments=routing sm ((Symbol.symbolPos sm w.SrcSymbol).BotR) (Symbol.symbolPos sm w.TargetSymbol)
+                {w with Segments= segments})
+
+        {model with Symbol=sm; WX=wires}, Cmd.map Symbol sCmd
     | AddWire _ -> failwithf "Not implemented"
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
