@@ -16,7 +16,7 @@ open Helpers
 
 
 //Static variables
-let STD_HEIGHT = 40.
+let STD_HEIGHT = 50.
 let HW_RATIO = 0.9
 let RAD = 3.
 
@@ -54,7 +54,7 @@ type genericPort =
 
 ///Symbol is unique for each component, and shares CommonTypes.ComponentId
 ///
-///Two positions TopL, BotR completely define the shape (all shapes are rectangular)
+///Two positions TopL, BotR completely define the shape
 type Symbol =
     {
         TopL: XYPos
@@ -156,12 +156,6 @@ let midSymY (sym : Symbol) : float = (midSym sym).Y
 ///Adds a float value onto an XYPos
 let addXYVal (xy : XYPos) (n : float) : XYPos = {X = xy.X + n; Y = xy.Y + n}
 
-///The number of possible ports on the top/bot side of the Symbol = Width / STD_HEIGHT
-let numPortsHorizontal (sym : Symbol) : int = int((sym.BotR.X - sym.TopL.X)/STD_HEIGHT)
-
-///The number of possible ports on the left/right side of the Symbol = Height / STD_HEIGHT
-let numPortsVertical (sym : Symbol) : int = int((sym.BotR.Y - sym.TopL.Y)/STD_HEIGHT)
-
 let posDiff a b = {X=a.X-b.X; Y=a.Y-b.Y}
 
 let posAdd a b = {X=a.X+b.X; Y=a.Y+b.Y}
@@ -193,11 +187,6 @@ let testBox (portPos : XYPos) (coord : XYPos) : bool =
     let topL = Box |> fst
     let botR = Box |> snd
     topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
-
-///Tests whether a position is within a certain amount of pixels to a label
-let testLabelBox (portPos : XYPos) (coord : XYPos) (sym : Symbol) : bool =
-    let transl = displace -5. portPos sym
-    testBox {X = fst transl; Y = snd transl} coord
 
 ///Calculates the port position where
 ///i = int indicating the index of the port on a side
@@ -399,10 +388,7 @@ let swapPortt portMap k1 k2 v1 v2 =
     |> Map.change k1 (fun _ -> Some v2)
     |> Map.change k2 (fun _ -> Some v1)
 
-let swapPort (sym : Symbol) (pId : CommonTypes.PortId) (pagePos : XYPos) = 
-    //The port we are moving
-    let port = findPort sym pId
-       
+let swapPort (sym : Symbol) (pagePos : XYPos) port = 
     //The index we want to move the port to is the one closest to the mouse
     sym.PortMap
     |> Map.toList
@@ -447,8 +433,8 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (genPort : generi
                        | CommonTypes.PortType.Output -> sprintf "Cout" 
             | Enable -> sprintf "En"
             | _ -> match portType with 
-                    | CommonTypes.PortType.Input -> sprintf "IN %d" i
-                    | CommonTypes.PortType.Output -> sprintf "OUT %d" i 
+                    | CommonTypes.PortType.Input -> sprintf "IN%d" i
+                    | CommonTypes.PortType.Output -> sprintf "OUT%d" i 
 
         Invert = 
             match portType with
@@ -558,7 +544,7 @@ let init () =
     //4 logic gates
     List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Not) 1 1 pos)) 
+    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 pos)) 
     , Cmd.none
 
 
@@ -619,9 +605,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
             if sId <> sym.Id then
                 sym
             else
-                let diff = pagePos
+                let port = findPort sym pId
                 { sym with
-                    PortMap = swapPort sym pId pagePos
+                    PortMap = swapPort sym pagePos port
                 }
         )
         , Cmd.none
@@ -847,7 +833,7 @@ let getPortCoords (symModel: Model) (pId : CommonTypes.PortId) : XYPos =
     |> List.tryFind (fun (v, k) -> k = string pId)
     |> function
     | Some x -> x |> fst
-    | None -> failwithf "Error couldn't find portID"
+    | None -> failwithf "Error couldn't find portID 1"
 
         
 ///Returns all symbols in the model in the form (ID, bounding box topLeft, bounding box botRight)
@@ -858,12 +844,12 @@ let getBoundingBoxes (symModel : Model) (startCoord : XYPos) : (CommonTypes.Comp
 ///Finds the portType of a specific port
 let getPortType (symModel: Model) (pId : CommonTypes.PortId) : CommonTypes.PortType =
     initPortSearch symModel
-    |> List.map (fun (v, k) -> (k, getPortName k, v))
-    |> List.tryFind (fun (_, id, _) -> id = string pId)
+    |> List.map (fun (v, k) -> (k, getPortId k, v))
+    |> List.tryFind (fun (_, id, _) -> id = pId)
     |> function
     | Some (Some k, _, _) -> k.Port.PortType
     | Some (_, _, _) ->  failwithf "Unexpected error in getPortType"
-    | None -> failwithf "Error couldn't find portID"
+    | None -> failwithf "Error couldn't find portID 2"
 
 ///Finds if a position lies on a port. Returns Some(position, portId) if found, none otherwise.
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * CommonTypes.PortId) Option =
@@ -890,7 +876,7 @@ let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int =
     |> function
     | Some (Some k, _, _) -> k.width
     | Some (_, _, _) ->  failwithf "Unexpected error in getPortWidth"
-    | None -> failwithf "Error couldn't find portID"
+    | None -> failwithf "Error couldn't find portID 3"
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
