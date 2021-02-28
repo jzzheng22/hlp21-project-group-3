@@ -197,7 +197,7 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
-    let Box = (addXYVal portPos -1., addXYVal portPos 1.);
+    let Box = (addXYVal portPos -5., addXYVal portPos 5.);
     let topL = Box |> fst
     let botR = Box |> snd
     topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
@@ -366,12 +366,13 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
 
     //Intermediate calculations
     let n = max (numIn + left) (numOut + right) |> float
+    let nBot = if bot > 0 then bot else (int (HW_RATIO * n))
     let h = STD_HEIGHT * n
-    let w = HW_RATIO * h
+    let w =  if bot <= 0 then (HW_RATIO * h) else ((float nBot) * STD_HEIGHT * 1.5)
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
     let _id = CommonTypes.ComponentId (Helpers.uuid())
-
+     
     // ---- Making portMap ---- //
 
     let l = 
@@ -381,11 +382,11 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         [0..int(n) - 1]
         |> List.map (fun i -> {X = botR.X; Y = (portPos i (int(n)) pos botR).Y})
     let t = 
-        [0..int(HW_RATIO * n) - 1]
-        |> List.map (fun i -> {X = (portPos i (int(n)) pos botR).X; Y = pos.Y})
+        [0..nBot - 1]
+        |> List.map (fun i -> {X = (portPos i nBot pos botR).X; Y = pos.Y})
     let b = 
-        [0..int(HW_RATIO * n) - 1]
-        |> List.map (fun i -> {X = (portPos i (int(n)) pos botR).X; Y = botR.Y})
+        [0..nBot - 1]
+        |> List.map (fun i -> {X = (portPos i nBot pos botR).X; Y = botR.Y})
     let slots = List.concat [l; r; t; b]
 
     // ---- Making symbol's ports ---- //
