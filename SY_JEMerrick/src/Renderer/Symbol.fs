@@ -141,6 +141,8 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int * Sy
 ///Returns a tuple of float = (Height, Width) from two coordinates
 let getHW (botR : XYPos) (topL : XYPos) = (botR.Y - topL.Y, botR.X - topL.X)
 
+let getHWObj (sym : Symbol) = getHW sym.BotR sym.TopL
+
 ///Finds the midpoint of two coordinates
 let midXY (botR : XYPos) (topL : XYPos) : XYPos =
     let midY = (botR.Y + topL.Y) / 2.
@@ -349,6 +351,14 @@ let tagCoords (sym : Symbol) : string =
         (sym.BotR.X) midY 
         (midX + RAD) (midY - RAD))
 
+let triangleCoords (i : XYPos) : string =
+    (sprintf "%f,%f %f,%f %f,%f"
+        i.X (i.Y + RAD) 
+        (i.X + RAD) 
+        i.Y i.X 
+        (i.Y - RAD))
+
+
 ///Returns a map with only positions that have Some port assigned to them
 let getUsedPorts (portMap : Map<XYPos, Portinfo Option>) : Map<XYPos, Portinfo Option> =
     portMap |> Map.toList |> List.filter (fun (v, k) -> k <> None) |> Map.ofList
@@ -398,6 +408,40 @@ let swapPort (sym : Symbol) (pagePos : XYPos) port =
     |> function
     | (k, x) -> swapPortt sym.PortMap k (port |> fst) x (port |> snd)  
                 
+let drawText (x : float) (y : float) (size : string) =
+    text[
+        X x
+        Y y
+        Style[
+            TextAnchor "middle"
+            DominantBaseline "middle"
+            FontSize size
+            FontWeight "bold"
+            Fill "Black"
+            UserSelect UserSelectOptions.None]
+    ]
+
+let drawPolygon (points : string) (color : string)  =
+    polygon[
+        Points points
+        Style[
+            Stroke color
+            Fill color
+        ]
+    ]
+
+let drawCircle (sym : Symbol) (i : XYPos) (fill : string) (stroke : string) (opac : float) (width : float) =
+    circle[
+        Cx (displaceNX sym i 3.)
+        Cy (displaceNY sym i 3.)
+        R RAD
+        SVGAttr.Fill fill
+        SVGAttr.Stroke stroke
+        SVGAttr.Opacity opac
+        SVGAttr.StrokeWidth width]
+
+let mapSetup (sym : Symbol) = sym.PortMap |> getUsedPorts |> Map.toList
+
 
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
@@ -544,7 +588,7 @@ let init () =
     //4 logic gates
     List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 pos)) 
+    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Output 1) 0 1 pos)) 
     , Cmd.none
 
 
@@ -668,27 +712,15 @@ let private renderObj =
                                 "gainsboro"
                 
             let labels : ReactElement list = 
-                props.Obj.PortMap
-                |> getUsedPorts
-                |> Map.toList
+                props.Obj
+                |> mapSetup
                 |> List.map(fun (i, k) ->
-                    text[
-                        X (displaceNX props.Obj i -10.)
-                        Y (displaceNY props.Obj i -10.)
-                        Style[
-                            TextAnchor "middle"
-                            DominantBaseline "middle"
-                            FontSize "6px"
-                            FontWeight "bold"
-                            Fill "Black"
-                            UserSelect UserSelectOptions.None
-                        ]
-                    ][str <| sprintf "%s" (getPortName k)])
+                    (drawText (displaceNX props.Obj i -10.) (displaceNY props.Obj i -10.) "6px")[str <| sprintf "%s" (getPortName k)])
 
             let wires : ReactElement list =
             //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
-                props.Obj.PortMap
-                |> Map.toList
+                props.Obj
+                |> mapSetup
                 |> List.map(fun (i, k) ->
                     polyline[
                         Points (sprintf "%f,%f %f,%f %f,%f" i.X i.Y (midSymX props.Obj) i.Y (midSymX props.Obj) (midSymY props.Obj))
@@ -700,16 +732,10 @@ let private renderObj =
 
             let triangles : ReactElement list =
                 //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
-                    props.Obj.PortMap
-                    |> Map.toList
+                    props.Obj
+                    |> mapSetup
                     |> List.map(fun (i, k) ->
-                        polygon[
-                            Points (sprintf "%f,%f %f,%f %f,%f" i.X (i.Y + RAD) (i.X + RAD) i.Y i.X (i.Y - RAD))
-                            Style[
-                                Stroke color
-                                Fill color
-                            ]
-                        ][])
+                        (drawPolygon (triangleCoords i) color)[])
             
             let io : ReactElement list =
                 [
@@ -725,30 +751,17 @@ let private renderObj =
 
             let displayBox : ReactElement list =
                 [
+                    
                     rect[
                         X props.Obj.TopL.X
                         Y props.Obj.TopL.Y
-                        Rx 0.75
-                        Ry 0.75
-                        SVGAttr.Height ((getHW props.Obj.BotR props.Obj.TopL) |> fst)
-                        SVGAttr.Width ((getHW props.Obj.BotR props.Obj.TopL) |> snd)
+                        SVGAttr.Height (getHWObj props.Obj |> fst)
+                        SVGAttr.Width (getHWObj props.Obj |> snd)
                         SVGAttr.Fill color
                         SVGAttr.Stroke "black"
                         SVGAttr.StrokeWidth 0.5][]
 
-                    text[
-                        X (midSymX props.Obj)
-                        Y (midSymY props.Obj)
-                        Style[
-                            TextAnchor "middle"
-                            DominantBaseline "middle"
-                            FontSize "10px"
-                            FontWeight "bold"
-                            Fill "Black"
-                            UserSelect UserSelectOptions.None
-                            
-                        ]
-                    ][str <| sprintf "%A" props.Obj.Name]
+                    drawText (midSymX props.Obj) (midSymY props.Obj) "10px"[str <| sprintf "%A" props.Obj.Name]
                 ]
             
             let drawInvert =
@@ -756,29 +769,14 @@ let private renderObj =
                 |> Map.toList
                 |> List.filter(fun (_, k) -> isPortInverse k)
                 |> List.map(fun (i, k) ->
-                    circle[
-                        Cx (displaceNX props.Obj i 3.)
-                        Cy (displaceNY props.Obj i 3.)
-                        R RAD
-                        SVGAttr.Fill color
-                        SVGAttr.Stroke "black"
-                        SVGAttr.StrokeWidth 0.5][])
+                    drawCircle props.Obj i color "black" 1. 0.5[])
 
             let ports =
                 if props.Obj.PortHighlight then
-                    props.Obj.PortMap
-                    |> getUsedPorts
-                    |> Map.toList
+                    props.Obj
+                    |> mapSetup
                     |> List.map(fun (i, k) ->
-                        circle[
-                            Cx (displaceNX props.Obj i 3.)
-                            Cy (displaceNY props.Obj i 3.)
-                            R RAD
-                            
-                            SVGAttr.Fill "deepskyblue"
-                            SVGAttr.Stroke "deepskyblue"
-                            SVGAttr.Opacity 0.4
-                            SVGAttr.StrokeWidth 1][])
+                        drawCircle props.Obj i "deepskyblue" "deepskyblue" 0.4 1.[])
 
                 else
                     []
