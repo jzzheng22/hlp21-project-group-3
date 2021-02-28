@@ -12,12 +12,12 @@ STATIC VARIABLES:
     RAD - Radius for inverters and port highlighting
 
 TYPES:
+    
     Portinfo
         Port                        - From CommonTypes
         NumWires                    - Keeps track of the number of wires connected to a port 
         Name                        - Label to be printed for that port
         Invert                      - A bool which = True if the port requires an inverter
-        slotPos                     - An int indicating the corresponding index in the PortMap
         width                       - A width indicating the wire/bus width into the component
 
     Symbol
@@ -30,27 +30,23 @@ TYPES:
         Name                        - The label to be prtined for the symbol
         Highlight                   - A bool indicating which = True if the symbol should be highlighted
         PortHighlight               - A bool indicating which = True if the ports should be highlighted
-        PortMap                     - A list of XYPos indicating the 'slots' a port may be placed into
-        PortList                    - A list of Portinfo objects associated with the symbol
+        PortMap                     - A map of <XYPos, Portinfo Option> which will be None if no port is assigned to a particular position, and Some if there is a port assigned to a position
+        
+        =========== FOR DEMO ONLY - THIS WILL ACTUALLY BE DONE WITH MESSAGES =============
         Rotation                    - An int indicating how much to rotate an object
         Scale                       - An XYPos indicating the scaling in the X and Y directions for the object
 
 
 MESSAGES:
-    MouseMsg                        - ALTERATIONS TO COME (MOVE)
-    StartDragging                   - ALTERATIONS TO COME (MOVE)
-    Dragging                        - ALTERATIONS TO COME (MOVE)
-    EndDragging                     - ALTERATIONS TO COME (MOVE)
+    Move                            - Moves list of symbols by a translation vector XYPos
     AddSymbol                       - Adds a new symbol to the model based on ComponentType, Position, Number of Inputs, Number of Outputs
     DeleteSymbol                    - Removes a symbol from the model based on ComponentID
     Highlight                       - Highlights symbols from a list of ComponentID, anything not in the list will be un-highlighted
     HighlightPorts                  - Highlights the symbol ports of a single ComponentID 
     UpdateSymbolModelWithComponent  - TODO
 
-    MESSAGES I WANT TO ADD
-    Scale
-    Rotate
-    Move
+    Scale                           - Scales a symbol by an XYPos indicating the scale in the x and y directions respectively
+    Rotate                          - Rotates a symbol by an int indicating the number of degrees to rotate
 
 
 INTERFACE FUNCTIONS:
@@ -59,6 +55,8 @@ INTERFACE FUNCTIONS:
     getPortType                     - Takes a model and portID, Returns whether a port is input/output
     isPort                          - Takes a model, XYpos and returns Some(XYPos, PortID) if the position was on a port, or None otherwise
     getPortIds                      - Inputs(model, symbolID), returns list of portIDs
+
+
 INTERFACE TO ISSIE
     TODO
 
@@ -180,3 +178,14 @@ CHANGELOG (For me)
         Drawing function is very long and needs splitting up
 
     NEXT TASKS:
+
+
+28/02/21
+
+    COMPLETE:
+        
+        PortList, and slot have been removed and PortMap is now a map of <XYPos, Option Portinfo>
+        All messages, interface funcs, etc have been updated to reflect this
+        Symbols width is now more accurately created such that the ports on the top/bottom are centred
+        Fixed bugs in the interface funcs where the wrong helper func was being called.
+
