@@ -48,12 +48,11 @@ type Msg =
     | AddWire of (CommonTypes.PortId * CommonTypes.PortId)
     | DeleteWires of CommonTypes.ConnectionId list
     | HighlightWires of CommonTypes.ConnectionId list
+    | MoveWires of CommonTypes.ConnectionId list * XYPos
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
 
 //-------------------Helpers for functions------------------------//
-
-
 
 /// Takes Source and Target positions of a wire and returns the 
 /// vertices of the path it should follow
@@ -75,13 +74,35 @@ let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
         let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
         [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
 
+let posLeftMost (posList: XYPos list) : XYPos list =
+    let posX pos = pos.X
+    posList
+    |> List.sortBy posX 
+let posRightMost (posList: XYPos list) : XYPos list =
+    let posX pos = pos.X
+    posList
+    |> List.sortByDescending posX
+let posHighest (posList: XYPos list) : XYPos list =
+    let posY pos = pos.Y
+    posList
+    |> List.sortBy posY
+let posLowest (posList: XYPos list) : XYPos list =
+    let posY pos = pos.Y
+    posList
+    |> List.sortByDescending posY
+
 /// Calculates and returns a list of bounding boxes for all the segments of a wire
 let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionId): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     let bbDist = 10. // Distance of Bounding Box Outline from wire
     let lineToBox (startPos: XYPos) (endPos: XYPos):  XYPos * XYPos =
-        let TopL = {startPos with X = startPos.X - bbDist; Y = startPos.Y + bbDist}
-        let BotR = {endPos with X = startPos.X + bbDist; Y = endPos.Y - bbDist}
-        (TopL,BotR)
+        if startPos.Y = endPos.Y then // Horizontal Segment
+            let leftmost = (posLeftMost [startPos;endPos]).Head
+            let rightmost = (posRightMost [startPos;endPos]).Head
+            {leftmost with Y = leftmost.Y - bbDist},{rightmost with Y = rightmost.Y + bbDist}
+        else // Vertical Segment
+            let highest = (posHighest [startPos;endPos]).Head
+            let lowest = (posLowest [startPos;endPos]).Head
+            {highest with X = highest.X - bbDist},{lowest with X = highest.X + bbDist}
 
     vertices
     |> List.pairwise
@@ -137,7 +158,8 @@ let singleWireView =
                     Y2 TgtP.Y
                     // Qualify these props to avoid name collision with CSSProp
                     SVGAttr.Stroke (if props.Width = 1 then props.ColorP else "purple")
-                    SVGAttr.StrokeWidth props.StrokeWidthP ] []
+                    SVGAttr.StrokeWidth props.StrokeWidthP
+                    SVGAttr.StrokeLinecap "round"] []
             let widthAnnotation = 
                 let textPos = Symbol.posAdd props.Vertices.Head {X = 5. ; Y = 5.}
                 text [
@@ -159,7 +181,7 @@ let singleWireView =
                     else
                         [
                         circle [
-                           Cx srcPortPos.X
+                           Cx (srcPortPos.X + 3.)
                            Cy srcPortPos.Y
                            R 3.
 
@@ -169,7 +191,7 @@ let singleWireView =
                            SVGAttr.StrokeWidth 1][]
                            ;
                         circle [
-                            Cx tgtPortPos.X
+                            Cx (tgtPortPos.X - 3.)
                             Cy tgtPortPos.Y
                             R 3.
 
@@ -307,6 +329,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     {w with Highlight = false}
             )
         {model with WX = wList}, Cmd.none
+    | MoveWires (_,_) -> model, Cmd.none // Not implemented yet
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
@@ -319,9 +342,18 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId option = 
     failwith "Not implemented"
 
+/// Returns all bounding boxes for all wire segments in the wire model
 let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     wModel.WX
     |> List.collect (fun w -> w.BoundingBoxes)
+
+/// Returns a list of wire IDs connected to the supplied ports
+let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =
+    wModel.WX
+    |> List.filter (fun w -> List.contains w.SourcePortId portIds || List.contains w.TargetPortId portIds)
+    |> List.map (fun w -> w.Id)
+    
+
 
 //----------------------interface to Issie-----------------------//
 let extractWire (wModel: Model) (sId:CommonTypes.ComponentId) : CommonTypes.Component= 
