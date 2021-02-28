@@ -829,8 +829,8 @@ let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos =
 ///Searches through the whole model until the port is found and retruns the position of that port
 let getPortCoords (symModel: Model) (pId : CommonTypes.PortId) : XYPos = 
     initPortSearch symModel
-    |> List.map (fun (v, k) -> (v, getPortName k))
-    |> List.tryFind (fun (v, k) -> k = string pId)
+    |> List.map (fun (v, k) -> (v, getPortId k))
+    |> List.tryFind (fun (v, k) -> k = pId)
     |> function
     | Some x -> x |> fst
     | None -> failwithf "Error couldn't find portID 1"
