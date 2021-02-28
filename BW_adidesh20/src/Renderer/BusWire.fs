@@ -342,9 +342,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId option = 
     failwith "Not implemented"
 
+/// Returns all bounding boxes for all wire segments in the wire model
 let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     wModel.WX
     |> List.collect (fun w -> w.BoundingBoxes)
+
+/// Returns a list of wire IDs connected to the supplied ports
+let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =
+    wModel.WX
+    |> List.filter (fun w -> List.contains w.SourcePortId portIds || List.contains w.TargetPortId portIds)
+    |> List.map (fun w -> w.Id)
     
 
 
