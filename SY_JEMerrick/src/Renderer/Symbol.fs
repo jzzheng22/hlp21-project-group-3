@@ -186,8 +186,8 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
     let Box = (addXYVal portPos -7., addXYVal portPos 7.);
-    let topL = Box |> fst
-    let botR = Box |> snd
+    let topL = fst Box
+    let botR = snd Box
     topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
 
 ///Calculates the port position where
@@ -291,8 +291,8 @@ let trans func sym trans =
     let rotBotR = func sym.BotR trans centre
     let newBox = getNewBox rotTopL rotBotR
     { sym with
-        TopL = newBox |> fst
-        BotR = newBox |> snd
+        TopL = fst newBox
+        BotR = snd newBox
         PortMap = mapTrans sym.PortMap func trans centre
     }
 
@@ -393,12 +393,12 @@ let findPort (sym: Symbol) (pId : CommonTypes.PortId) =
     |> List.find (fun (v, k) -> getPortId k  = pId)
 
 //Swaps two values in a map
-let swapPortt portMap k1 k2 v1 v2 =
+let swapPort portMap k1 k2 v1 v2 =
     portMap
     |> Map.change k1 (fun _ -> Some v2)
     |> Map.change k2 (fun _ -> Some v1)
 
-let swapPort (sym : Symbol) (pagePos : XYPos) port = 
+let swapMap (sym : Symbol) (pagePos : XYPos) port = 
     //The index we want to move the port to is the one closest to the mouse
     sym.PortMap
     |> Map.toList
@@ -406,7 +406,7 @@ let swapPort (sym : Symbol) (pagePos : XYPos) port =
     |> List.minBy fst
     |> snd
     |> function
-    | (k, x) -> swapPortt sym.PortMap k (port |> fst) x (port |> snd)  
+    | (k, x) -> swapPort sym.PortMap k (port |> fst) x (port |> snd)  
                 
 let drawText (x : float) (y : float) (size : string) =
     text[
@@ -618,13 +618,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     | Highlight sIdList ->
         model
         |> List.map (fun sym ->
-            if List.contains sym.Id sIdList then 
                 { sym with
-                    Highlight = true
-                }
-            else
-                { sym with
-                    Highlight = false 
+                    Highlight = List.contains sym.Id sIdList
                 }
         )
         , Cmd.none
@@ -632,13 +627,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     | HighlightPorts sId ->
         model
         |> List.map (fun sym ->
-            if sym.Id = sId then 
                 { sym with
-                    PortHighlight = true
-                }
-            else
-                { sym with
-                    PortHighlight = false 
+                    PortHighlight = (sym.Id = sId)
                 }
         )
         , Cmd.none
@@ -651,7 +641,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
             else
                 let port = findPort sym pId
                 { sym with
-                    PortMap = swapPort sym pagePos port
+                    PortMap = swapMap sym pagePos port
                 }
         )
         , Cmd.none
@@ -751,7 +741,6 @@ let private renderObj =
 
             let displayBox : ReactElement list =
                 [
-                    
                     rect[
                         X props.Obj.TopL.X
                         Y props.Obj.TopL.Y
@@ -760,7 +749,6 @@ let private renderObj =
                         SVGAttr.Fill color
                         SVGAttr.Stroke "black"
                         SVGAttr.StrokeWidth 0.5][]
-
                     drawText (midSymX props.Obj) (midSymY props.Obj) "10px"[str <| sprintf "%A" props.Obj.Name]
                 ]
             
@@ -777,9 +765,7 @@ let private renderObj =
                     |> mapSetup
                     |> List.map(fun (i, k) ->
                         drawCircle props.Obj i "deepskyblue" "deepskyblue" 0.4 1.[])
-
-                else
-                    []
+                else []
             
             let symDraw = 
                 match props.Obj.genericType with
