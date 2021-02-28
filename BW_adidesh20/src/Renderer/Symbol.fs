@@ -454,7 +454,7 @@ let init () =
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
     |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 pos)) 
     , Cmd.none
-
+    
 
 /// update function which displays symbols
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
