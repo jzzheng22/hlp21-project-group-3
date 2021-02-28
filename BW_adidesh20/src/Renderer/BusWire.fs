@@ -187,7 +187,7 @@ let singleWireView =
 
                            SVGAttr.Fill "deepskyblue"
                            SVGAttr.Stroke "deepskyblue"
-                           SVGAttr.Opacity 0.4
+                           //SVGAttr.Opacity 0.4
                            SVGAttr.StrokeWidth 1][]
                            ;
                         circle [
@@ -197,7 +197,7 @@ let singleWireView =
 
                             SVGAttr.Fill "deepskyblue"
                             SVGAttr.Stroke "deepskyblue"
-                            SVGAttr.Opacity 0.4
+                            //SVGAttr.Opacity 0.4
                             SVGAttr.StrokeWidth 1][]
                         ]
             
