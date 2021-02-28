@@ -30,6 +30,7 @@ type WireSegment = {
     Id: CommonTypes.ConnectionId 
     SrcPos: XYPos
     TargetPos: XYPos
+    BB: XYPos * XYPos
     }
 
 type Model = {
@@ -37,13 +38,30 @@ type Model = {
     WX: WireSegment list
     Color: CommonTypes.HighLightColor
     }
+
+let makeWireBB (sPos:XYPos) (tPos:XYPos)=
+    match sPos.X,sPos.Y, tPos.X, tPos.Y with
+    | (sx,sy,tx,ty) when tx>sx -> ({X=sx;Y=sy+2.},{X=tx;Y=ty-2.})
+    | (sx,sy,tx,ty) when tx<sx -> ({X=tx;Y=ty+2.},{X=sx;Y=sy-2.})
+    | (sx,sy,tx,ty) when ty>sy -> ({X=sx-2.;Y=sy},{X=tx+2.;Y=ty})
+    | (sx,sy,tx,ty) when ty<sy -> ({X=tx-2.;Y=ty},{X=sx+2.;Y=sy})
+    | (sx,sy,tx,ty) when (tx=sx && ty=sy) -> ({X=tx;Y=ty},{X=sx;Y=sy})
+    | _ -> failwithf "diagonal line error"
+
 let makeWireSegment (sPos) (tPos) = 
     {
         Id=CommonTypes.ConnectionId (uuid())
         SrcPos=sPos
         TargetPos=tPos
+        BB= makeWireBB sPos tPos
     }
-    
+let bbCollision (bb1:XYPos*XYPos) (bb2:XYPos*XYPos) =
+    match fst bb1, snd bb1, fst bb2, snd bb2 with
+    | (tL1, bR1, tL2, bR2) when bR2.Y < tL1.Y -> false
+    | (tL1, bR1, tL2, bR2) when tL2.X > bR1.X -> false
+    | (tL1, bR1, tL2, bR2) when bR2.Y > tL1.Y -> false
+    | (tL1, bR1, tL2, bR2) when bR2.X < tL1.X -> false
+    |_ ->true
 
 let findNearestBox (symbols: Symbol.Symbol list) (src:XYPos) =
     let list =
@@ -57,36 +75,68 @@ let findNearestBox (symbols: Symbol.Symbol list) (src:XYPos) =
 
 let goPastBox (src:XYPos) (sym:Symbol.Symbol) =
 
-    let pos1= {X= sym.TopL.X - float 20. ; Y=src.Y}
-    let pos2= {X=pos1.X;Y=sym.BotR.Y + float 20.}
-    let pos3= {X=pos2.X + float 21. ; Y=pos2.Y}
+    
+    let pos1= {X=src.X; Y=src.Y}
+    let pos2= {X=pos1.X;Y=sym.BotR.Y}
     [   
         makeWireSegment src pos1
         makeWireSegment pos1 pos2
-        makeWireSegment pos2 pos3
-    ], pos3
+        makeWireSegment pos2 sym.BotR
+    ], sym.BotR
+    
+let goPastBox2 (src:XYPos) (sym:Symbol.Symbol) =
+
+    
+    let pos1= {X=src.X; Y=src.Y}
+    let pos2= {X=pos1.X;Y=sym.BotR.Y}
+    [   
+        makeWireSegment src pos1
+        makeWireSegment pos1 pos2
+        makeWireSegment pos2 sym.BotR
+    ], sym.BotR
+    
+
+
+
 
 
 let goToTarget (src:XYPos) (tar:Symbol.Symbol) =
-    let pos1= {X= tar.TopL.X - float 20. ; Y=src.Y}
+    let pos1= {X= (tar.TopL.X + src.X)/(2.) ; Y=src.Y}
     let pos2= {X=pos1.X;Y=tar.TopL.Y}
     [   
         makeWireSegment src pos1
         makeWireSegment pos1 pos2
         makeWireSegment pos2 tar.TopL
     ]
+ 
+let findBoxesInPath (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol)=
+    let pos1= {X= (tar.TopL.X + src.X)/(2.) ; Y=src.Y}
+    let pos2= {X=pos1.X;Y=tar.TopL.Y}
+    let bb1= makeWireBB src pos1
+    let bb2= makeWireBB pos1 pos2
+    let bb3= makeWireBB pos2 tar.TopL
 
+    let list =
+        Symbol.getBoundingBoxes symbols
+        |> List.map (fun (sym,l,r)->(l,r))
+        |> List.filter (fun x-> (bbCollision bb1 x || bbCollision bb2 x || bbCollision bb3 x))
+    if List.isEmpty list 
+        then None
+    else 
+        Some (List.minBy (fun (l,r)->l) list)
+        //|> (fun (l,r)->Some sym)
 
 
 let rec routing (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol)=
-
+(*
     match findNearestBox symbols src with
     | None -> goToTarget src tar
     | Some sym when sym.Id = tar.Id-> goToTarget src tar
     | Some sym -> 
         let tuple= goPastBox src sym
         ( fst tuple) @ (routing (symbols) (snd tuple) tar)
-
+*)
+    goToTarget  src tar
 //----------------------------Message Type-----------------------------------//
 
 /// Messages to update buswire model
@@ -132,7 +182,7 @@ let singleWireView =
 
 
 let view (model:Model) (dispatch: Dispatch<Msg>)=
-    let newWires= routing model.Symbol model.Symbol.[0].TopL model.Symbol.[1]
+    let newWires= routing model.Symbol model.Symbol.[0].BotR model.Symbol.[1]
 
     let wires = 
         //model.WX
@@ -181,7 +231,7 @@ let init n () =
     // findNearestBox symbols (symbols.[0].TopL)
     // |> goPastBox (symbols.[0].TopL)
 
-    routing symbols symbols.[0].TopL symbols.[1]
+    routing symbols symbols.[0].BotR symbols.[1]
     //List.map (fun i -> makeRandomWire()) [1..n]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
 
