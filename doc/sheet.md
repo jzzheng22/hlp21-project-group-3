@@ -43,7 +43,7 @@ To BusWire: (see [buswire.md](./buswire.md) for description)
 `HighlightConnection of wireIdList`
 - WireIdList is a list of wire IDs
 
-To Symbol:
+To Symbol: (see [symbol.md](./symbol.md) for description)
 `MoveSymbol of symbolIdList * posX * posY`
 
 `DeleteSymbol of symbolIdList`

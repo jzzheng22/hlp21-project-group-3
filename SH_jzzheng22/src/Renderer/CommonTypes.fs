@@ -8,6 +8,7 @@ module CommonTypes
     // Canvas state mapped to f# data structure //
     //==========================================//
 
+
     // Specify the position and type of a port in a JSComponent.
     type PortType = Input | Output
 
@@ -140,6 +141,10 @@ module CommonTypes
     /// Connection ports and connected component ports have the same port Id
     /// InputPortId and OutputPortID wrap the hash to distinguish component
     /// inputs and outputs some times (e.g. in simulation)
+
+
+    [<Erase>]
+    type PortId = | PortId of string
 
     [<Erase>]
     type InputPortId      = | InputPortId of string
