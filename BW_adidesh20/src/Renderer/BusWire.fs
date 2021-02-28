@@ -54,12 +54,6 @@ type Msg =
 
 //-------------------Helpers for functions------------------------//
 
-let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list =
-    let bb =
-        wModel.WX
-        |> List.collect (fun w -> w.BoundingBoxes)
-    bb
-
 /// Takes Source and Target positions of a wire and returns the 
 /// vertices of the path it should follow
 ///
@@ -216,9 +210,6 @@ let singleWireView =
 
 
 let view (model:Model) (dispatch: Dispatch<Msg>)=
-    let allBB = getBoundingBoxes model {X=100.;Y=100.}
-    printfn "viewing"
-    printfn "%A" allBB
     let wires = 
         model.WX
         |> List.map (fun w ->
@@ -350,13 +341,12 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 /// to determine which wire (if any) to select on a mouse click
 let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId option = 
     failwith "Not implemented"
-(*
+
 let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list =
-    let bb =
-        wModel.WX
-        |> List.collect (fun w -> w.BoundingBoxes)
-    bb
-*)
+    wModel.WX
+    |> List.collect (fun w -> w.BoundingBoxes)
+    
+
 
 //----------------------interface to Issie-----------------------//
 let extractWire (wModel: Model) (sId:CommonTypes.ComponentId) : CommonTypes.Component= 

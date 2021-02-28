@@ -521,13 +521,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |> List.filter (boxEncloses draggedBox)
                 |> List.map (obtainID >> CommonTypes.ComponentId)
             //If we get something then we move to ComponentSymbol state with the selected symbols.
+            let selectedWires =
+                BusWire.getBoundingBoxes (model.Wire) endPoint
+                |> List.map (fun (a,b,c) -> a)
             if not (List.isEmpty selectedSymbols) then 
                 {model with
                     SelectBoxStart = origin;
                     SelectBoxCurrent = origin;
                     SelectionType = ComponentSymbol;
                     SelectedComponentIDs = selectedSymbols;
-                    SelectedWireIDs = [];
+                    SelectedWireIDs = selectedWires;
                     SelectedPort = None}, Cmd.none 
             //Otherwise we have nothing
             else 
