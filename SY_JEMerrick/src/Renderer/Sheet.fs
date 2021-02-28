@@ -374,7 +374,7 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
 let view (model:Model) (dispatch : Msg -> unit) =
 
     WireMsg (BusWire.Symbol (Symbol.Highlight model.SelectedComponentIDs)) |> dispatch
-    WireMsg (BusWire.HighlightWires model.SelectedWireIDs) |> dispatch           
+    WireMsg (BusWire.HighlightConnection model.SelectedWireIDs) |> dispatch           
      
     let wDispatch wMsg = dispatch (WireMsg wMsg)
     //Get components from wire and symbol
