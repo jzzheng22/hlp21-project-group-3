@@ -13,10 +13,11 @@ type Model = {
     SelectedPorts: CommonTypes.PortId list
     SelectedComponents: CommonTypes.ComponentId list
     SelectedWires: CommonTypes.ConnectionId list
+    SelectingMultiple: bool
     DragStartPos: XYPos
     // DragEndPos: XYPos
-    DraggingPos: bool * XYPos
-    MousePos: XYPos
+    DraggingPos: XYPos
+    // MousePos: XYPos
     }
 
 type KeyboardMsg =
@@ -27,12 +28,13 @@ type Msg =
     | Symbol of Symbol.Msg
     | KeyPress of KeyboardMsg
     | SelectPort of (XYPos * CommonTypes.PortId)
-    | SelectComponents of (XYPos * CommonTypes.ComponentId list)
-    | SelectWires of (XYPos * CommonTypes.ConnectionId list)
+    | SelectComponents of CommonTypes.ComponentId list
+    | SelectWires of CommonTypes.ConnectionId list
+    | SelectMultiple of XYPos
     | SelectDragStart of XYPos
-    | SelectDragEnd of (bool * XYPos)
-    | SelectDragging of (bool * XYPos)
-    | MouseMove of XYPos
+    | SelectDragEnd of XYPos
+    | SelectDragging of XYPos
+    // | MouseMove of XYPos
 
 let origin = {X = 0.; Y = 0.}
 
@@ -63,17 +65,72 @@ let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
         |> List.map getID
     printf "%A" symbolIDList
     // if not (List.isEmpty symbolIDList) then
-    dispatch <| SelectComponents (mousePos, symbolIDList)
+    dispatch <| SelectComponents symbolIDList
     dispatch <| Symbol (Symbol.Highlight symbolIDList)
 
 
     // if not (List.isEmpty wireIDList) then
-    dispatch <| SelectWires (mousePos, wireIDList)
+    dispatch <| SelectWires wireIDList
+    dispatch <| Wire (BusWire.HighlightWires wireIDList)
     // else
     dispatch <| SelectDragStart mousePos
 
-let selectDragging (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
-    failwithf "Not implemented"
+
+let boxInSelectedArea startPos endPos box = 
+    let minX = min startPos.X endPos.X
+    let minY = min startPos.Y endPos.Y
+    let maxX = max startPos.X endPos.X
+    let maxY = max startPos.Y endPos.Y
+
+    match box with
+    | _, topL, botR ->
+        let leftX = topL.X
+        let rightX = botR.X
+        let topY = topL.Y
+        let botY = botR.Y
+        // printf "%A" (point.X >= leftX && point.X <= rightX && point.Y >= botY && point.Y <= topY)
+        printf "%A" (minX <= leftX && maxX >= rightX && minY <= topY && maxY >= botY)
+
+        minX <= leftX && maxX >= rightX && minY <= topY && maxY >= botY
+        // point.X >= leftX && point.X <= rightX && point.Y <= botY && point.Y >= topY
+    // failwithf "Not implemented"
+
+let dragSelectElements (model: Model) (dispatch: Dispatch<Msg>) =
+    printf "%A" "in drag select elements"
+    let symbolIDList = 
+        Symbol.getBoundingBoxes model.Wire.Symbol model.DraggingPos
+        |> List.filter (boxInSelectedArea model.DragStartPos model.DraggingPos)
+        |> List.map getID
+    let wireIDList = 
+        BusWire.getBoundingBoxes model.Wire model.DraggingPos
+        |> List.filter (boxInSelectedArea model.DragStartPos model.DraggingPos)
+        |> List.map getID
+    printf "%A" "symbol id list"
+    printf "%A" symbolIDList
+
+
+    dispatch <| SelectComponents symbolIDList
+    dispatch <| Symbol (Symbol.Highlight symbolIDList)
+    dispatch <| SelectWires wireIDList
+    dispatch <| Wire (BusWire.HighlightWires wireIDList)
+
+let cornersToString startCoord endCoord =
+    sprintf "%f,%f %f,%f %f,%f %f,%f" startCoord.X startCoord.Y endCoord.X startCoord.Y endCoord.X endCoord.Y startCoord.X endCoord.Y
+
+let drawSelectionBox model =
+    // [
+    // if model.SelectingMultiple then
+    polygon [
+        SVGAttr.Points (cornersToString model.DragStartPos model.DraggingPos)
+        SVGAttr.StrokeWidth "1px"
+        SVGAttr.Stroke "lightblue"
+        SVGAttr.StrokeDasharray "5,5"
+        SVGAttr.FillOpacity 0.1
+        SVGAttr.Fill "grey"] []
+    // else 
+        // []
+    // ]
+
 
 /// This function zooms an SVG canvas by transforming its content and altering its size.
 /// Currently the zoom expands based on top left corner. Better would be to collect dimensions
@@ -99,15 +156,13 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             let mousePos = {X = coordX; Y = coordY}
             match Symbol.isPort model.Wire.Symbol mousePos with
             | Some (portCoords, portId) -> dispatch <| SelectPort (portCoords, portId)
-            | None -> selectElements model mousePos dispatch
+            | None -> 
+                if (List.isEmpty model.SelectedComponents) && (List.isEmpty model.SelectedWires)then
+                    selectElements model mousePos dispatch
+            dispatch <| SelectDragStart mousePos
           )
             // (mouseOp Down ev))
-          OnMouseUp (fun ev -> 
-            let coordX = ev.clientX / model.Zoom
-            let coordY = ev.clientY / model.Zoom
-            let mousePos = {X = coordX; Y = coordY}
-            dispatch <| SelectDragEnd (false, mousePos)
-          )
+
             // (mouseOp Up ev))
           OnMouseMove (fun ev -> 
             let coordX = ev.clientX / model.Zoom
@@ -118,10 +173,27 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                 |> List.filter (inBoundingBox mousePos)
                 |> List.map getID
             // if not (List.isEmpty symbolIDList) then
+
             dispatch <| Symbol (Symbol.HighlightPorts symbolIDList)
             if mDown ev then // Drag
-                dispatch <| SelectDragging (true, mousePos)
-            )
+                dispatch <| SelectDragging mousePos
+                if not (List.isEmpty model.SelectedComponents) then
+                    let transVector = {X = coordX - model.DraggingPos.X; Y = coordY - model.DraggingPos.Y}
+                    dispatch <| Symbol (Symbol.Move (model.SelectedComponents, transVector))
+                else if not (List.isEmpty model.SelectedWires) then
+                    let transVector = {X = coordX - model.DraggingPos.X; Y = coordY - model.DraggingPos.Y}
+                    dispatch <| Wire (BusWire.MoveWires (model.SelectedWires, transVector))
+                else
+                    dispatch <| SelectMultiple mousePos
+          )
+          OnMouseUp (fun ev -> 
+            let coordX = ev.clientX / model.Zoom
+            let coordY = ev.clientY / model.Zoom
+            let mousePos = {X = coordX; Y = coordY}
+            dispatch <| SelectDragging mousePos
+            dragSelectElements model dispatch
+            dispatch <| SelectDragEnd mousePos
+          )
         ]
         [ svg
             [ Style 
@@ -134,22 +206,25 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             [ g // group list of elements with list of attributes
                 [ Style [Transform (sprintf "scale(%f)" model.Zoom)]] // top-level transform style attribute for zoom
                 [ 
-                    text [ // a demo text svg element
-                        X 500; 
-                        Y 50; 
-                        Style [
-                            TextAnchor "middle" // horizontal algnment vs (X,Y)
-                            DominantBaseline "middle" // vertical alignment vs (X,Y)
-                            FontSize "40px"
-                            FontWeight "Bold"
-                            Fill "Green" // font color
-                        ]
-                    ] [str "sample text"]
+                    // text [ // a demo text svg element
+                    //     X 500; 
+                    //     Y 50; 
+                    //     Style [
+                    //         TextAnchor "middle" // horizontal algnment vs (X,Y)
+                    //         DominantBaseline "middle" // vertical alignment vs (X,Y)
+                    //         FontSize "40px"
+                    //         FontWeight "Bold"
+                    //         Fill "Green" // font color
+                    //     ]
+                    // ] [str "sample text"]
+
 
                     svgReact // the application code
-
+                    if model.SelectingMultiple then
+                        drawSelectionBox model
 
                 ]
+
             ]
         ]
 
@@ -190,19 +265,21 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
         let _, portID = spMsg
         {model with SelectedPorts = [portID]}, Cmd.none
     | SelectComponents scMsg -> 
-        let _, componentIDList = scMsg
-        {model with SelectedComponents = componentIDList}, Cmd.none
+        // let _, componentIDList = scMsg
+        {model with SelectedComponents = scMsg}, Cmd.none
     | SelectWires swMsg -> 
-        let _, wireIDList = swMsg
-        {model with SelectedWires = wireIDList}, Cmd.none
+        // let _, wireIDList = swMsg
+        {model with SelectedWires = swMsg}, Cmd.none
+    | SelectMultiple multMsg ->
+        {model with DraggingPos = multMsg; SelectingMultiple = true}, Cmd.none
     | SelectDragStart dragMsg -> 
-        {model with DragStartPos = dragMsg}, Cmd.none
+        {model with DragStartPos = dragMsg; DraggingPos = dragMsg}, Cmd.none
     | SelectDragEnd dragMsg ->
-        {model with DraggingPos = dragMsg}, Cmd.none
+        {model with DragStartPos = origin; DraggingPos = origin; SelectingMultiple = false}, Cmd.none
     | SelectDragging dragMsg ->
         {model with DraggingPos = dragMsg}, Cmd.none
-    | MouseMove moveMsg ->
-        {model with MousePos = moveMsg}, Cmd.none
+    // | MouseMove moveMsg ->
+    //     {model with MousePos = moveMsg}, Cmd.none
 
 
 
@@ -215,10 +292,11 @@ let init() =
         SelectedPorts = []
         SelectedComponents = []
         SelectedWires = []
+        SelectingMultiple = false
         DragStartPos = origin
         // DragEndPos = origin
-        DraggingPos = false, origin
-        MousePos = origin
+        DraggingPos = origin
+        // MousePos = origin
     }, Cmd.map Wire cmds
     
 
