@@ -16,7 +16,7 @@ open Helpers
 
 
 //Static variables
-let STD_HEIGHT = 50.
+let STD_HEIGHT = 35.
 let HW_RATIO = 0.9
 let RAD = 3.
 
@@ -336,20 +336,22 @@ let isPortInverse (port : Portinfo Option) : bool =
     | Some x -> x.Invert
     | None -> false
 
-///Coordinates to create the tag shape used for input/output symbols
-let tagCoords (sym : Symbol) : string = 
+///Coordinates to create the tag shape used for input/output symbols,
+let tagCoords (sym : Symbol) : string =
+    let i = if sym.Type = CommonTypes.ComponentType.Input 1 then 0. else snd (getHWObj sym)
     let midX = midSymX sym
     let midY = midSymY sym
     (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" 
-        sym.TopL.X (midY - RAD) 
-        sym.TopL.X (midY + RAD) 
-        (midX + RAD) (midY + RAD) 
-        (sym.BotR.X) midY 
-        (midX + RAD) (midY - RAD))
+        (sym.TopL.X + i) (midY - RAD) 
+        (sym.TopL.X + i) (midY + RAD) 
+        (midX + RAD - (i/7.)) (midY + RAD) 
+        (sym.BotR.X - i) midY 
+        (midX + RAD - (i/7.)) (midY - RAD))
 
 ///Returns the coordinates of a triangle where midpoint of the flat side = input position i
-let triangleCoords (i : XYPos) : string =
-    (sprintf "%f,%f %f,%f %f,%f" i.X (i.Y + RAD) (i.X + RAD) i.Y i.X (i.Y - RAD))
+let triangleCoords (i : XYPos) (sym : Symbol) : string =
+    let pos = midSymX sym
+    (sprintf "%f,%f %f,%f %f,%f" pos (i.Y + RAD) (pos + RAD) i.Y pos (i.Y - RAD))
 
 ///Returns a map with only positions that have Some port assigned to them
 let getUsedPorts (portMap : Map<XYPos, Portinfo Option>) : Map<XYPos, Portinfo Option> =
@@ -502,7 +504,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     //Intermediate calculations
     let n = max (numIn + left) (numOut + right) |> float //The max number of ports initially will always be on the left or right of the box
     let nBot = if bot > 0 then bot else (int (HW_RATIO * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
-    let h = STD_HEIGHT * n
+    let h = if numIn = 1 && numOut = 1 then STD_HEIGHT * 2. else STD_HEIGHT * n
     let w =  if bot <= 0 then (HW_RATIO * h) else ((float nBot) * STD_HEIGHT * 1.5) //Width is either standard, or based on number of ports on the bottom
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
@@ -554,13 +556,14 @@ let init () =
         CommonTypes.Memory.Data = [(1L, 0L); (2L, 0L); (3L, 0L)] |> Map.ofList
     }
     [
-        (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 {X = 0.; Y = 0.})
+        (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 {X = 100.; Y = 0.})
         (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 {X = 200.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 {X = 300.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Demux2) 1 2 {X = 400.; Y = 50.})
-        (CreateNewSymbol (CommonTypes.ComponentType.ROM memory) 1 1 {X = 0.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Input 1) 1 0 {X = 200.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.ROM memory) 1 1 {X = 100.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Output 1) 0 1 {X = 200.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.Decode4) 2 4 {X = 400.; Y = 200.})
+        
     ]
     , Cmd.none
 
@@ -693,7 +696,7 @@ let private renderObj =
             let triangles : ReactElement list =
                 props.Obj
                 |> mapSetup
-                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i) color color 1.)[])
+                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1.)[])
             
             let io : ReactElement list = [drawPolygon (tagCoords props.Obj) "black" color 0.5 []]
 
@@ -783,7 +786,7 @@ let getPortCoords (symModel: Model) (pId : CommonTypes.PortId) : XYPos =
     |> List.map (fun (v, k) -> (v, getPortId k))
     |> List.tryFind (fun (_, k) -> k = pId)
     |> function
-    | Some x -> x |> fst
+    | Some x -> fst x
     | None -> failwithf "Error in getPortCoords: couldn't find portID"
 
         
