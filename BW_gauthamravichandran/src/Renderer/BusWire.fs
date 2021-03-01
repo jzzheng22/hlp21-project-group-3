@@ -30,9 +30,8 @@ type WireSegment = {
     }
 type Wire = {
     Id: CommonTypes.ConnectionId 
-    SrcSymbol: CommonTypes.ComponentId
-    TargetSymbol: CommonTypes.ComponentId
-
+    SrcPort: CommonTypes.PortId
+    TargetPort: CommonTypes.PortId
     Segments: WireSegment list
     }
 
@@ -65,7 +64,7 @@ let bbCollision (bb1:XYPos*XYPos) (bb2:XYPos*XYPos) =
     | (tL1, bR1, tL2, bR2) when bR2.Y > tL1.Y -> false
     | (tL1, bR1, tL2, bR2) when bR2.X < tL1.X -> false
     |_ ->true
-
+(*
 let findNearestBox (symbols: Symbol.Symbol list) (src:XYPos) =
     let list =
         Symbol.getBoundingBoxes symbols
@@ -75,7 +74,7 @@ let findNearestBox (symbols: Symbol.Symbol list) (src:XYPos) =
     else 
         List.minBy (fun (sym,l,r)->l) list
         |> (fun (sym,l,r)->Some sym)
-
+*)
 let goPastBox (src:XYPos) (sym:Symbol.Symbol) =
 
     
@@ -103,15 +102,16 @@ let goPastBox2 (src:XYPos) (sym:Symbol.Symbol) =
 
 
 
-let goToTarget (src:XYPos) (tar:Symbol.Symbol) =
-    let pos1= {X= (tar.TopL.X + src.X)/(2.) ; Y=src.Y}
-    let pos2= {X=pos1.X;Y=tar.TopL.Y}
+let goToTarget (src:XYPos) (tar:XYPos) =
+    let pos1= {X= (tar.X + src.X)/(2.) ; Y=src.Y}
+    let pos2= {X=pos1.X;Y=tar.Y}
     [   
         makeWireSegment src pos1
         makeWireSegment pos1 pos2
-        makeWireSegment pos2 tar.TopL
+        makeWireSegment pos2 tar
     ]
- 
+
+(*
 let findBoxesInPath (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol)=
     let pos1= {X= (tar.TopL.X + src.X)/(2.) ; Y=src.Y}
     let pos2= {X=pos1.X;Y=tar.TopL.Y}
@@ -128,9 +128,9 @@ let findBoxesInPath (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol
     else 
         Some (List.minBy (fun (l,r)->l) list)
         //|> (fun (l,r)->Some sym)
+*)
 
-
-let rec routing (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol)=
+let rec routing (symbols: Symbol.Symbol list) (src:XYPos) (tar:XYPos)=
 (*
     match findNearestBox symbols src with
     | None -> goToTarget src tar
@@ -141,15 +141,16 @@ let rec routing (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol)=
 *)
     goToTarget  src tar
 
-let makeWire (src:Symbol.Symbol) (tar:Symbol.Symbol) (symbols: Symbol.Symbol list) =
+let makeWire (srcId:CommonTypes.PortId) (tarId:CommonTypes.PortId) (symbols: Symbol.Symbol list) =
     
-    let segments = routing symbols src.BotR tar
+    let segments = routing symbols (Symbol.getPortCoords symbols srcId) (Symbol.getPortCoords symbols tarId)
     {
     Id= CommonTypes.ConnectionId (uuid()) 
-    SrcSymbol= src.Id
-    TargetSymbol= tar.Id
+    SrcPort= srcId
+    TargetPort= tarId
     Segments= segments
     }
+
 //----------------------------Message Type-----------------------------------//
 
 /// Messages to update buswire model
@@ -159,7 +160,10 @@ let makeWire (src:Symbol.Symbol) (tar:Symbol.Symbol) (symbols: Symbol.Symbol lis
 /// for highlighting, width inference, etc
 type Msg =
     | Symbol of Symbol.Msg
-    | AddWire of (CommonTypes.ConnectionId * CommonTypes.ConnectionId)
+    | AddWire of (CommonTypes.PortId * CommonTypes.PortId)
+    | DeleteWires of CommonTypes.ConnectionId list
+    | HighlightWires of CommonTypes.ConnectionId list
+    | MoveWires of CommonTypes.ConnectionId list * XYPos
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
 
@@ -246,9 +250,9 @@ let init n () =
     // |> goPastBox (symbols.[0].TopL)
 
     [
-        makeWire  symbols.[0] symbols.[1] symbols
-        makeWire  symbols.[2] symbols.[3] symbols
-    
+        //printfn (Symbol.getPortIds symbols symbols.[0].Id)
+        makeWire  ((Symbol.getPortIds symbols symbols.[0].Id).[0]) ((Symbol.getPortIds symbols symbols.[1].Id).[0]) symbols
+        makeWire  ((Symbol.getPortIds symbols symbols.[2].Id).[0]) ((Symbol.getPortIds symbols symbols.[3].Id).[0]) symbols
     ]
     //List.map (fun i -> makeRandomWire()) [1..n]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
@@ -262,16 +266,20 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wires = 
             model.WX
             |> List.map (fun w ->
-                let segments=routing sm ((Symbol.symbolPos sm w.SrcSymbol).BotR) (Symbol.symbolPos sm w.TargetSymbol)
+                let segments=routing sm (Symbol.getPortCoords sm w.SrcPort) (Symbol.getPortCoords sm w.TargetPort)
                 {w with Segments= segments})
 
         {model with Symbol=sm; WX=wires}, Cmd.map Symbol sCmd
     | AddWire _ -> failwithf "Not implemented"
+    | DeleteWires _ -> failwithf "Not implemented"
+    | HighlightWires _ -> failwithf "Not implemented"
+    | MoveWires _ -> failwithf "Not implemented"
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
 
 //---------------Other interface functions--------------------//
-
+let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list=
+    failwithf "not impl"
 /// Given a point on the canvas, returns the wire ID of a wire within a few pixels
 /// or None if no such. Where there are two close wires the nearest is taken. Used
 /// to determine which wire (if any) to select on a mouse click
