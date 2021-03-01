@@ -91,7 +91,7 @@ type Msg =
     | Add of compType: CommonTypes.ComponentType * pagePos : XYPos * numIn : int * numOut : int
     | Delete of sIdList : CommonTypes.ComponentId list
     | Highlight of sIdList: CommonTypes.ComponentId list
-    | HighlightPorts of sId : CommonTypes.ComponentId
+    | HighlightPorts of sIdList : CommonTypes.ComponentId list
     | DragPort of sId : CommonTypes.ComponentId * pId : CommonTypes.PortId * pagePos: XYPos
     | Rotate of sId : CommonTypes.ComponentId * rot : int
     | Scale of sId : CommonTypes.ComponentId * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
@@ -195,7 +195,7 @@ let testBox (portPos : XYPos) (coord : XYPos) : bool =
 ///n = int indicating the total number of ports on a side
 ///topL = the top left position of the box
 ///botR = the bottom right position of the box
-let portPos (i : int) (n : int) (topL : XYPos) (botR : XYPos) : XYPos = 
+let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos = 
     let h = getHW botR topL |> fst
     let w = getHW botR topL |> snd
     let x = topL.X + (w * float(i + 1) / float(n + 1))
@@ -241,8 +241,7 @@ let getPairs (m1 : float list) (m2 : float list list) : (float list * float list
 
 ///Multiplies two 2d matrices together
 let multMatrix (m1 : float list list) (m2 : float list list) : float list list  =
-    let transM = transp m2
-    m1 |> List.map (fun x -> getPairs x transM) |> List.map (List.map(fun (x, y) -> mulList x y))
+    m1 |> List.map (fun x -> getPairs x (transp m2)) |> List.map (List.map(fun (x, y) -> mulList x y))
     
 ///A generic transformation - It will always transform from the centre given 
 ///Mathematically it performs: Translate to origin, Transform, Translate back to centre
@@ -273,7 +272,7 @@ let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
 let mapTrans myMap transf param centre = 
     myMap 
     |> Map.toList 
-    |> List.map (fun (k, x) -> (transf k param centre, x)) 
+    |> List.map (fun (k, x) -> (transf k param centre, x))
     |> Map.ofList
 
 ///Transforms a map with a given transformation (1 parameter)
@@ -308,20 +307,17 @@ let displaceNX (sym : Symbol) (i : XYPos) (n : float) : float = displaceN sym i 
 ///Displace an object and retrieve the Y coordinate
 let displaceNY (sym : Symbol) (i : XYPos) (n : float) : float = displaceN sym i n |> snd
 
+//Helpers for makePosList
+let makeLR (len : int) x func = List.map (fun i -> {X = x.X; Y = (func i).Y}) [0..len - 1]
+let makeTB (len : int) y func = List.map (fun i -> {X = (func i).X; Y = y.Y}) [0..len - 1]
+let makeGen func len pos topL botR = func len pos (portPos len topL botR)
+
 ///Creates the list of positions for ports to slot in to on each side, returns in tupled list form
 let makePosList (n : int) (nBot : int) (topL : XYPos) (botR : XYPos) : (XYPos list * XYPos list * XYPos list * XYPos list) =
-    let l = 
-        [0..n - 1]
-        |> List.map (fun i -> {X = topL.X; Y = (portPos i (int(n)) topL botR).Y})
-    let r = 
-        [0..n - 1]
-        |> List.map (fun i -> {X = botR.X; Y = (portPos i (int(n)) topL botR).Y})
-    let t = 
-        [0..nBot - 1]
-        |> List.map (fun i -> {X = (portPos i nBot topL botR).X; Y = topL.Y})
-    let b = 
-        [0..nBot - 1]
-        |> List.map (fun i -> {X = (portPos i nBot topL botR).X; Y = botR.Y})
+    let l = makeGen makeLR n topL topL botR
+    let r = makeGen makeLR n botR topL botR
+    let t = makeGen makeTB nBot topL topL botR 
+    let b = makeGen makeTB nBot botR topL botR
     (l, r, t, b)
 
 //Functions for retrieving portinfo data from the option type:
@@ -351,13 +347,9 @@ let tagCoords (sym : Symbol) : string =
         (sym.BotR.X) midY 
         (midX + RAD) (midY - RAD))
 
+///Returns the coordinates of a triangle where midpoint of the flat side = input position i
 let triangleCoords (i : XYPos) : string =
-    (sprintf "%f,%f %f,%f %f,%f"
-        i.X (i.Y + RAD) 
-        (i.X + RAD) 
-        i.Y i.X 
-        (i.Y - RAD))
-
+    (sprintf "%f,%f %f,%f %f,%f" i.X (i.Y + RAD) (i.X + RAD) i.Y i.X (i.Y - RAD))
 
 ///Returns a map with only positions that have Some port assigned to them
 let getUsedPorts (portMap : Map<XYPos, Portinfo Option>) : Map<XYPos, Portinfo Option> =
@@ -374,8 +366,7 @@ let numExPorts (symType : SymbolType) (numIn : int) : (int * int * int) =
 ///We want to create Some(X) for every index in the list of positions that will have a port
 ///And None for every index in the list of positions that will not
 let mapPorts (posList : XYPos list) (portList : Portinfo list) : Portinfo Option list = 
-    posList
-    |> List.mapi (fun i _ -> if i < List.length portList then Some (List.item i portList) else None)
+    posList |> List.mapi (fun i _ -> if i < List.length portList then Some (List.item i portList) else None)
 
 ///Converts the list of portinfo and the list of XYPositions into a map of <XYPos, Portinfo Option>
 let getPortMap (ins: Portinfo list) (leftPort : Portinfo list) (outs : Portinfo list) (rightPort : Portinfo list) (botPort : Portinfo list) (l,r,t,b) : Map<XYPos, Portinfo Option> = 
@@ -383,26 +374,24 @@ let getPortMap (ins: Portinfo list) (leftPort : Portinfo list) (outs : Portinfo 
     let right =  List.concat [outs; rightPort] |> mapPorts r
     let top = [] |> mapPorts t 
     let bot = botPort |> mapPorts b
-    
-    List.zip  (List.concat [l; r; t; b]) (List.concat[left; right; top; bot])
-    |> Map.ofList
+    List.zip (List.concat [l; r; t; b]) (List.concat[left; right; top; bot]) |> Map.ofList
 
 let findPort (sym: Symbol) (pId : CommonTypes.PortId) = 
     sym.PortMap
     |> Map.toList
     |> List.find (fun (v, k) -> getPortId k  = pId)
 
-//Swaps two values in a map
+///Swaps two values in a map
 let swapPort portMap k1 k2 v1 v2 =
     portMap
     |> Map.change k1 (fun _ -> Some v2)
     |> Map.change k2 (fun _ -> Some v1)
 
-let swapMap (sym : Symbol) (pagePos : XYPos) port = 
-    //The index we want to move the port to is the one closest to the mouse
+//Finds the port with position closest to a coordinate, and swap the map values of that port with a given port
+let swapMap (sym : Symbol) (coord : XYPos) port = 
     sym.PortMap
     |> Map.toList
-    |> List.map (fun (v, k) -> (absDiff pagePos v, (v, k)))
+    |> List.map (fun (v, k) -> (absDiff coord v, (v, k)))
     |> List.minBy fst
     |> snd
     |> function
@@ -418,16 +407,15 @@ let drawText (x : float) (y : float) (size : string) =
             FontSize size
             FontWeight "bold"
             Fill "Black"
-            UserSelect UserSelectOptions.None]
+            UserSelect UserSelectOptions.None] //Prevent highlighting text
     ]
 
-let drawPolygon (points : string) (color : string)  =
+let drawPolygon (points : string) (stroke : string) (fill : string) (width : float) =
     polygon[
         Points points
-        Style[
-            Stroke color
-            Fill color
-        ]
+        SVGAttr.Stroke stroke
+        SVGAttr.Fill fill
+        SVGAttr.StrokeWidth width
     ]
 
 let drawCircle (sym : Symbol) (i : XYPos) (fill : string) (stroke : string) (opac : float) (width : float) =
@@ -579,18 +567,16 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
 /// Dummy function for test. Creates 4 NAND gates with 2 input, 1 output.
 let init () =
     //use for checking rom/ram
-    let myMap = [(1L, 0L); (2L, 0L); (3L, 0L)] |> Map.ofList
     let memory = {
         CommonTypes.Memory.AddressWidth = 10 
         CommonTypes.Memory.WordWidth = 10
-        CommonTypes.Memory.Data = myMap
+        CommonTypes.Memory.Data = [(1L, 0L); (2L, 0L); (3L, 0L)] |> Map.ofList
     }
     //4 logic gates
     List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Output 1) 0 1 pos)) 
+    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 pos)) 
     , Cmd.none
-
 
 /// update function which displays symbols
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
@@ -624,11 +610,11 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         )
         , Cmd.none
 
-    | HighlightPorts sId ->
+    | HighlightPorts sIdList ->
         model
         |> List.map (fun sym ->
                 { sym with
-                    PortHighlight = (sym.Id = sId)
+                    PortHighlight = List.contains sym.Id sIdList
                 }
         )
         , Cmd.none
@@ -711,33 +697,19 @@ let private renderObj =
             //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
                 props.Obj
                 |> mapSetup
-                |> List.map(fun (i, k) ->
+                |> List.map(fun (i, _) ->
                     polyline[
                         Points (sprintf "%f,%f %f,%f %f,%f" i.X i.Y (midSymX props.Obj) i.Y (midSymX props.Obj) (midSymY props.Obj))
-                        Style[
-                            Stroke color
-                            Fill "none"
-                        ]
+                        SVGAttr.Stroke color
+                        SVGAttr.Fill "none"
                     ][])
 
             let triangles : ReactElement list =
-                //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
-                    props.Obj
-                    |> mapSetup
-                    |> List.map(fun (i, k) ->
-                        (drawPolygon (triangleCoords i) color)[])
+                props.Obj
+                |> mapSetup
+                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i) color color 1.)[])
             
-            let io : ReactElement list =
-                [
-                    polygon[
-                        Points (tagCoords props.Obj)
-                        Style[
-                            Stroke "black"
-                            Fill color
-                            StrokeWidth 0.5
-                        ]
-                    ][]
-                ]
+            let io : ReactElement list = [drawPolygon (tagCoords props.Obj) "black" color 0.5 []]
 
             let displayBox : ReactElement list =
                 [
@@ -756,15 +728,13 @@ let private renderObj =
                 props.Obj.PortMap
                 |> Map.toList
                 |> List.filter(fun (_, k) -> isPortInverse k)
-                |> List.map(fun (i, k) ->
-                    drawCircle props.Obj i color "black" 1. 0.5[])
+                |> List.map(fun (i, _) -> drawCircle props.Obj i color "black" 1. 0.5[])
 
             let ports =
                 if props.Obj.PortHighlight then
                     props.Obj
                     |> mapSetup
-                    |> List.map(fun (i, k) ->
-                        drawCircle props.Obj i "deepskyblue" "deepskyblue" 0.4 1.[])
+                    |> List.map(fun (i, _) -> drawCircle props.Obj i "deepskyblue" "deepskyblue" 0.4 1.[])
                 else []
             
             let symDraw = 
@@ -803,6 +773,15 @@ let initPortSearch (symModel: Model) : (XYPos * Portinfo Option) list =
     |> List.map (fun x -> Map.toList x)
     |> List.concat
 
+let getPortinfo (symModel: Model) (pId : CommonTypes.PortId) =
+    initPortSearch symModel
+    |> List.map (fun (_, k) -> (k, getPortId k))
+    |> List.tryFind (fun (_, id) -> id = pId)
+    |> function
+    | Some (Some k, _) -> k
+    | Some _ ->  failwithf "Unexpected error in getPortinfo"
+    | None -> failwithf "Error in getPortinfo: couldn't find portID"
+
 //TODO - REMOVE - ONLY USED BY BUSWIRE - Currently connects every input 0 to each other.
 let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos = 
     List.find (fun sym -> sym.Id = sId) symModel
@@ -816,7 +795,7 @@ let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos =
 let getPortCoords (symModel: Model) (pId : CommonTypes.PortId) : XYPos = 
     initPortSearch symModel
     |> List.map (fun (v, k) -> (v, getPortId k))
-    |> List.tryFind (fun (v, k) -> k = pId)
+    |> List.tryFind (fun (_, k) -> k = pId)
     |> function
     | Some x -> x |> fst
     | None -> failwithf "Error in getPortCoords: couldn't find portID"
@@ -824,28 +803,20 @@ let getPortCoords (symModel: Model) (pId : CommonTypes.PortId) : XYPos =
         
 ///Returns all symbols in the model in the form (ID, bounding box topLeft, bounding box botRight)
 let getBoundingBoxes (symModel : Model) (startCoord : XYPos) : (CommonTypes.ComponentId * XYPos * XYPos) list =
-    symModel
-    |> List.map (fun sym -> (sym.Id, sym.TopL, sym.BotR))
+    List.map (fun sym -> (sym.Id, sym.TopL, sym.BotR)) symModel
 
 ///Finds the portType of a specific port
 let getPortType (symModel: Model) (pId : CommonTypes.PortId) : CommonTypes.PortType =
-    initPortSearch symModel
-    |> List.map (fun (v, k) -> (k, getPortId k, v))
-    |> List.tryFind (fun (_, id, _) -> id = pId)
-    |> function
-    | Some (Some k, _, _) -> k.Port.PortType
-    | Some (_, _, _) ->  failwithf "Unexpected error in getPortType"
-    | None -> failwithf "Error in getPortType: couldn't find portID"
+    (getPortinfo symModel pId).Port.PortType
 
 ///Finds if a position lies on a port. Returns Some(position, portId) if found, none otherwise.
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * CommonTypes.PortId) Option =
     symModel
     |>initPortSearch
-    |> List.tryFind (fun (v, k) -> testBox v pos)
+    |> List.tryFind (fun (v, _) -> testBox v pos)
     |> function
     | Some(v, Some k) -> Some(v, (CommonTypes.PortId (k.Port.Id)))
-    | Some(_, None) -> None
-    | None -> None
+    | _ -> None
 
 //Returns a list of Port Ids for a given symbol
 let getPortIds (model : Model) (sId : CommonTypes.ComponentId) : CommonTypes.PortId list = 
@@ -853,16 +824,10 @@ let getPortIds (model : Model) (sId : CommonTypes.ComponentId) : CommonTypes.Por
     |> List.tryFind (fun sym -> sym.Id = sId)
     |> function
     | Some sym -> sym.PortMap |> Map.toList |> List.map (fun (v, k) -> getPortId k)
-    | None -> failwithf "Error, could not find symbol"
+    | None -> failwithf "Error in getPortIds, couldn't find symbol"
 
-let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int =
-    initPortSearch model
-    |> List.map (fun (v, k) -> (k, getPortId k, v))
-    |> List.tryFind (fun (_, id, _) -> id = pId)
-    |> function
-    | Some (Some k, _, _) -> k.width
-    | Some (_, _, _) ->  failwithf "Unexpected error in getPortWidth"
-    | None -> failwithf "Error in getPortWidth: couldn't find portID"
+let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int = 
+    (getPortinfo model pId).width
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
