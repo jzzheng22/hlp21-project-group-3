@@ -317,7 +317,7 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                                                            |> List.map CommonTypes.ConnectionId
                                     //Check if we have something.
                                     if not (List.isEmpty filteredWireList) then
-                                        //If we select an ID that is already highlighted we don't change anything
+                                        //If we select a wire ID that is already highlighted we don't change anything
                                         if hasCommon filteredWireList model.SelectedWireIDs then
                                             UpdateMouse mousePos |> dispatch
                                         //Else we initiate a new selection
@@ -421,8 +421,19 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         match model.SelectionType with 
         | ComponentSymbol -> 
             printfn "CASE 1"
-            let wModel, wCmd = BusWire.update (BusWire.Symbol (Symbol.Delete model.SelectedComponentIDs)) model.Wire
-            {model with Wire = wModel}, Cmd.map WireMsg wCmd
+            //We first need to find and delete all connected wires of the symbol(s)
+            let connectedWires = model.SelectedComponentIDs
+                                 //Obtain portID lists for each selected component
+                                 |> List.map (Symbol.getPortIds model.Wire.Symbol) 
+                                 //Obtain the wires corresponding to all these ports into a single list
+                                 |> List.collect (BusWire.getWireIdsFromPortIds model.Wire)
+                                 //Remove repeated elements 
+                                 |> List.distinct
+            //Delete the wires first.                  
+            let wModel1, wCmd1 = BusWire.update (BusWire.DeleteWires connectedWires) model.Wire
+            //Then delete the symbols.
+            let wModel2, wCmd2 = BusWire.update (BusWire.Symbol (Symbol.Delete model.SelectedComponentIDs)) wModel1
+            {model with Wire = wModel2}, Cmd.batch [Cmd.map WireMsg wCmd2; Cmd.map WireMsg wCmd1]
         | ComponentWire -> 
             printfn "CASE 2"
             let wModel, wCmd = BusWire.update (BusWire.DeleteWires model.SelectedWireIDs) model.Wire
@@ -564,11 +575,23 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |> List.map (fun (a,b,c) -> (string a, b, c))
                 |> List.filter (boxEncloses draggedBox)
                 |> List.map (obtainID >> CommonTypes.ComponentId)
-            //If we get something then we move to ComponentSymbol state with the selected symbols.
-            let selectedWires =
-                BusWire.getBoundingBoxes (model.Wire) scaledEndPoint
-                |> List.map (fun (a,b,c) -> a)
+           
+            //If we get something then we move to ComponentSymbol state with the selected symbols and associated wires.
             if not (List.isEmpty selectedSymbols) then 
+
+                let selectedWires =
+                    selectedSymbols
+                    //Obtain portID lists for each selected component
+                    |> List.map (Symbol.getPortIds model.Wire.Symbol) 
+                    //Obtain the wires corresponding to all these ports
+                    |> List.collect (BusWire.getWireIdsFromPortIds model.Wire)
+                    //Count how many of each ID there are 
+                    |> List.countBy id
+                    //Filter out wireIDs that only appear once 
+                    |> List.filter (fun (id, count) -> count > 1)
+                    //Only interested in the first elements of tuples i.e. ids
+                    |> List.map fst
+                    
                 {model with
                     SelectBoxStart = origin;
                     SelectBoxCurrent = origin;
