@@ -30,7 +30,7 @@ To Sheet:
  - From mouse and keyboard
 
 To BusWire: (see [buswire.md](./buswire.md) for description)
-`AddConnection of wireInfo` 
+`AddWire of (CommonTypes.PortId * CommonTypes.PortId)`
  - WireInfo is tuple of portID `(startPort: string * endPort: string)`
  - Sent by Sheet on mouse click up depending on return value of `Symbol.isPort`
 
