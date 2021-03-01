@@ -497,7 +497,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let (name, wIn, wOut, symType) = typeToInfo compType
 
     //Finding the component specific extra ports required
-    let (left, right, bot) = numExPorts symType numIn
+    let (left, right, bot) = numExPorts symType (max numIn numOut)
 
     //Intermediate calculations
     let n = max (numIn + left) (numOut + right) |> float //The max number of ports initially will always be on the left or right of the box
@@ -526,38 +526,19 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     //Create the map
     let portMap = getPortMap ins leftPort outs rightPort botPort (l, r, t, b)
 
-    //---------------------------------------------------------------------------------------------//
-    //----FOR DEMO PURPOSES ONLY - THIS IS AN EXACT COPY OF THE TRANS FUNCTION USED IN MESSAGES----//
-    //---------------------------------------------------------------------------------------------//
-    let centre = midXY pos botR
-    let rot  = 0
-    let rotTopL = rotateCoords pos rot centre
-    let rotBotR = rotateCoords botR rot centre
-    let rotSlots = mapTrans portMap rotateCoords rot centre
-
-    let scale = {X = 1.0; Y = 1.0}
-    let scaleTopL = scaleCoords rotTopL scale centre
-    let scaleBotR = scaleCoords rotBotR scale centre
-    let scaleSlots = mapTrans rotSlots scaleCoords scale centre
-    let newBox = getNewBox scaleTopL scaleBotR
-
-    //---------------------------------------------------------------------------------------------//
-    //---------------------------------------------------------------------------------------------//
-    //---------------------------------------------------------------------------------------------//
-
     // ------- Symbol Creation ------ ///
     {
-        TopL = newBox |> fst //only the demo for rotation/scaling, without demo: TopL = pos, and BotR = botR.
-        BotR = newBox |> snd
+        TopL = pos
+        BotR = botR
         Id = _id
         Type = compType
         Name = name
         Highlight = false
         PortHighlight = false
-        Rotation = rot
-        Scale = scale
+        Rotation = 0
+        Scale = {X = 0.;Y = 0.}
         genericType = symType
-        PortMap = scaleSlots
+        PortMap = portMap
     }
 
 
@@ -572,10 +553,15 @@ let init () =
         CommonTypes.Memory.WordWidth = 10
         CommonTypes.Memory.Data = [(1L, 0L); (2L, 0L); (3L, 0L)] |> Map.ofList
     }
-    //4 logic gates
-    List.allPairs [1..2] [1..2]
-    |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 pos)) 
+    [
+        (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 {X = 0.; Y = 0.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 {X = 200.; Y = 50.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 {X = 300.; Y = 50.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Demux2) 1 2 {X = 400.; Y = 50.})
+        (CreateNewSymbol (CommonTypes.ComponentType.ROM memory) 1 1 {X = 0.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Input 1) 1 0 {X = 200.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Decode4) 2 4 {X = 400.; Y = 200.})
+    ]
     , Cmd.none
 
 /// update function which displays symbols
