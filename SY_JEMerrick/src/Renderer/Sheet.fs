@@ -358,10 +358,10 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                             //We get something then highlight the symbol ports.
                             | Some a ->
                                 let symid, tl, br = a 
-                                WireMsg (BusWire.Symbol (Symbol.HighlightPorts (CommonTypes.ComponentId symid))) |> dispatch
+                                WireMsg (BusWire.Symbol (Symbol.HighlightPorts [(CommonTypes.ComponentId symid)])) |> dispatch
                             //Else highlight nothing.
                             | None -> 
-                                WireMsg (BusWire.Symbol (Symbol.HighlightPorts (CommonTypes.ComponentId ""))) |> dispatch
+                                WireMsg (BusWire.Symbol (Symbol.HighlightPorts [(CommonTypes.ComponentId "")])) |> dispatch
 
                             if mDown ev 
                             then SelectGrow mousePos |> dispatch
