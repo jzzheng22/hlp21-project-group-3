@@ -208,7 +208,6 @@ let singleWireView =
             |> ofList)
 
 
-
 let view (model:Model) (dispatch: Dispatch<Msg>)=
     let wires = 
         model.WX
