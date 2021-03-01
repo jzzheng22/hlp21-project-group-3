@@ -351,7 +351,7 @@ let tagCoords (sym : Symbol) : string =
 ///Returns the coordinates of a triangle where midpoint of the flat side = input position i
 let triangleCoords (i : XYPos) (sym : Symbol) : string =
     let pos = midSymX sym
-    (sprintf "%f,%f %f,%f %f,%f" pos (i.Y + RAD) (pos + RAD) i.Y pos (i.Y - RAD))
+    (sprintf "%f,%f %f,%f %f,%f" pos (i.Y + RAD) (pos + (RAD * 2.)) i.Y pos (i.Y - RAD))
 
 ///Returns a map with only positions that have Some port assigned to them
 let getUsedPorts (portMap : Map<XYPos, Portinfo Option>) : Map<XYPos, Portinfo Option> =
