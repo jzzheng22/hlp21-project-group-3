@@ -10,7 +10,7 @@ open Helpers
 type Model = {
     Wire: BusWire.Model
     Zoom: float 
-    SelectedPorts: CommonTypes.PortId list
+    SelectedPort: CommonTypes.PortId option
     SelectedComponents: CommonTypes.ComponentId list
     SelectedWires: CommonTypes.ConnectionId list
     SelectingMultiple: bool
@@ -131,6 +131,25 @@ let drawSelectionBox model =
         // []
     // ]
 
+let drawPortConnectionLine model =
+    line [
+        X1 model.DragStartPos.X; Y1 model.DragStartPos.Y; 
+        X2 model.DraggingPos.X; Y2 model.DraggingPos.Y;
+        Style [
+            match Symbol.isPort model.Wire.Symbol model.DraggingPos with 
+            | Some _ ->
+                Stroke "darkblue"
+                StrokeWidth "5px"
+                StrokeDasharray "10,10"
+            | None ->
+                Stroke "green"
+                StrokeWidth "1px"
+                StrokeDasharray "5,5"
+            FillOpacity 0.1
+        ]
+    ] []
+
+
 
 /// This function zooms an SVG canvas by transforming its content and altering its size.
 /// Currently the zoom expands based on top left corner. Better would be to collect dimensions
@@ -164,6 +183,8 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             // (mouseOp Down ev))
 
             // (mouseOp Up ev))
+
+          //TODO: MOVE IS CURRENTLY BROKEN. CAUSES SELECTINO BOX TO BE DRAWN SOMETIMES. OBEJCTS DONT DMOVE AS THEY SHOULD
           OnMouseMove (fun ev -> 
             let coordX = ev.clientX / model.Zoom
             let coordY = ev.clientY / model.Zoom
@@ -173,7 +194,7 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                 |> List.filter (inBoundingBox mousePos)
                 |> List.map getID
             // if not (List.isEmpty symbolIDList) then
-
+            // TODO: HIGHLIGHTPORTS NEEDS TO HIGHLIGHT WHEN CLOSE TO SYMBOL, NOT JUST INSIDE SYMBOL
             dispatch <| Symbol (Symbol.HighlightPorts symbolIDList)
             if mDown ev then // Drag
                 dispatch <| SelectDragging mousePos
@@ -191,7 +212,15 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             let coordY = ev.clientY / model.Zoom
             let mousePos = {X = coordX; Y = coordY}
             dispatch <| SelectDragging mousePos
-            dragSelectElements model dispatch
+            match Symbol.isPort model.Wire.Symbol model.DraggingPos with 
+            | Some (_, endPoint) ->
+                let startPort = 
+                    match model.SelectedPort with
+                    | Some a -> a
+                    | None -> failwithf "Error: tried to create port connection without starting port"
+                dispatch <| Wire (BusWire.AddWire (startPort, endPoint))
+            | None ->
+                dragSelectElements model dispatch
             dispatch <| SelectDragEnd mousePos
           )
         ]
@@ -220,6 +249,11 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
 
 
                     svgReact // the application code
+                    match model.SelectedPort with
+                    | Some _ ->
+                        drawPortConnectionLine model
+                    | None -> ()
+                        
                     if model.SelectingMultiple then
                         drawSelectionBox model
 
@@ -263,7 +297,7 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
         model, Cmd.ofMsg (Wire <| BusWire.SetColor c)
     | SelectPort spMsg -> 
         let _, portID = spMsg
-        {model with SelectedPorts = [portID]}, Cmd.none
+        {model with SelectedPort = Some portID}, Cmd.none
     | SelectComponents scMsg -> 
         // let _, componentIDList = scMsg
         {model with SelectedComponents = scMsg}, Cmd.none
@@ -275,7 +309,7 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
     | SelectDragStart dragMsg -> 
         {model with DragStartPos = dragMsg; DraggingPos = dragMsg}, Cmd.none
     | SelectDragEnd dragMsg ->
-        {model with DragStartPos = origin; DraggingPos = origin; SelectingMultiple = false}, Cmd.none
+        {model with SelectedPort = None; DragStartPos = origin; DraggingPos = origin; SelectingMultiple = false}, Cmd.none
     | SelectDragging dragMsg ->
         {model with DraggingPos = dragMsg}, Cmd.none
     // | MouseMove moveMsg ->
@@ -289,7 +323,7 @@ let init() =
     {
         Wire = model
         Zoom = 1.0
-        SelectedPorts = []
+        SelectedPort = None
         SelectedComponents = []
         SelectedWires = []
         SelectingMultiple = false
