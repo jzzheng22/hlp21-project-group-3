@@ -176,7 +176,13 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             match Symbol.isPort model.Wire.Symbol mousePos with
             | Some (portCoords, portId) -> dispatch <| SelectPort (portCoords, portId)
             | None -> 
-                if (List.isEmpty model.SelectedComponents) && (List.isEmpty model.SelectedWires)then
+                if boxInSelectedArea model.DragStartPos model.DraggingPos ((), mousePos, mousePos) then
+                    ()
+                else
+                //TEST TO SEE IF IN BOX OF MULTIBOX
+                //IF YES, THEN APPLIES TO EVERYTHING
+                //IF NOT, THEN RESET SELECTED THINGS
+                // if (List.isEmpty model.SelectedComponents) && (List.isEmpty model.SelectedWires) then
                     selectElements model mousePos dispatch
             dispatch <| SelectDragStart mousePos
           )
@@ -198,14 +204,18 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             dispatch <| Symbol (Symbol.HighlightPorts symbolIDList)
             if mDown ev then // Drag
                 dispatch <| SelectDragging mousePos
-                if not (List.isEmpty model.SelectedComponents) then
-                    let transVector = {X = coordX - model.DraggingPos.X; Y = coordY - model.DraggingPos.Y}
-                    dispatch <| Symbol (Symbol.Move (model.SelectedComponents, transVector))
-                else if not (List.isEmpty model.SelectedWires) then
-                    let transVector = {X = coordX - model.DraggingPos.X; Y = coordY - model.DraggingPos.Y}
-                    dispatch <| Wire (BusWire.MoveWires (model.SelectedWires, transVector))
-                else
-                    dispatch <| SelectMultiple mousePos
+                match model.SelectedPort with
+                | Some _ ->
+                    ()
+                | None ->
+                    if not (List.isEmpty model.SelectedComponents) then
+                        let transVector = {X = coordX - model.DraggingPos.X; Y = coordY - model.DraggingPos.Y}
+                        dispatch <| Symbol (Symbol.Move (model.SelectedComponents, transVector))
+                    else if not (List.isEmpty model.SelectedWires) then
+                        let transVector = {X = coordX - model.DraggingPos.X; Y = coordY - model.DraggingPos.Y}
+                        dispatch <| Wire (BusWire.MoveWires (model.SelectedWires, transVector))
+                    else
+                        dispatch <| SelectMultiple mousePos
           )
           OnMouseUp (fun ev -> 
             let coordX = ev.clientX / model.Zoom
@@ -214,14 +224,20 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             dispatch <| SelectDragging mousePos
             match Symbol.isPort model.Wire.Symbol model.DraggingPos with 
             | Some (_, endPoint) ->
+                // TODO: MAKE SURE TARGET PORT IS INVERSE OF SOURCE PORT
                 let startPort = 
                     match model.SelectedPort with
                     | Some a -> a
                     | None -> failwithf "Error: tried to create port connection without starting port"
                 dispatch <| Wire (BusWire.AddWire (startPort, endPoint))
-            | None ->
+            | None -> ()
+            if model.SelectingMultiple then
                 dragSelectElements model dispatch
+            // if (List.isEmpty model.SelectedComponents) && (List.isEmpty model.SelectedWires) then
             dispatch <| SelectDragEnd mousePos
+            printf "%A" "OnMouseUp"
+            printf "%A" model.DragStartPos 
+            printf "%A" model.DraggingPos
           )
         ]
         [ svg
@@ -303,13 +319,15 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
         {model with SelectedComponents = scMsg}, Cmd.none
     | SelectWires swMsg -> 
         // let _, wireIDList = swMsg
+        printf "%A" "SelectWires msg"
+        printf "%A" swMsg
         {model with SelectedWires = swMsg}, Cmd.none
     | SelectMultiple multMsg ->
         {model with DraggingPos = multMsg; SelectingMultiple = true}, Cmd.none
     | SelectDragStart dragMsg -> 
         {model with DragStartPos = dragMsg; DraggingPos = dragMsg}, Cmd.none
     | SelectDragEnd dragMsg ->
-        {model with SelectedPort = None; DragStartPos = origin; DraggingPos = origin; SelectingMultiple = false}, Cmd.none
+        {model with SelectedPort = None; SelectingMultiple = false}, Cmd.none
     | SelectDragging dragMsg ->
         {model with DraggingPos = dragMsg}, Cmd.none
     // | MouseMove moveMsg ->

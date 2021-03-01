@@ -331,7 +331,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     {w with Highlight = false}
             )
         {model with WX = wList}, Cmd.none
-    | MoveWires (_,_) -> model, Cmd.none // Not implemented yet
+    | MoveWires (_,_) -> 
+        printf "%A" "move wires"
+        model, Cmd.none // Not implemented yet
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
