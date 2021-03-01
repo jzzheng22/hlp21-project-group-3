@@ -524,7 +524,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let (leftPort, rightPort, botPort) = getExPorts symType bot left right _id compType wIn wOut
     
     //Create the map
-    let myMap = getPortMap ins leftPort outs rightPort botPort (l, r, t, b)
+    let portMap = getPortMap ins leftPort outs rightPort botPort (l, r, t, b)
 
     //---------------------------------------------------------------------------------------------//
     //----FOR DEMO PURPOSES ONLY - THIS IS AN EXACT COPY OF THE TRANS FUNCTION USED IN MESSAGES----//
@@ -533,7 +533,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let rot  = 0
     let rotTopL = rotateCoords pos rot centre
     let rotBotR = rotateCoords botR rot centre
-    let rotSlots = mapTrans myMap rotateCoords rot centre
+    let rotSlots = mapTrans portMap rotateCoords rot centre
 
     let scale = {X = 1.0; Y = 1.0}
     let scaleTopL = scaleCoords rotTopL scale centre
