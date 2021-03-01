@@ -37,9 +37,9 @@ type KeyboardMsg =
     | AltV 
     | AltZ 
     | AltShiftZ 
-    //| RotateSymbol 
-    //| ScaleUpSymbol
-    //| ScaleDownSymbol
+    | RotateSymbol 
+    | ScaleUpSymbol
+    | ScaleDownSymbol
     | AltA
     | DEL 
     | ZoomCanvasIn 
@@ -422,8 +422,6 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
             ]
         ]
 
-
-
 // END OF UBIQUITOUS HELPER FUNCTIONS
 
 
@@ -476,39 +474,30 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     | KeyPress ZoomCanvasOut -> 
         ({model with Zoom = model.Zoom/1.25}, Cmd.none)
 
-    //NOTE: The following three cases are part of Joanna's demo - Uncomment when the same functionality is implemented.
-    // Rotating symbol utility. Rotates symbol clockwise by 90 degrees.
-    //| KeyPress RotateSymbol -> 
-    //    if List.isEmpty model.SelectedComponentIDs then 
-    //        model, Cmd.none
-    //    else 
-    //        //Only perform transformation on one selected element
-    //        let symid = List.head model.SelectedComponentIDs
-    //        let wModel, wCmd = BusWire.update (BusWire.Symbol (Symbol.Rotate (symid, 90))) model.Wire
-    //        {model with Wire = wModel}, Cmd.map WireMsg wCmd
-
-
-    // Scaling up symbol utility. Magnifies symbol by 1.25.
-    //| KeyPress ScaleUpSymbol -> 
-    //    if List.isEmpty model.SelectedComponentIDs then 
-    //        model, Cmd.none
-    //    else 
-    //        //Only perform transformation on one selected element
-    //        let symid = List.head model.SelectedComponentIDs
-    //        let wModel, wCmd = BusWire.update (BusWire.Symbol (Symbol.Scale (symid, {X = 1.25; Y = 1.25}))) model.Wire
-    //        {model with Wire = wModel}, Cmd.map WireMsg wCmd
-
-
-    // Scaling down symbol utility. Shrinks symbol to scale 0.8 = 1/1.25.
-    //| KeyPress ScaleDownSymbol -> 
-    //    if List.isEmpty model.SelectedComponentIDs then 
-    //        model, Cmd.none
-    //    else 
-    //        //Only perform transformation on one selected element
-    //        let symid = List.head model.SelectedComponentIDs
-    //        let wModel, wCmd = BusWire.update (BusWire.Symbol (Symbol.Scale (symid, {X = 0.8; Y = 0.8}))) model.Wire
-    //        {model with Wire = wModel}, Cmd.map WireMsg wCmd
-
+    //NOTE: The following case is part of Joanna's demo. It implements:
+    //          - Rotating symbol utility. Rotates symbol clockwise by 90 degrees.
+    //          - Scaling up symbol utility. Magnifies symbol by 1.25.
+    //          - Scaling down symbol utility. Shrinks symbol to scale 0.8 = 1/1.25.
+    // Stretching and clockwise rotation NOT implemented.
+    | KeyPress k when (k = RotateSymbol || k = ScaleUpSymbol || k = ScaleDownSymbol) -> 
+        if List.isEmpty model.SelectedComponentIDs then 
+            model, Cmd.none
+        else 
+            let symid = List.head model.SelectedComponentIDs
+            match k with 
+            //Rotation
+            | RotateSymbol -> 
+                updateSymbolModel model  (Symbol.Rotate (symid, 90))
+            //Magnification
+            | ScaleUpSymbol -> 
+                let scaleamt = 1.25
+                updateSymbolModel model (Symbol.Scale (symid, {X = scaleamt; Y = scaleamt}))
+            //Shrinking
+            | ScaleDownSymbol -> 
+                let scaleamt = 0.8 
+                updateSymbolModel model (Symbol.Scale (symid, {X = scaleamt; Y = scaleamt}))
+            | _ -> 
+                failwithf "Unexpected input in symbol transformation."
 
     //Deleting a selected symbol(s)/wire(s).
     | KeyPress DEL -> 
