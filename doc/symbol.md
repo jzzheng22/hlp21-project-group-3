@@ -35,6 +35,11 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
  - `Some (portCoords: XYPos * portID: string)`
  - `None`
 
+`Symbol.getPortIds (model: Model) (symbolIds: ComponentID list)`
+- Returns list of lists of ports for each symbol ID.
+- Is used to find wires connected to symbol(s).
+
+
 ## Messages
 
 `Move of symbolIdList *  XYPos`
@@ -52,8 +57,22 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
 
 `Highlight of symbolIdList`
 
-`HighlightPorts of symbolId`
- - Highlights ports of symbols
+`HighlightPorts of symbolIdList`
+ - Highlights ports of symbols - ISSIE highlights ports on multiple symbols if the mouse is in range of all of them, so the list helps to highlight ports on multiple symbols.
+
+**EXTRA: (not necessary but aamanrebello has implemented these)**
+ 
+aamanrebello's commit called "Final Version (without Joanna's extra features)" does not implement the below interface messages, but does implement the essential ones above. Use this commit if you have not implemented the below messages but want to use aamanrebello's sheet program as a stub for the demo. However, aamanrebello's commit "Final Version - with Joanna's additional features" sends the below messages to Symbol:
+
+`Rotate of sId : CommonTypes.ComponentId * rot : int`
+- Used to rotate a single selected symbol 'rot' degrees clockwise. You can do this via the drop-down menu. From sheet, aamanrebello uses this to turn symbols clockwise by 90 degrees via drop-down menu.
+
+`Scale of sId : CommonTypes.ComponentId * scale : XYPos`
+- The 'scale' parameter can scale a symbol by a specified factor in X and Y directions (corresponding to the X and Y fields in the XYPos type). This is used to magnify and shrink symbols via drop-down menu
+
+
+
+
 
 ## State Outputs
  - SymbolBBs (to Sheet and BusWire)
