@@ -49,6 +49,10 @@
                    makeKeyItem "Delete"  "delete" (fun () -> dispatch KeyboardMsg.DEL)
                    makeKeyItem "Red" "Alt+Z" (fun () -> dispatch KeyboardMsg.AltZ)
                    makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.AltA)
+                   //menuSeparator
+                   //makeKeyItem "Rotate Symbol Clockwise" "Alt+Shift+R" (fun () -> dispatch KeyboardMsg.RotateSymbol)
+                   //makeKeyItem "Enlarge Symbol" "Alt+Shift+U" (fun () -> dispatch KeyboardMsg.ScaleUpSymbol)
+                   //makeKeyItem "Shrink Symbol" "Alt+Shift+D" (fun () -> dispatch KeyboardMsg.ScaleDownSymbol)
                    menuSeparator
                    makeKeyItem "Diagram Zoom In" "CmdOrCtrl+z" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
                    makeKeyItem "Diagram Zoom Out" "CmdOrCtrl+y" (fun () -> dispatch KeyboardMsg.ZoomCanvasOut)
