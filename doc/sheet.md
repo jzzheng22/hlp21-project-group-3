@@ -29,8 +29,10 @@ Message mechanism:
  - `BusWire.update` calls `Symbol.update`to send messages to Sheet module.
 Sheet can also access Symbol directly if needed (implementation decision - will NOT affect the interfaces).
 
+
 **To Sheet:**
  - From mouse and keyboard - keyboard shortcuts my be bound to dropdown menu options (see *src/Renderer/Renderer.fs*).
+
 
 **To BusWire:** (see [buswire.md](./buswire.md) for description)
 
@@ -44,12 +46,11 @@ Sheet can also access Symbol directly if needed (implementation decision - will 
  - Deleting a BusWire does not delete any Symbols connected to it
 
 `MoveWires of CommonTypes.ConnectionId list * XYPos`
-- Moves all wires in the list according to a translation vector of type XYPos. The vector takes the form {X = x_translation; Y = y_translation}.
-- wireSegmentIdList is a list of wire segment IDs
+- Moves all wires in the wire Id list according to a translation vector of type XYPos. The vector takes the form {X = x_translation; Y = y_translation}.
 
 `HighlightWires of CommonTypes.ConnectionId list`
-- Message to highlight all wires in the WireIdList of type CommonTypes.ConnectionId list.
-- WireIdList is a list of wire IDs
+- Message to highlight all wires in the Wire Id list of type CommonTypes.ConnectionId list.
+
 
 **To Symbol:** (see [symbol.md](./symbol.md) for description)
 
@@ -82,8 +83,11 @@ Sheet can also access Symbol directly if needed (implementation decision - will 
 `Scale of CommonTypes.ComponentId * XYPos`
 - Used to scale a symbol of a given id in the x and y directions. The scaling factor in X and Y directions is specified in a variable of type XYPos.
 
+
 **To ISSIE:** 
  - Infer widths (extension)
+
+
 
  ## Bounding Box
 
@@ -125,7 +129,7 @@ Highlight components only when mouse is in bounding box (i.e. no unhighlight mes
 
 ### Highlighting Ports
 Ports should become visible when mouse is hovering in range
- - Highlight message (called `Symbol.highlightPorts (symbolIdList: CommonTypes.ComponentId list)` sent to Symbol when in bounding box of symbol and not mouse click down.
+ - Highlight message (called `Symbol.highlightPorts (symbolIdList: CommonTypes.ComponentId list)`) sent to Symbol when in bounding box of symbol and not mouse click down.
  - These need to highlight ports but not symbol - the highlighting for port is different from the highlighting for symbols.
 
 ### Selecting Ports
@@ -142,8 +146,10 @@ On mouse click up: call the function `Symbol.isPort (symbolModel: Model) (mouseC
  - `None`: don't draw.
 In all cases stop rendering the dotted line.
 
+
 ## State outputs (extension)
  - Inferred width of wires (to BusWire and ISSIE)
+
 
 ## Stretch Goals
 Zooming, snap-to-grid etc can hopefully be implemented without adding to the above existing interface.
