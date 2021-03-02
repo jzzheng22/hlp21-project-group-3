@@ -771,13 +771,6 @@ let getPortinfo (symModel: Model) (pId : CommonTypes.PortId) =
     | Some _ ->  failwithf "Unexpected error in getPortinfo"
     | None -> failwithf "Error in getPortinfo: couldn't find portID"
 
-//TODO - REMOVE - ONLY USED BY BUSWIRE - Currently connects every input 0 to each other.
-let symbolPos (symModel: Model) (sId: CommonTypes.ComponentId) : XYPos = 
-    List.find (fun sym -> sym.Id = sId) symModel
-    |> (fun sym -> sym.TopL)
-    
-
-
 //-----------------------Interface functions--------------------//
 
 ///Searches through the whole model until the port is found and retruns the position of that port
@@ -817,6 +810,9 @@ let getPortIds (model : Model) (sId : CommonTypes.ComponentId) : CommonTypes.Por
 
 let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int = 
     (getPortinfo model pId).width
+
+let getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId =
+    CommonTypes.ComponentId (getPortinfo model pId).Port.HostId
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
