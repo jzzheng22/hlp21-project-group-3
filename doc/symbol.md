@@ -6,74 +6,92 @@ Owners:
 
 Any changes must be agreed by owners then communicated to the rest of the group.
 
-Generating symbols and ports
+Generating symbols and ports.
 
-Has list of symbols
+Has list of symbols.
 
-Each Symbol owns its ports
- - Ports need to keep track of how many wires are connected to those ports
- - Internal implementation details: each port could have its own bounding box
-    - If used, this should be invisible to other modules
-
-Might want to add in portID and symbolID and wireID as types instead of strings for type safety. **UPDATE:** As Ids for symbols, wires and ports we use the types CommonTypes.ComponentId, CommonTypes.ConnectionId, CommonTypes.PortId respectively.
+Each Symbol owns its ports.
+ - Ports need to keep track of how many wires are connected to those ports.
+ - Internal implementation details: each port could have its own bounding box.
+    - If used, this should be invisible to other modules.
 
 ## Interface Functions
 
 `Symbol.getPortCoords (symbolModel : Model) (portID: CommonTypes.PortId)`
- - Used by BusWire for connecting wires to ports
- - Returns XYPos
+ - Used by BusWire for connecting wires to ports.
+ - Returns `XYPos`.
 
 `Symbol.getBoundingBoxes (symbolModel : Model) (mouseCoord: XYPos)`
- - Called by sheet. Returns list of (id: CommonTypes.ComponentId * topleft: XYPos * bottomright: XYPos)
- - Initially return all bounding boxes.
+ - Returns list of `(id: CommonTypes.ComponentId * topleft: XYPos * bottomright: XYPos)`. Called by Sheet.
+ - Initially returns all bounding boxes.
 
 `Symbol.getPortType (symbolModel : Model) (portID: CommonTypes.PortId)`
- - Returns if port is input or output
+ - Returns if port is input or output.
 
 `Symbol.isPort (symbolModel : Model) (portCoords: XYPos)`
- - Returns Option type indicating if mouse has clicked down on port. Called by sheet.
+ - Returns Option type indicating if mouse has clicked down on port. Called by Sheet.
  - `Some (portCoords: XYPos * portID: CommonTypes.PortID)`
  - `None`
 
 `Symbol.getPortIds (model: Model) (symbolId: CommonTypes.ComponentID)`
-- Returns list of ports for each symbol ID.
-- Is used to find wires connected to symbol(s).
+ - Returns list of ports for each symbol ID.
+ - Is used to find wires connected to symbol(s).
 
+*Optional interface functions*
+These are called by adidesh20's BusWire and implemented in JEMerrick's Symbol:
+`Symbol.getPortWidth (model : Model) (pId : CommonTypes.PortId) : int`
+ - Returns width of specified port.
+
+`Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
+ - Returns the ComponentID which the PortID belongs to.
 
 ## Messages
+**Received from Sheet via BusWire**
 
 `Move of (CommonTypes.ComponentId list * XYPos)`
- - XYPos is a translation vector
- - Received from Sheet.
+ - XYPos is a translation vector.
+ - Move symbols in list by given translation vector.
+
+`Add of compType: CommonTypes.ComponentType * pagePos: XYPos * numIn: int * numOut: int`
+ - Adds a new symbol based on the provided information.
+ - compType: type of component.
+ - pagePos: location on canvas.
+ - numIn: number of input ports.
+    - This number does not include any enable or clock signals
+ - numOut: number of output ports.
+ - Properties like "inputPortList", "outputPortList", "highlighted", "Id", "boundingBoxCoordinates" (XYPos * XYPos) can be set up and calculated by Symbol in addition to what is provided.
+ - Initial position of symbol:
+    - ISSIE chooses an arbitrary random position to put the symbol. From here we can drag. 
+    - This arbitrary initial position changes each time.
 
 `Delete of CommonTypes.ComponentId list`
- - Deletes symbols from model based on ID.
- - Received from Sheet.
-
-`Add of symbolInfo`
- - This still needs discussion **UPDATE:** The below arrangement was decided upon.
- - Symbol info would be a record with fields: "componentType", "position", "numberInputs", "numberOutputs"
- - Properties like "inputPortList", "outputPortList", "highlighted", "Id", "boundingBoxCoordinates" (this is XYPos * XYPos) can be set up and calculated by Symbol in addition to what is provided.
- - Coords - how to choose initial position of symbol. Look at how ISSIE does it? Issie chooses an arbitrary random position to put the symbol. From here we can drag. This arbitrary initial position changes each time.
- - Received from Sheet.
+ - Deletes symbols from model based on IDs in list.
 
 `Highlight of CommonTypes.ComponentId list`
-- Receieved from Sheet to highlight symbols.
+- Highlight symbols in list.
 
 `HighlightPorts of CommonTypes.ComponentId list`
- - Highlights ports of symbols - ISSIE highlights ports on multiple symbols if the mouse is in range of all of them, so the list helps to highlight ports on multiple symbols.
+ - Highlights all ports of symbols in list.
 
-**EXTRA based on additional features inplemented by JEMerrick**
- 
+*Optional messages implemented in JEMerrick's Symbol* 
 The below messages can also be sent to JEMerrick's version of Symbol:
 
 `Rotate of sId : CommonTypes.ComponentId * rot : int`
-- Used to rotate a single selected symbol 'rot' degrees clockwise. Can be called from Sheet.
+ - Rotates a single symbol clockwise by `rot` degrees.
+ - Sent from Sheet via BusWire.
 
 `Scale of sId : CommonTypes.ComponentId * scale : XYPos`
-- The 'scale' parameter can scale a symbol by a specified factor in X and Y directions (corresponding to the X and Y fields in the XYPos type). This is used to magnify, shrink, stretch and distort symbols. Again can be called from Sheet.
+ - Scales a symbol by specified factor in X and Y directions.
+ - Used to magnify, shrink, stretch and distort symbols.
+ - Sent from Sheet via BusWire.
 
-
+`HighlightError of sIdList: CommonTypes.ComponentId list`
+ - Highlights symbols when they are in an error state.
+ - Sent from Sheet via BusWire.
+ 
+`DragPort of sId : CommonTypes.ComponentId * pId : CommonTypes.PortId * pagePos: XYPos`
+ - Moves the selected port to the port position closest to the mouse.
+ - Ports have pre-specified locations where they can be moved to.
 
 
 

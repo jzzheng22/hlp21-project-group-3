@@ -8,148 +8,177 @@ Any changes must be agreed by owners then communicated to the rest of the group.
 
 Top level of data model - linking everything together.
 Model of Sheet must contain a data structure of BusWires and Symbols.
-First point of contact for mouse events on canvas
-
-Might want to add in portID and symbolID and wireID as types instead of strings for type safety. **UPDATE:** The interface functions between sheet and the other modules make use of the type CommonTypes.ComponentID for symbol IDs, CommonTypes.ConnectionID for wire IDs and CommonTypes.PortID for portIDs. These provide type safety and can easily be converted to strings and back. 
+First point of contact for mouse events on canvas.
 
 ## Responsibilities of Sheet
  - Click, select and highlight multiple components e.g. symbols, wires on sheet i.e. svg canvas.
  - Move selected components over the canvas on dragging the mouse.
  - Highlight the ports of a symbol when the mouse comes within a suitable range of the symbol.
  - Draw selection box. Send message to each component covered by selection box to indicate which components are highlighted.
- - Change shape of cursor
+ - Change shape of cursor.
  - Draw dotted line on dragging from one port to another to create wires between the ports.
  - Extension goals - specific decision for each of the owners of this document.
  
 
 ## Messages
 Message mechanism:
- - `Sheet.update` takes in a message and model, and outputs a tuple of `Model * Cmd<Msg>`
+ - `Sheet.update` takes in a message and model, and outputs a tuple of `Model * Cmd<Msg>`.
  - `Sheet.update` calls `BusWire.update` to send messages to BusWire module.
  - `BusWire.update` calls `Symbol.update`to send messages to Sheet module.
-Sheet can also access Symbol directly if needed (implementation decision - will NOT affect the interfaces).
+Sheet can also access Symbol directly if needed.
 
 
 **To Sheet:**
- - From mouse and keyboard - keyboard shortcuts my be bound to dropdown menu options (see *src/Renderer/Renderer.fs*).
+ - From mouse and keyboard - keyboard shortcuts may be bound to dropdown menu options (see *src/Renderer/Renderer.fs*).
 
 
-**To BusWire:** (see [buswire.md](./buswire.md) for description)
+**To BusWire:** (see [buswire.md](./buswire.md) for further description)
 
 `AddWire of (CommonTypes.PortId * CommonTypes.PortId)`
- - Message to create a wire between two ports - whether busWire actually does this always is an implementation decision (e.g. input port to input port is probably not allowed).
- - WireInfo is tuple of portID `(startPort: CommonTypes.PortId * endPort: CommonTypes.PortId)`
- - Sent by Sheet on mouse click up depending on return value of `Symbol.isPort`
+ - Creates wire between two ports.
+ - Sent by Sheet on mouse click up depending on return value of `Symbol.isPort`.
 
 `DeleteWires of CommonTypes.ConnectionId list`
  - Deletes all wires whose IDs are in the ConnectionID list.
- - Deleting a BusWire does not delete any Symbols connected to it
+ - Deleting a BusWire does not delete any Symbols connected to it.
+
+`HighlightWires of CommonTypes.ConnectionId list`  
+ - Highlights wires in list.
 
 `MoveWires of CommonTypes.ConnectionId list * XYPos`
-- Moves all wires in the wire Id list according to a translation vector of type XYPos. The vector takes the form {X = x_translation; Y = y_translation}.
-
-`HighlightWires of CommonTypes.ConnectionId list`
-- Message to highlight all wires in the Wire Id list of type CommonTypes.ConnectionId list.
+ - XYPos is a translation vector.
+ - Move wires in list by given translation vector.
 
 
 **To Symbol:** (see [symbol.md](./symbol.md) for description)
 
 `Move of CommonTypes.ComponentId list *  XYPos`
-- Moves all symbols whose Ids are in the list, according to a translation vector of type XYPos.
-- The translation vector takes the form {X = x_translation; Y = y_translation}.
+ - XYPos is a translation vector.
+ - Move symbols in list by given translation vector.
+
+`Add of compType: CommonTypes.ComponentType * pagePos: XYPos * numIn: int * numOut: int`
+ - Adds a new symbol based on the provided information.
+ - compType: type of component.
+ - pagePos: location on canvas.
+ - numIn: number of input ports.
+    - This number does not include any enable or clock signals
+ - numOut: number of output ports.
 
 `Delete of CommonTypes.ComponentId list`
  - Deletes all symbols whose IDs are in the list.
- - Deleting Symbols deletes any BusWires connected to it
-
-`Add of symbolInfo`
-- Adds a new symbol based on the provided information.
-- symbolinfo is a tuple: (compType: CommonTypes.ComponentType * pagePos : XYPos * numIn : int * numOut : int)
-- compType indicates the type of created component, pagePos indicates where in the canvas to put the new symbol, numIn and numOut indicate the number of input and output ports.
+ - Deleting Symbols deletes any BusWires connected to it.
 
 `Highlight of CommonTypes.ComponentId list`
- - Message to highlight all symbols in the list.
- - See also later discussion
+ - Highlights symbols in list.
+ - See also later discussion.
 
 `HighlightPorts of CommonTypes.ComponentId list`
-- Message to highlight all the ports on each symbol in the list.
-- Ports are intended to become coloured and more prominent.
+- Highlight all ports of symbols in list.
 
-*Two optional messages (for extended version of Symbol used by JEMErrick)*
-
-`Rotate of CommonTypes.ComponentId * int`
-- Used to rotate a symbol of a given Id. The amount of rotation is in degrees and specified as an integer.
+*Optional messages implemented in JEMerrick's Symbol:*
+`Rotate of sId : CommonTypes.ComponentId * rot : int`
+ - Rotates a symbol clockwise by `rot` degrees.
+ - Unit of rotation is degrees, and limited to ints.
 
 `Scale of CommonTypes.ComponentId * XYPos`
-- Used to scale a symbol of a given id in the x and y directions. The scaling factor in X and Y directions is specified in a variable of type XYPos.
+ - Scales a symbol by specified factor in X and Y directions.
+ - Used to magnify, shrink, stretch and distort symbols.
 
+`HighlightError of sIdList: CommonTypes.ComponentId list`
+ - Highlights symbols when they are in an error state.
+ - Sent from Sheet via BusWire.
 
 **To ISSIE:** 
  - Infer widths (extension)
 
 
+## Interface Functions
 
- ## Bounding Box
+`BusWire.getBoundingBoxes (mouseCoord: XYPos) (model : Model)`
+ - Returns list of `(id: CommonTypes.ComponentId * topLeft: XYPos * bottomRight: XYPos)`
+ - Initially just returns all bounding boxes.
+
+`BusWire.getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list`
+ - Takes a list of PortIds as input and returns the IDs of all the wires connected to the supplied ports.
+
+`Symbol.getBoundingBoxes (symbolModel : Model) (mouseCoord: XYPos)`
+ - Returns list of `(id: CommonTypes.ComponentId * topleft: XYPos * bottomright: XYPos)`. Called by Sheet.
+ - Initially returns all bounding boxes.
+
+`Symbol.getPortType (symbolModel : Model) (portID: CommonTypes.PortId)`
+ - Returns if port is input or output.
+
+`Symbol.isPort (symbolModel : Model) (portCoords: XYPos)`
+ - Returns Option type indicating if mouse has clicked down on port. Called by Sheet.
+ - `Some (portCoords: XYPos * portID: CommonTypes.PortID)`
+ - `None`
+
+`Symbol.getPortIds (model: Model) (symbolId: CommonTypes.ComponentID)`
+ - Returns list of ports for each symbol ID.
+ - Is used to find wires connected to symbol(s).
+
+## Bounding Box
+ - Each buswire and symbol owns its bounding box. 
+ - Can be fully defined using top left and bottom right corners. 
+ - Should be slightly bigger than each component to allow for negation bubble.
 
 **OPTION 1:** (Currently using this method)
-Each buswire and symbol owns its bounding box. Bounding box can be fully defined using top left and bottom right corners. It should be slightly bigger than each component to allow for negation bubble.
+Sheet is able to access bounding boxes of BusWires and Symbols.
+`BusWire.getBoundingBoxes (wireModel: Model) (mouseCoord: XYPos)`
+ - Return type: `(ID: CommonTypes.ConnectionId * topLeft: XYPos * bottomRight:  XYPos)`.
 
-Sheet is able to access bounding boxes of buswires and symbols
-`BusWire.getBoundingBoxes (wireModel: Model) (mousecoord: XYPos)`
-`Symbol.getBoundingBoxes (symbolModel: Model) (mousecoord: XYPos)`
-These functions will return the top-left and bottom-right corners of the boxes along with the ids of the related components `(id: IDtype * topleft: XYPos * bottomright:  XYPos)`
- - IDtype may be CommonTypes.ComponentId or CommonTypes.ConnectionId for Symbol or BusWire respectively.
- - Sheet has coordinates of mouse/mouse click
- - Sheet calls `getBoundingBoxes`, which returns a list of the bounding box of each component for that module
- - Sheet performs exhaustive search to find which bounding box(es) are selected - hopefully we make this more efficient.
+`Symbol.getBoundingBoxes (symbolModel: Model) (mouseCoord: XYPos)`
+ - Return type: `(ID: CommonTypes.ComponentId * topLeft: XYPos * bottomRight:  XYPos)`.
 
-Things to consider:
- - Optimisations: We pass in mouse coordinates to `getBoundingBoxes` for now, even though it may not be needed. We can delete later of course, although we may also be able to filter down the boxes based on mouseCoord.
- - Split up canvas into sections: Identify which section the coordinates are in and return bounding boxes in that section only. Consider: do we define this split in Sheet or in submodules?. Bounding boxes which overlap across sections - what do you do?
- - Maybe sort list by coordinate (proximity to bounding box) - binary search.
-    - Might as well just return single bounding box instead of list?
+ - Sheet has coordinates of mouse/mouse click.
+ - Sheet calls `getBoundingBoxes`, which returns a list of the bounding box of each component for that module.
+ - Sheet performs exhaustive search to find which bounding box(es) are selected.
+
+Potential Optimisations:
+ - `getBoundingBoxes` takes mouse coordinates as parameter.
+    - Can be removed later.
+    - Could be used to filter down boxes based on `mouseCoord`.
+ - Split up canvas into sections: 
+    - Identify which section the coordinates are in and return bounding boxes in that section only.
+    - Consider: do we define this split in Sheet or in submodules?
+    - How to handle bounding boxes which overlap across multiple sections.
+ - Sort list by coordinates (proximity to bounding box) - binary search.
+    - Could return single bounding box instead of list.
 
 **OPTION 2**
- - Send coords to BusWire and Symbol
- - BusWire and Symbol run through their list of components
- - Return list of components where mouse coords inside bounding box
- - Sheet sends highlight message to highlight components in those lists
+ 1. Send coords to BusWire and Symbol.
+ 2. BusWire and Symbol run through their list of components.
+ 3. Return list of components where mouse coords inside bounding box.
+ 4. Sheet sends highlight message to highlight components in those lists.
 
 ## Highlight
 On mouse click down (including click and drag):
-1. Sheet identifies which bounding boxes are inside selection
-2. Sheet sends a `highlight` message to the selected component(s)
-3. The selected component(s) are highlighted using an interface function
-
-e.g. in Sheet we would send these messages:
-`BusWire.HighlightWires of (WireIdList: CommonTypes.ConnectionID list)`
-`Symbol.Highlight of (SymbolIdList: CommonTypes.ComponentID list)`
-
-Highlight components only when mouse is in bounding box (i.e. no unhighlight message). Components not highlighted when mouse not in bounding box i.e. the corresponding symbol/wire would not be in the list passed with the message.
+1. Sheet identifies which bounding boxes are inside selection.
+2. Sheet sends a `Highlight` message to the selected component(s).
+3. The selected component(s) are highlighted using an interface function.
+- Components highlighted only when mouse is in bounding box (no explicit message to unhighlight).
 
 ### Highlighting Ports
-Ports should become visible when mouse is hovering in range
- - Highlight message (called `Symbol.highlightPorts (symbolIdList: CommonTypes.ComponentId list)`) sent to Symbol when in bounding box of symbol and not mouse click down.
- - These need to highlight ports but not symbol - the highlighting for port is different from the highlighting for symbols.
+Ports should become visible when mouse is hovering in range.
+ - `Symbol.highlightPorts (symbolIdList: CommonTypes.ComponentId list)` sent to Symbol when in bounding box of symbol.
+ - This highlights ports but not symbol.
 
 ### Selecting Ports
- - A port is selected if it is highlighted and then mouse click down
- - If we select a port then drag, Sheet draws a dashed line
- - If we drag to another port, Sheet sends message to BusWire to make wire between two ports
+ - A port is selected if it is highlighted and then mouse click down.
+ - If we select a port then drag, Sheet draws a dashed line.
+ - If we drag to another port, Sheet sends message to BusWire to make wire between two ports when mouse is released.
 
-Selecting port: on mouse click down, call the interface function in Symbol module: `Symbol.isPort (symbolModel: Model) (mouseCoord: XYPos)`. Return value:
+Selecting port: on mouse click down, call `Symbol.isPort (symbolModel: Model) (mouseCoord: XYPos)`. Return value:
  - `Some (portCoord: XYPos * portID: CommonTypes.PortID)`: draw dotted line.
  - `None`: don't draw - it may be another case e.g. drag select, selecting an actual component.
 
-On mouse click up: call the function `Symbol.isPort (symbolModel: Model) (mouseCoord: XYPos)`. Return value:
+On mouse click up: call `Symbol.isPort (symbolModel: Model) (mouseCoord: XYPos)`. Return value:
  - `Some (portCoord: XYPos * portID: CommonTypes.PortID)`: tell BusWire to draw new wire.
  - `None`: don't draw.
 In all cases stop rendering the dotted line.
 
-
 ## State outputs (extension)
  - Inferred width of wires (to BusWire and ISSIE)
-
 
 ## Stretch Goals
 Zooming, snap-to-grid etc can hopefully be implemented without adding to the above existing interface.
