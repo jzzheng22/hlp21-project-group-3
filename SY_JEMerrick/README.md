@@ -18,7 +18,7 @@ Symbol Advisor  - Sacha Ayoun - Email not piazza
         * NumWires                    - Keeps track of the number of wires connected to a port 
         * Name                        - Label to be printed for that port
         * Invert                      - A bool which = True if the port requires an inverter
-        * width                       - A width indicating the wire/bus width into the component
+        * width                       - A width indicating the wire/bus width of that port
 
     - Symbol
         * TopL                        - The top left coordinate of the symbol
