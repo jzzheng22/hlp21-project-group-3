@@ -30,28 +30,31 @@ To Sheet:
  - From mouse and keyboard
 
 To BusWire: (see [buswire.md](./buswire.md) for description)
-`AddConnection of wireInfo` 
+`AddWire of (CommonTypes.PortId * CommonTypes.PortId)`
  - WireInfo is tuple of portID `(startPort: string * endPort: string)`
  - Sent by Sheet on mouse click up depending on return value of `Symbol.isPort`
 
-`DeleteConnection of wireId`
+`DeleteWires of CommonTypes.ConnectionId list`
  - Deleting a BusWire does not delete any Symbols connected to it
 
-`MoveConnection of wireIdList * posX * posY`
+`MoveWires of wireIdList * XYPos`
 - wireSegmentIdList is a list of wire segment IDs
 
-`HighlightConnection of wireIdList`
+`HighlightWires of CommonTypes.ConnectionId list`
 - WireIdList is a list of wire IDs
 
-To Symbol:
-`MoveSymbol of symbolIdList * posX * posY`
+To Symbol: (see [symbol.md](./symbol.md) for description)
+`Move of symbolIdList *  XYPos`
 
-`DeleteSymbol of symbolIdList`
+`Delete of symbolIdList`
  - Deleting Symbols deletes any BusWires connected to it
 
-`AddSymbol of symbolInfo`
+`Add of symbolInfo`
 
-`HighlightSymbol of symbolIdList`(see later discussion and the end for description)
+`Highlight of symbolIdList`
+ - See also later discussion
+
+`HighlightPorts of symbolIdList`
 
 To ISSIE: 
  - Infer widths (extension)
@@ -95,7 +98,7 @@ Highlight components only when mouse is in bounding box (i.e. no unhighlight mes
 
 ### Highlighting Ports
 Ports should become visible when mouse is hovering in range
- - Highlight message (called `Symbol.highlightPort symbolId`) sent to Symbol when in bounding box of symbol and not mouse click down.
+ - Highlight message (called `Symbol.highlightPorts symbolIdList`) sent to Symbol when in bounding box of symbol and not mouse click down.
  - These need to highlight ports but not symbol - the highlighting for port (turning black) is different from the highlighting for symbols (turning green)
 
 ### Selecting Ports
