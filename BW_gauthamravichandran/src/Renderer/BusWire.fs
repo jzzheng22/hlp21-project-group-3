@@ -280,6 +280,12 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 //---------------Other interface functions--------------------//
 let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list=
     failwithf "not impl"
+
+
+let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =
+    wModel.WX
+    |> List.filter (fun w -> List.contains w.SrcPort portIds || List.contains w.TargetPort portIds)
+    |> List.map (fun w -> w.Id)
 /// Given a point on the canvas, returns the wire ID of a wire within a few pixels
 /// or None if no such. Where there are two close wires the nearest is taken. Used
 /// to determine which wire (if any) to select on a mouse click
