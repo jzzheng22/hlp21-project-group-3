@@ -282,7 +282,7 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
 
 /// for the demo code
 let view (model:Model) (dispatch : Msg -> unit) =
-    printf "%A" model.Wire.Symbol.[6]
+    // printf "%A" model.Wire.Symbol.[6]
     printf "%A" "Selected Components:"
     printf "%A" model.SelectedComponents
     // dispatch <| Symbol (Symbol.Highlight model.SelectedComponents)
@@ -297,11 +297,38 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
         let wModel, wCmd = BusWire.update wMsg model.Wire
         {model with Wire = wModel}, Cmd.map Wire wCmd
     | Symbol sMsg ->
-        let wModel, wCmd = BusWire.update (BusWire.Symbol sMsg) model.Wire
-        {model with Wire = wModel}, Cmd.map Wire wCmd
+        let sModel, sCmd = BusWire.update (BusWire.Symbol sMsg) model.Wire
+        {model with Wire = sModel}, Cmd.map Wire sCmd
     | KeyPress AltShiftZ -> 
         printStats() // print and reset the performance statistics in dev tools window
         model, Cmd.none // do nothing else and return model unchanged
+    | KeyPress Del -> 
+        // if (List.isEmpty model.SelectedComponents) then
+        // if (List.isEmpty model.SelectedWires) then
+        printf "%A" "in del"
+        let connectedWires = 
+            printf "%A" "asdf"
+            model.SelectedComponents
+            |> List.map (Symbol.getPortIds model.Wire.Symbol)
+            |> List.collect (BusWire.getWireIdsFromPortIds model.Wire)
+        printf "%A" connectedWires
+        
+        let wiresToDelete = 
+            connectedWires
+            |> List.append model.SelectedWires
+            |> List.distinct
+        printf "%A" wiresToDelete
+        printf "%A" model.SelectedComponents
+        
+        let wModel, wCmd = BusWire.update (BusWire.DeleteWires wiresToDelete) model.Wire
+        let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Delete model.SelectedComponents)) wModel
+        printf "%A" "back in sheet but havent updated model"
+        printf "%A" sModel
+        {model with Wire = sModel; SelectedPort = None; SelectedComponents = []; SelectedWires = []}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
+        // printf "%A" "end of update"
+        // {model with Wire = sModel}, Cmd.batch [Cmd.map Wire sCmd; Cmd.map Wire wCmd]
+
+        // model, Cmd.none
     | KeyPress s -> // all other keys are turned into SetColor commands
         let c =
             match s with
