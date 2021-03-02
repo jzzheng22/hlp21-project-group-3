@@ -45,12 +45,16 @@ type SymbolType =
     | Wires
     | Adder
     | FF
+    | FFE
+    | RAM
 
 type GenericPort =
     | InOut
     | Select
     | Carry
     | Enable
+    | Clk
+    | Addr
 
 type Symbol =
     {
@@ -88,13 +92,9 @@ type Msg =
 
 
 
-
-
 //---------------------------------------------------------------------------//
 //------------------------------helper functions-----------------------------//
 //---------------------------------------------------------------------------//
-
-
 
 
 ///Takes a component type and returns info (label, buswidth in, buswidth out, generic symbol type)
@@ -113,15 +113,15 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int * Sy
     | CommonTypes.ComponentType.Demux2 -> ("DMUX" , 1, 1, Mux)
     | CommonTypes.ComponentType.NbitsAdder x -> ("Σ", x, x, Adder)
     | CommonTypes.ComponentType.Custom x -> (x.Name, 1, 1, LogMem)
-    | CommonTypes.ComponentType.DFF -> ("DFF", 1, 1, LogMem)
-    | CommonTypes.ComponentType.DFFE -> ("DFFE", 1, 1, FF)
-    | CommonTypes.ComponentType.Register x -> ("SRG", x, x, LogMem)
-    | CommonTypes.ComponentType.RegisterE x -> ("SRGE", x, x, FF) 
-    | CommonTypes.ComponentType.AsyncROM x -> ("A/ROM", x.AddressWidth, x.WordWidth, LogMem)
-    | CommonTypes.ComponentType.ROM x -> ("ROM", x.AddressWidth, x.WordWidth, LogMem)
-    | CommonTypes.ComponentType.RAM x -> ("RAM", x.AddressWidth, x.WordWidth, LogMem)
-    | CommonTypes.ComponentType.Input x -> ("IN", x, x, IO) 
-    | CommonTypes.ComponentType.Output x -> ("OUT", x, x, IO) 
+    | CommonTypes.ComponentType.DFF -> ("DFF", 1, 1, FF)
+    | CommonTypes.ComponentType.DFFE -> ("DFFE", 1, 1, FFE)
+    | CommonTypes.ComponentType.Register x -> ("SRG", x, x, FF)
+    | CommonTypes.ComponentType.RegisterE x -> ("SRGE", x, x, FFE) 
+    | CommonTypes.ComponentType.AsyncROM x -> ("AROM", x.AddressWidth, x.WordWidth, LogMem)
+    | CommonTypes.ComponentType.ROM x -> ("ROM", x.AddressWidth, x.WordWidth, FF)
+    | CommonTypes.ComponentType.RAM x -> ("RAM", x.AddressWidth, x.WordWidth, RAM)
+    | CommonTypes.ComponentType.Input x -> ((sprintf "In<%d:0>" x), x, x, IO) 
+    | CommonTypes.ComponentType.Output x -> ((sprintf "Out<%d:0>" x), x, x, IO) 
     | CommonTypes.ComponentType.IOLabel -> ("", 0, 0, IO) //Check generic type WHAT IS THIS?? 
     | CommonTypes.ComponentType.BusSelection (x, y) -> ("", x, y, Wires)
     | CommonTypes.ComponentType.MergeWires -> ("", 0, 0, Wires)
@@ -311,15 +311,15 @@ let isPortInverse (port : Portinfo Option) : bool =
 
 ///Coordinates to create the tag shape used for input/output symbols,
 let tagCoords (sym : Symbol) : string =
-    let i = if sym.Type = CommonTypes.ComponentType.Input 1 then 0. else snd (getHWObj sym)
+    let (i, a) = if sym.Type = CommonTypes.ComponentType.Input 1 then 0., -1. else snd (getHWObj sym), 1.
     let midX = midSymX sym
     let midY = midSymY sym
     (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" 
-        (sym.TopL.X + i) (midY - RAD) 
-        (sym.TopL.X + i) (midY + RAD) 
-        (midX + RAD - (i/7.)) (midY + RAD) 
-        (sym.BotR.X - i) midY 
-        (midX + RAD - (i/7.)) (midY - RAD))
+        (sym.TopL.X + (i + (a * 5.))) (midY - 10.) 
+        (sym.TopL.X + (i + (a * 5.))) (midY + 10.) 
+        (midX - ((i/7.) + (a * 5.))) (midY + 10.) 
+        (sym.BotR.X - (i + (a * 15.))) midY 
+        (midX - ((i/7.) + (a * 5.))) (midY - 10.))
 
 ///Returns the coordinates of a triangle where midpoint of the flat side = input position i
 let triangleCoords (i : XYPos) (sym : Symbol) : string =
@@ -331,8 +331,9 @@ let numExPorts (symType : SymbolType) (numIn : int) : (int * int * int) =
     match symType with
     | Mux -> (0, 0, log2 numIn)
     | Adder -> (1, 1, 0)
-    | FF -> (1, 0, 0)
-    | _ -> (0, 0, 0) //Logic, memory, wires, IO do not require extra ports
+    | FF  | FFE  -> (1, 0, 1)
+    | RAM -> (2, 0, 0)
+    | _ -> (0, 0, 0) //Logic, AROM, wires, IO do not require extra ports
 
 ///Converts a list of positions and a list of portinfo into a portinfo option list
 ///We want to create Some(X) for every index in the list of positions that will have a port
@@ -433,9 +434,26 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (genPort : Generi
                        | CommonTypes.PortType.Input -> sprintf "Cin" 
                        | CommonTypes.PortType.Output -> sprintf "Cout" 
             | Enable -> sprintf "En"
-            | _ -> match portType with 
-                    | CommonTypes.PortType.Input -> sprintf "IN%d" i
-                    | CommonTypes.PortType.Output -> sprintf "OUT%d" i 
+            | Clk -> sprintf "Clk"
+            | Addr -> if i = 0 then "addr" elif i = 1 then "write" else "Clk"
+            | _ -> match compType with 
+                    | CommonTypes.ComponentType.ROM x | CommonTypes.ComponentType.AsyncROM x ->
+                        match portType with 
+                        | CommonTypes.PortType.Input -> sprintf "addr"
+                        | CommonTypes.PortType.Output -> sprintf "data"
+                    | CommonTypes.ComponentType.RAM _ | CommonTypes.ComponentType.Register _ | CommonTypes.ComponentType.RegisterE _ ->
+                        match portType with 
+                        | CommonTypes.PortType.Input -> sprintf "data-in"
+                        | CommonTypes.PortType.Output -> sprintf "data-out"
+                    | CommonTypes.ComponentType.DFF | CommonTypes.ComponentType.DFFE ->
+                        match portType with 
+                        | CommonTypes.PortType.Input -> sprintf "D"
+                        | CommonTypes.PortType.Output -> sprintf "Q"
+                    | CommonTypes.ComponentType.Input _ | CommonTypes.ComponentType.Output _ -> ""
+                    | _ ->
+                        match portType with 
+                        | CommonTypes.PortType.Input -> sprintf "IN%d" i
+                        | CommonTypes.PortType.Output -> sprintf "OUT%d" i 
 
         Invert = 
             match portType with
@@ -456,7 +474,9 @@ let getExPorts (symType: SymbolType) (bot : int) (left : int) (right : int) (_id
     match symType with
     | Mux ->  ([], [], makePort bot CommonTypes.PortType.Input _id compType wIn Select)
     | Adder -> ((makePort left CommonTypes.PortType.Input _id compType wIn Carry), (makePort right CommonTypes.PortType.Output _id compType wOut Carry), [])
-    | FF -> ((makePort left CommonTypes.PortType.Input _id compType wIn Enable), [], [])
+    | FF -> ((makePort left CommonTypes.PortType.Input _id compType wIn Clk),[],[])
+    | FFE -> ((makePort left CommonTypes.PortType.Input _id compType wIn Clk), [], (makePort bot CommonTypes.PortType.Input _id compType wIn Enable))
+    | RAM -> ((makePort left CommonTypes.PortType.Input _id compType wIn Addr), [], [])
     | _ -> ([],[],[])
 
 ///Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
@@ -471,20 +491,18 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     //Intermediate calculations
     let n = max (numIn + left) (numOut + right) |> float //The max number of ports initially will always be on the left or right of the box
     let nBot = if bot > 0 then bot else (int (HW_RATIO * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
-    let h = if numIn = 1 && numOut = 1 then STD_HEIGHT * 2. else STD_HEIGHT * n
+    let h = if numIn = 1 && numOut = 1 then STD_HEIGHT * 2. else STD_HEIGHT * n //ensures minimum height for 1 in 1 out components
     let w =  if bot <= 0 then (HW_RATIO * h) else ((float nBot) * STD_HEIGHT * 1.5) //Width is either standard, or based on number of ports on the bottom
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
     //Symbol's Component id creation
     let _id = CommonTypes.ComponentId (Helpers.uuid())
      
-
     // ---- Making portMap ---- //
     let posList = makePosList (int n) nBot pos botR
     let (l, r, t, b) =  posList
 
     // ---- Making symbol's ports ---- //
-
     //First make the generic input output ports with labels IN0...INn,  OUT0 .. OUTn
     let ins = makePort numIn CommonTypes.PortType.Input _id compType wIn InOut
     let outs = makePort numOut CommonTypes.PortType.Output _id compType wOut InOut
@@ -527,10 +545,11 @@ let init () =
         (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 {X = 200.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 {X = 300.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Demux2) 1 2 {X = 400.; Y = 50.})
-        (CreateNewSymbol (CommonTypes.ComponentType.ROM memory) 1 1 {X = 100.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Output 1) 0 1 {X = 200.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Decode4) 2 4 {X = 400.; Y = 200.})
-        
+        (CreateNewSymbol (CommonTypes.ComponentType.Input 1) 0 1 {X = 200.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Decode4) 2 4 {X = 300.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Register 1) 1 1 {X = 500.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.DFFE) 1 1 {X = 600.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 700.; Y = 200.})
     ]
     , Cmd.none
 
@@ -677,8 +696,9 @@ let private renderObj =
                         SVGAttr.Fill color
                         SVGAttr.Stroke "black"
                         SVGAttr.StrokeWidth 0.5][]
-                    drawText (midSymX props.Obj) (midSymY props.Obj) "10px"[str <| sprintf "%A" props.Obj.Name]
-                ]
+                 ]
+
+            let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px"[str <| sprintf "%A" props.Obj.Name]
             
             let drawInvert =
                 genMapList props.Obj.PortMap (List.filter(fun (_, k) -> isPortInverse k))
@@ -697,7 +717,7 @@ let private renderObj =
                 | IO -> io
                 | _ -> displayBox
             
-            g[](List.concat [symDraw; labels; drawInvert; ports])
+            g[](List.concat [symDraw; labels; drawInvert; ports; [title]])
             
     , "Circle"
     , equalsButFunctions
