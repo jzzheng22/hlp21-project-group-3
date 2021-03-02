@@ -15,13 +15,6 @@ let STD_HEIGHT = 35.
 let HW_RATIO = 0.9
 let RAD = 3.
 
-/// PortInfo extends the CommonTypes.Port
-///
-/// Pos: XYPos of the port on the canvas
-///
-/// Port: The original Port type from CommonTypes.Port
-///
-/// Placement: Int indicating the position on that side the port is placed in going in ascending order where horizontals would be left->right, and verticals top->bottom
 type Portinfo = 
     {
         Port: CommonTypes.Port
