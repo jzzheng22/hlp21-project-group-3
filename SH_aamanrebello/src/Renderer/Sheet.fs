@@ -35,9 +35,9 @@ type KeyboardMsg =
     | AltC 
     | AltV 
     | AltShiftZ 
-    //| RotateSymbol 
-    //| ScaleUpSymbol
-    //| ScaleDownSymbol
+    | RotateSymbol 
+    | ScaleUpSymbol
+    | ScaleDownSymbol
     | AltA
     | DEL 
     | ZoomCanvasIn 
@@ -554,25 +554,25 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     //          - Scaling up symbol utility. Magnifies symbol by 1.25.
     //          - Scaling down symbol utility. Shrinks symbol to scale 0.8 = 1/1.25.
     // Stretching and clockwise rotation NOT implemented.
-    //| KeyPress RotateSymbol | KeyPress ScaleUpSymbol | KeyPress ScaleDownSymbol -> 
-    //    if List.isEmpty model.SelectedComponentIDs then 
-    //        model, Cmd.none
-    //    else 
-    //        let symid = List.head model.SelectedComponentIDs
-    //        match msg with 
-    //        //Rotation
-    //        | KeyPress RotateSymbol -> 
-    //            updateSymbolModel model  (Symbol.Rotate (symid, 90))
-    //        //Magnification
-    //        | KeyPress ScaleUpSymbol -> 
-    //            let scaleamt = 1.25
-    //            updateSymbolModel model (Symbol.Scale (symid, {X = scaleamt; Y = scaleamt}))
-    //        //Shrinking
-    //        | KeyPress ScaleDownSymbol -> 
-    //            let scaleamt = 0.8 
-    //            updateSymbolModel model (Symbol.Scale (symid, {X = scaleamt; Y = scaleamt}))
-    //        | _ -> 
-    //            failwithf "Unexpected input in symbol transformation."
+    | KeyPress RotateSymbol | KeyPress ScaleUpSymbol | KeyPress ScaleDownSymbol -> 
+        if List.isEmpty model.SelectedComponentIDs then 
+            model, Cmd.none
+        else 
+            let symid = List.head model.SelectedComponentIDs
+            match msg with 
+            //Rotation
+            | KeyPress RotateSymbol -> 
+                updateSymbolModel model  (Symbol.Rotate (symid, 90))
+            //Magnification
+            | KeyPress ScaleUpSymbol -> 
+                let scaleamt = 1.25
+                updateSymbolModel model (Symbol.Scale (symid, {X = scaleamt; Y = scaleamt}))
+            //Shrinking
+            | KeyPress ScaleDownSymbol -> 
+                let scaleamt = 0.8 
+                updateSymbolModel model (Symbol.Scale (symid, {X = scaleamt; Y = scaleamt}))
+            | _ -> 
+                failwithf "Unexpected input in symbol transformation."
 
     //Deleting a selected symbol(s)/wire(s).
     | KeyPress DEL -> 

@@ -48,10 +48,10 @@
                    menuSeparator
                    makeKeyItem "Align Horizontally" "Alt+C" (fun () -> dispatch KeyboardMsg.AltC)
                    makeKeyItem "Align Vertically" "Alt+V" (fun () -> dispatch KeyboardMsg.AltV)
-                   //menuSeparator
-                   //makeKeyItem "Rotate Symbol Clockwise" "Alt+Shift+R" (fun () -> dispatch KeyboardMsg.RotateSymbol)
-                   //makeKeyItem "Enlarge Symbol" "Alt+Shift+U" (fun () -> dispatch KeyboardMsg.ScaleUpSymbol)
-                   //makeKeyItem "Shrink Symbol" "Alt+Shift+D" (fun () -> dispatch KeyboardMsg.ScaleDownSymbol)
+                   menuSeparator
+                   makeKeyItem "Rotate Symbol Clockwise" "Alt+Shift+R" (fun () -> dispatch KeyboardMsg.RotateSymbol)
+                   makeKeyItem "Enlarge Symbol" "Alt+Shift+U" (fun () -> dispatch KeyboardMsg.ScaleUpSymbol)
+                   makeKeyItem "Shrink Symbol" "Alt+Shift+D" (fun () -> dispatch KeyboardMsg.ScaleDownSymbol)
                    menuSeparator
                    makeKeyItem "Diagram Zoom In" "CmdOrCtrl+z" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
                    makeKeyItem "Diagram Zoom Out" "CmdOrCtrl+y" (fun () -> dispatch KeyboardMsg.ZoomCanvasOut)
