@@ -1,7 +1,7 @@
 # Joanna Merrick (jem18 - CID: 01504728)
 (Member of group 3)
 
-##An Overview of the Code
+## An Overview of the Code
 
 The module implemented here is **Symbol**
 
@@ -13,7 +13,7 @@ The code may be run by entering the following from within this directory
 npm run dev
 ```
 
-##Demo outline
+## Demo outline
 
 1. Different symbols
     * I will have symbols of each general category created in the init for the demo, so will be displayed on startup.
