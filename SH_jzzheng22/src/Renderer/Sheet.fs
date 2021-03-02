@@ -15,9 +15,7 @@ type Model = {
     SelectedWires: CommonTypes.ConnectionId list
     SelectingMultiple: bool
     DragStartPos: XYPos
-    // DragEndPos: XYPos
     DraggingPos: XYPos
-    // MousePos: XYPos
     }
 
 type KeyboardMsg =
@@ -34,7 +32,6 @@ type Msg =
     | SelectDragStart of XYPos
     | SelectDragEnd of XYPos
     | SelectDragging of XYPos
-    // | MouseMove of XYPos
 
 let origin = {X = 0.; Y = 0.}
 
@@ -45,7 +42,6 @@ let inBoundingBox point box =
         let rightX = botR.X
         let topY = topL.Y
         let botY = botR.Y
-        // printf "%A" (point.X >= leftX && point.X <= rightX && point.Y >= botY && point.Y <= topY)
         point.X >= leftX && point.X <= rightX && point.Y <= botY && point.Y >= topY
 
 let getID tuple =
@@ -53,8 +49,6 @@ let getID tuple =
     id
 
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
-    // printf "%A" "SELECT ELEMENTS"
-    printf "%A" (Symbol.getBoundingBoxes model.Wire.Symbol mousePos)
     let symbolIDList = 
         Symbol.getBoundingBoxes model.Wire.Symbol mousePos
         |> List.filter (inBoundingBox mousePos)
@@ -63,16 +57,11 @@ let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
         BusWire.getBoundingBoxes model.Wire mousePos
         |> List.filter (inBoundingBox mousePos)
         |> List.map getID
-    printf "%A" symbolIDList
-    // if not (List.isEmpty symbolIDList) then
+    
     dispatch <| SelectComponents symbolIDList
     dispatch <| Symbol (Symbol.Highlight symbolIDList)
-
-
-    // if not (List.isEmpty wireIDList) then
     dispatch <| SelectWires wireIDList
     dispatch <| Wire (BusWire.HighlightWires wireIDList)
-    // else
     dispatch <| SelectDragStart mousePos
 
 
@@ -88,15 +77,9 @@ let boxInSelectedArea startPos endPos box =
         let rightX = botR.X
         let topY = topL.Y
         let botY = botR.Y
-        // printf "%A" (point.X >= leftX && point.X <= rightX && point.Y >= botY && point.Y <= topY)
-        printf "%A" (minX <= leftX && maxX >= rightX && minY <= topY && maxY >= botY)
-
         minX <= leftX && maxX >= rightX && minY <= topY && maxY >= botY
-        // point.X >= leftX && point.X <= rightX && point.Y <= botY && point.Y >= topY
-    // failwithf "Not implemented"
 
 let dragSelectElements (model: Model) (dispatch: Dispatch<Msg>) =
-    printf "%A" "in drag select elements"
     let symbolIDList = 
         Symbol.getBoundingBoxes model.Wire.Symbol model.DraggingPos
         |> List.filter (boxInSelectedArea model.DragStartPos model.DraggingPos)
@@ -105,9 +88,6 @@ let dragSelectElements (model: Model) (dispatch: Dispatch<Msg>) =
         BusWire.getBoundingBoxes model.Wire model.DraggingPos
         |> List.filter (boxInSelectedArea model.DragStartPos model.DraggingPos)
         |> List.map getID
-    printf "%A" "symbol id list"
-    printf "%A" symbolIDList
-
 
     dispatch <| SelectComponents symbolIDList
     dispatch <| Symbol (Symbol.Highlight symbolIDList)
@@ -118,8 +98,6 @@ let cornersToString startCoord endCoord =
     sprintf "%f,%f %f,%f %f,%f %f,%f" startCoord.X startCoord.Y endCoord.X startCoord.Y endCoord.X endCoord.Y startCoord.X endCoord.Y
 
 let drawSelectionBox model =
-    // [
-    // if model.SelectingMultiple then
     polygon [
         SVGAttr.Points (cornersToString model.DragStartPos model.DraggingPos)
         SVGAttr.StrokeWidth "1px"
@@ -127,9 +105,6 @@ let drawSelectionBox model =
         SVGAttr.StrokeDasharray "5,5"
         SVGAttr.FillOpacity 0.1
         SVGAttr.Fill "grey"] []
-    // else 
-        // []
-    // ]
 
 let drawPortConnectionLine model =
     line [
@@ -148,7 +123,6 @@ let drawPortConnectionLine model =
             FillOpacity 0.1
         ]
     ] []
-
 
 
 /// This function zooms an SVG canvas by transforming its content and altering its size.
@@ -179,18 +153,9 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                 if boxInSelectedArea model.DragStartPos model.DraggingPos ((), mousePos, mousePos) then
                     ()
                 else
-                //TEST TO SEE IF IN BOX OF MULTIBOX
-                //IF YES, THEN APPLIES TO EVERYTHING
-                //IF NOT, THEN RESET SELECTED THINGS
-                // if (List.isEmpty model.SelectedComponents) && (List.isEmpty model.SelectedWires) then
                     selectElements model mousePos dispatch
             dispatch <| SelectDragStart mousePos
           )
-            // (mouseOp Down ev))
-
-            // (mouseOp Up ev))
-
-          //TODO: MOVE IS CURRENTLY BROKEN. CAUSES SELECTINO BOX TO BE DRAWN SOMETIMES. OBEJCTS DONT DMOVE AS THEY SHOULD
           OnMouseMove (fun ev -> 
             let coordX = ev.clientX / model.Zoom
             let coordY = ev.clientY / model.Zoom
@@ -199,8 +164,6 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                 Symbol.getBoundingBoxes model.Wire.Symbol mousePos
                 |> List.filter (inBoundingBox mousePos)
                 |> List.map getID
-            // if not (List.isEmpty symbolIDList) then
-            // TODO: HIGHLIGHTPORTS NEEDS TO HIGHLIGHT WHEN CLOSE TO SYMBOL, NOT JUST INSIDE SYMBOL
             dispatch <| Symbol (Symbol.HighlightPorts symbolIDList)
             if mDown ev then // Drag
                 dispatch <| SelectDragging mousePos
@@ -224,7 +187,6 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             dispatch <| SelectDragging mousePos
             match Symbol.isPort model.Wire.Symbol model.DraggingPos with 
             | Some (_, endPoint) ->
-                // TODO: MAKE SURE TARGET PORT IS INVERSE OF SOURCE PORT
                 let startPort = 
                     match model.SelectedPort with
                     | Some a -> a
@@ -233,11 +195,7 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             | None -> ()
             if model.SelectingMultiple then
                 dragSelectElements model dispatch
-            // if (List.isEmpty model.SelectedComponents) && (List.isEmpty model.SelectedWires) then
             dispatch <| SelectDragEnd mousePos
-            printf "%A" "OnMouseUp"
-            printf "%A" model.DragStartPos 
-            printf "%A" model.DraggingPos
           )
         ]
         [ svg
@@ -251,19 +209,6 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             [ g // group list of elements with list of attributes
                 [ Style [Transform (sprintf "scale(%f)" model.Zoom)]] // top-level transform style attribute for zoom
                 [ 
-                    // text [ // a demo text svg element
-                    //     X 500; 
-                    //     Y 50; 
-                    //     Style [
-                    //         TextAnchor "middle" // horizontal algnment vs (X,Y)
-                    //         DominantBaseline "middle" // vertical alignment vs (X,Y)
-                    //         FontSize "40px"
-                    //         FontWeight "Bold"
-                    //         Fill "Green" // font color
-                    //     ]
-                    // ] [str "sample text"]
-
-
                     svgReact // the application code
                     match model.SelectedPort with
                     | Some _ ->
@@ -272,20 +217,12 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                         
                     if model.SelectingMultiple then
                         drawSelectionBox model
-
                 ]
-
             ]
         ]
 
 
-
-/// for the demo code
 let view (model:Model) (dispatch : Msg -> unit) =
-    // printf "%A" model.Wire.Symbol.[6]
-    printf "%A" "Selected Components:"
-    printf "%A" model.SelectedComponents
-    // dispatch <| Symbol (Symbol.Highlight model.SelectedComponents)
     let wDispatch wMsg = dispatch (Wire wMsg)
     let wireSvg = BusWire.view model.Wire wDispatch
     displaySvgWithZoom model wireSvg dispatch
@@ -303,32 +240,19 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
         printStats() // print and reset the performance statistics in dev tools window
         model, Cmd.none // do nothing else and return model unchanged
     | KeyPress Del -> 
-        // if (List.isEmpty model.SelectedComponents) then
-        // if (List.isEmpty model.SelectedWires) then
-        printf "%A" "in del"
         let connectedWires = 
-            printf "%A" "asdf"
             model.SelectedComponents
             |> List.map (Symbol.getPortIds model.Wire.Symbol)
             |> List.collect (BusWire.getWireIdsFromPortIds model.Wire)
-        printf "%A" connectedWires
         
         let wiresToDelete = 
             connectedWires
             |> List.append model.SelectedWires
             |> List.distinct
-        printf "%A" wiresToDelete
-        printf "%A" model.SelectedComponents
         
         let wModel, wCmd = BusWire.update (BusWire.DeleteWires wiresToDelete) model.Wire
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Delete model.SelectedComponents)) wModel
-        printf "%A" "back in sheet but havent updated model"
-        printf "%A" sModel
         {model with Wire = sModel; SelectedPort = None; SelectedComponents = []; SelectedWires = []}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
-        // printf "%A" "end of update"
-        // {model with Wire = sModel}, Cmd.batch [Cmd.map Wire sCmd; Cmd.map Wire wCmd]
-
-        // model, Cmd.none
     | KeyPress AltA ->
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Add (CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1))) model.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
@@ -339,18 +263,13 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
             | AltV -> CommonTypes.Green
             | AltZ -> CommonTypes.Red
             | _ -> CommonTypes.Grey
-        printfn "Key:%A" c
         model, Cmd.ofMsg (Wire <| BusWire.SetColor c)
     | SelectPort spMsg -> 
         let _, portID = spMsg
         {model with SelectedPort = Some portID}, Cmd.none
     | SelectComponents scMsg -> 
-        // let _, componentIDList = scMsg
         {model with SelectedComponents = scMsg}, Cmd.none
     | SelectWires swMsg -> 
-        // let _, wireIDList = swMsg
-        printf "%A" "SelectWires msg"
-        printf "%A" swMsg
         {model with SelectedWires = swMsg}, Cmd.none
     | SelectMultiple multMsg ->
         {model with DraggingPos = multMsg; SelectingMultiple = true}, Cmd.none
@@ -360,10 +279,6 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
         {model with SelectedPort = None; SelectingMultiple = false}, Cmd.none
     | SelectDragging dragMsg ->
         {model with DraggingPos = dragMsg}, Cmd.none
-    // | MouseMove moveMsg ->
-    //     {model with MousePos = moveMsg}, Cmd.none
-
-
 
 
 let init() = 
@@ -376,9 +291,7 @@ let init() =
         SelectedWires = []
         SelectingMultiple = false
         DragStartPos = origin
-        // DragEndPos = origin
         DraggingPos = origin
-        // MousePos = origin
     }, Cmd.map Wire cmds
     
 

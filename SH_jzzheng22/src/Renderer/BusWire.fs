@@ -301,8 +301,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 {w with 
                     Vertices = newVertices
                     BoundingBoxes = newBB })
-        printf "%A" "in buswire update symbol"
-        printf "%A" sm
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
     | AddWire (portId1,portId2) ->
@@ -318,11 +316,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         | None -> model, Cmd.none
 
     | DeleteWires wIdList -> 
-        printf "%A" "in delete wires"
         let wList =
             model.WX
             |> List.filter (fun w -> List.contains w.Id wIdList = false)
-        printf "%A" wList
         {model with WX = wList}, Cmd.none
 
     | HighlightWires wIdList -> 
@@ -336,7 +332,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             )
         {model with WX = wList}, Cmd.none
     | MoveWires (_,_) -> 
-        printf "%A" "move wires"
         model, Cmd.none // Not implemented yet
 
     | SetColor c -> {model with Color = c}, Cmd.none

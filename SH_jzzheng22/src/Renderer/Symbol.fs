@@ -571,8 +571,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         (CreateNewSymbol compType numIn numOut pagePos) :: model, Cmd.none
 
     | Delete sIdList -> 
-        printf "%A" "delete symbol"
-        printf "%A" sIdList
         List.filter (fun sym -> List.contains sym.Id sIdList = false) model, Cmd.none
 
     | Move (compList, translate) ->
@@ -671,8 +669,6 @@ let private renderObj =
                             else
                                 "darkgrey"
                 | _ -> 
-                    printf "%A" "in symbol"
-                    printf "%A" props.Obj.Highlight
                     if props.Obj.Highlight then
                                 "lightblue"
                             else
@@ -742,8 +738,6 @@ let private renderObj =
 
 /// View function for symbol layer of SVG
 let view (model : Model) (dispatch : Msg -> unit) = 
-    printf "%A" "Symbol view"
-    // printf "%A" model.[6]
     model
     |> List.map (fun ({Id = CommonTypes.ComponentId id} as shape) ->
         renderObj 
