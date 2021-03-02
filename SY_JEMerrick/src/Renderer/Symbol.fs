@@ -6,21 +6,14 @@ open Elmish
 open Elmish.React
 open Helpers
 
-
-
-
 //------------------------------------------------------------------------//
 //-------------------------------Symbol Types-----------------------------//
 //------------------------------------------------------------------------//
-
-
 
 //Static variables
 let STD_HEIGHT = 35.
 let HW_RATIO = 0.9
 let RAD = 3.
-
-
 
 /// PortInfo extends the CommonTypes.Port
 ///
@@ -631,7 +624,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     | _ -> failwithf "Not implemented"
 
 
-
 //---------------------------------------------------------------------------------//
 //----------------------------View Function for Symbols----------------------------//
 //---------------------------------------------------------------------------------//
@@ -735,7 +727,6 @@ let view (model : Model) (dispatch : Msg -> unit) =
             }
     )
     |> ofList
-
 
 //---------------Helpers for interface functions--------------------//
 
