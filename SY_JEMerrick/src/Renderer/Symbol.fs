@@ -359,7 +359,7 @@ let swapMap (sym : Symbol) (coord : XYPos) port =
     |> List.minBy fst
     |> snd
     |> function
-    | (k, x) -> swapPort sym.PortMap k (port |> fst) x (port |> snd)  
+    | (k, x) -> swapPort sym.PortMap k (fst port) x (snd port)  
                 
 let drawText (x : float) (y : float) (size : string) =
     text[
