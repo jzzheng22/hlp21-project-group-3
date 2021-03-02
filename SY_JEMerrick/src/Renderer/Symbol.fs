@@ -56,7 +56,7 @@ type Symbol =
         Id : CommonTypes.ComponentId
         Type : CommonTypes.ComponentType
         Name : string
-        Highlight : bool
+        Highlight : string
         PortHighlight : bool
         PortMap : Map<XYPos, Portinfo Option>
         Rotation : int
@@ -77,6 +77,7 @@ type Msg =
     | Add of compType: CommonTypes.ComponentType * pagePos : XYPos * numIn : int * numOut : int
     | Delete of sIdList : CommonTypes.ComponentId list
     | Highlight of sIdList: CommonTypes.ComponentId list
+    | HighlightError of sIdList: CommonTypes.ComponentId list
     | HighlightPorts of sIdList : CommonTypes.ComponentId list
     | DragPort of sId : CommonTypes.ComponentId * pId : CommonTypes.PortId * pagePos: XYPos
     | Rotate of sId : CommonTypes.ComponentId * rot : int
@@ -513,7 +514,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         Id = _id
         Type = compType
         Name = name
-        Highlight = false
+        Highlight = "gainsboro"
         PortHighlight = false
         Rotation = 0
         Scale = {X = 0.;Y = 0.}
@@ -573,7 +574,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         model
         |> List.map (fun sym ->
                 { sym with
-                    Highlight = List.contains sym.Id sIdList
+                    Highlight = if List.contains sym.Id sIdList then "lightblue" else "gainsboro"
+                }
+        )
+        , Cmd.none
+
+    | HighlightError sIdList ->
+        model
+        |> List.map (fun sym ->
+                { sym with
+                    Highlight = if List.contains sym.Id sIdList then "red" else "gainsboro"
                 }
         )
         , Cmd.none
@@ -645,15 +655,12 @@ let private renderObj =
 
             let color =
                 match props.Obj.GenericType with
-                | Wires -> if props.Obj.Highlight then
-                                "red"
+                | Wires -> if props.Obj.Highlight = "lightblue" then
+                                "purple"
                             else
                                 "darkgrey"
-                | _ -> if props.Obj.Highlight then
-                                "lightblue"
-                            else
-                                "gainsboro"
-                
+                | _ -> props.Obj.Highlight
+
             let labels : ReactElement list = 
                 props.Obj
                 |> mapSetup
