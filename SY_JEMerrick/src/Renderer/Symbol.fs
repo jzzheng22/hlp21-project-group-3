@@ -683,19 +683,17 @@ let private renderObj =
                 |> mapSetup
                 |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1.)[])
             
-            let io : ReactElement list = [drawPolygon (tagCoords props.Obj) "black" color 0.5 []]
+            let io : ReactElement = drawPolygon (tagCoords props.Obj) "black" color 0.5 []
 
-            let displayBox : ReactElement list =
-                [
-                    rect[
-                        X props.Obj.TopL.X
-                        Y props.Obj.TopL.Y
-                        SVGAttr.Height (getHWObj props.Obj |> fst)
-                        SVGAttr.Width (getHWObj props.Obj |> snd)
-                        SVGAttr.Fill color
-                        SVGAttr.Stroke "black"
-                        SVGAttr.StrokeWidth 0.5][]
-                 ]
+            let displayBox : ReactElement =
+                rect[
+                    X props.Obj.TopL.X
+                    Y props.Obj.TopL.Y
+                    SVGAttr.Height (getHWObj props.Obj |> fst)
+                    SVGAttr.Width (getHWObj props.Obj |> snd)
+                    SVGAttr.Fill color
+                    SVGAttr.Stroke "black"
+                    SVGAttr.StrokeWidth 0.5][]
 
             let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px"[str <| sprintf "%A" props.Obj.Name]
             
@@ -713,8 +711,8 @@ let private renderObj =
             let symDraw = 
                 match props.Obj.GenericType with
                 | Wires -> List.concat [wires; triangles]
-                | IO -> io
-                | _ -> displayBox
+                | IO -> [io]
+                | _ -> [displayBox]
             
             g[](List.concat [symDraw; labels; drawInvert; ports; [title]])
             
