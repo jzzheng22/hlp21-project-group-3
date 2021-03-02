@@ -25,8 +25,8 @@ Symbol Advisor  - Sacha Ayoun - Email not piazza
         * BotR                        - The bottom right coordinate of the symbol
         * Id                          - The component ID associated with the symbol
         * Type                        - The component type associated with the symbol
-        * Name                        - The label to be prtined for the symbol
-        * Highlight                   - A bool indicating which = True if the symbol should be highlighted
+        * Name                        - The label to be printed for the symbol
+        * Highlight                   - A string indicating the colour the symbol should be (grey/blue/red)
         * PortHighlight               - A bool indicating which = True if the ports should be highlighted
         * PortMap                     - A map of <XYPos, Portinfo Option> which will be None if no port is assigned to a particular position, and Some if there is a port assigned to a position
 
