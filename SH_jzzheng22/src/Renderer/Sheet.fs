@@ -21,7 +21,7 @@ type Model = {
     }
 
 type KeyboardMsg =
-    | CtrlS | AltC | AltV | AltZ | AltShiftZ | Del
+    | CtrlS | AltC | AltV | AltZ | AltShiftZ | Del | AltA
 
 type Msg =
     | Wire of BusWire.Msg
@@ -53,7 +53,7 @@ let getID tuple =
     id
 
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
-    printf "%A" "SELECT ELEMENTS"
+    // printf "%A" "SELECT ELEMENTS"
     printf "%A" (Symbol.getBoundingBoxes model.Wire.Symbol mousePos)
     let symbolIDList = 
         Symbol.getBoundingBoxes model.Wire.Symbol mousePos
@@ -329,6 +329,9 @@ let update (msg : Msg) (model : Model): Model * Cmd<Msg> =
         // {model with Wire = sModel}, Cmd.batch [Cmd.map Wire sCmd; Cmd.map Wire wCmd]
 
         // model, Cmd.none
+    | KeyPress AltA ->
+        let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Add (CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1))) model.Wire
+        {model with Wire = sModel}, Cmd.map Wire sCmd
     | KeyPress s -> // all other keys are turned into SetColor commands
         let c =
             match s with
