@@ -5,8 +5,8 @@
 
 The module implemented here is **Symbol**
 
--This code uses Aaman's Sheet, and Aditya's Buswire implementations as stubs.
--The renderer.fs has also been modified to fit with these modules and add some features specific to symbol such as 'Rotation' and 'Scaling'
+- This code uses Aaman's Sheet, and Aditya's Buswire implementations as stubs.
+- The renderer.fs has also been modified to fit with these modules and add some features specific to symbol such as 'Rotation' and 'Scaling'
 
 The code may be run by entering the following from within this directory
 ```
