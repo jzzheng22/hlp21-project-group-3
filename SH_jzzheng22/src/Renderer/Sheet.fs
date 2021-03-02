@@ -36,52 +36,34 @@ type Msg =
     | SelectWires of CommonTypes.ConnectionId list
     | SelectMultiple of XYPos
     | SelectDragStart of XYPos
-    | SelectDragEnd of XYPos
     | SelectDragging of XYPos
+    | SelectDragEnd
 
 type MouseOps =
     | MouseDown
     | MouseUp
     | MouseMove
 
-type Predicate<'a> = 
-    | A of (XYPos -> 'a * XYPos * XYPos)
-    | B of (XYPos * XYPos -> 'a * XYPos * XYPos)
-
 let origin = { X = 0.; Y = 0. }
 
 /// Tests if a point is inside a bounding box
 let inBoundingBox point box =
-    // match box with
-    // | _, topL, botR ->
-    //     point.X >= topL.X && point.X <= botR.X && point.Y >= topL.Y && point.Y <= botR.Y
-    // match box with
-    // | _, topL, botR ->
     point.X >= (fst box).X && point.X <= (snd box).X && point.Y >= (fst box).Y && point.Y <= (snd box).Y
+
 /// Takes in two coordinates and a bounding box
 /// Tests to see if box is between those two coordinates
 let boxInSelectedArea outerBox innerBox = 
     let outerTopL = {X = min (fst outerBox).X (snd outerBox).X; Y = min (fst outerBox).Y (snd outerBox).Y}
     let outerBotR = {X = max (fst outerBox).X (snd outerBox).X; Y = max (fst outerBox).Y (snd outerBox).Y}
     let outerBox = outerTopL, outerBotR
-    // match innerBox with
-    // | _, topL, botR ->
-    //     inBoundingBox topL outerBox && inBoundingBox botR outerBox
     inBoundingBox (fst innerBox) outerBox && inBoundingBox (snd innerBox) outerBox
 
-let getID tuple =
-    let id, _, _ = tuple
-    id
+let getID (id, _, _) = id
 
 let getIDList filter lst =
     lst
     |> filter
     |> List.map getID
-
-// let getIDList predicate coords lst =
-//     lst
-//     |> List.filter (predicate coords)
-//     |> List.map getID
 
 let dispatchSelection symbolIDList wireIDList dispatch = 
     dispatch <| SelectComponents symbolIDList
@@ -89,68 +71,25 @@ let dispatchSelection symbolIDList wireIDList dispatch =
     dispatch <| SelectWires wireIDList
     dispatch <| Wire(BusWire.HighlightWires wireIDList)
 
-//TODO: REFACTOR THIS TO USE SINGLE FUNCTION IN ALL CODE
-/// Selects elements inside the outer box
-// let dragSelectElements (model: Model) (predicate: Predicate<'a>) coords (dispatch: Dispatch<Msg>) =
-    /// 
-        /// let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>) =
-    // let symbolIDList =
-    //     Symbol.getBoundingBoxes model.Wire.Symbol model.DraggingPos
-    //     |> getIDList (List.filter (predicate coords))
-    // let wireIDList =
-    //     BusWire.getBoundingBoxes model.Wire model.DraggingPos
-    //     |> getIDList (List.filter (predicate coords))
-    // dispatchSelection symbolIDList wireIDList dispatch
-// let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>) =
-//     let symbolIDList =
-//         Symbol.getBoundingBoxes model.Wire.Symbol model.DraggingPos
-//         |> getIDList predicate coords
-//     let wireIDList =
-//         BusWire.getBoundingBoxes model.Wire model.DraggingPos
-//         |> getIDList predicate coords
-//     dispatchSelection symbolIDList wireIDList dispatch
-let filterFunc predicate coords tuple = 
-    match tuple with
-    | _, a, b -> predicate coords (a, b)
+/// Removes ID from tuple. Used for testing where IDs are not necessary 
+let removeID predicate coords (_, a, b) = predicate coords (a, b)
 
+/// Selects elements inside the outer box
 let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>) =
-    // let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
     let symbolIDList =
         Symbol.getBoundingBoxes model.Wire.Symbol model.DraggingPos
-        |> getIDList (List.filter (filterFunc predicate coords))
-        // |> getIDList (List.filter (fun (_, a, b) -> boxInSelectedArea outerBoxCoords (a, b)))
+        |> getIDList (List.filter (removeID predicate coords))
 
     let wireIDList =
         BusWire.getBoundingBoxes model.Wire model.DraggingPos
-        // |> getIDList boxInSelectedArea outerBoxCoords
-        // |> getIDList (List.filter (fun (_, a, b) -> boxInSelectedArea outerBoxCoords (a, b)))
-        |> getIDList (List.filter (filterFunc predicate coords))
+        |> getIDList (List.filter (removeID predicate coords))
 
     dispatchSelection symbolIDList wireIDList dispatch
 
-// TODO: CHANGE THIS TO USE DRAGGINGPOS INSTEAD? CHECK MESSAGE UPDATES TO SEE IF POSSIBLE
 /// Selects elements where mousePos is inside bounding box
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
     dragSelectElements model inBoundingBox mousePos dispatch
     dispatch <| SelectDragStart mousePos
-
-// let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
-//     let symbolIDList =
-//         Symbol.getBoundingBoxes model.Wire.Symbol mousePos
-//         // |> getIDList inBoundingBox mousePos
-//         // |> getIDList (List.filter (fun (_, a, b) -> inBoundingBox mousePos (a, b)))
-//         |> getIDList (List.filter (filterFunc predicate coords))
-
-
-//     let wireIDList =
-//         BusWire.getBoundingBoxes model.Wire mousePos
-//         // |> getIDList inBoundingBox mousePos
-//         |> getIDList (List.filter (filterFunc predicate coords))
-
-//         // |> getIDList (List.filter (fun (_, a, b) -> inBoundingBox mousePos (a, b)))
-
-//     dispatchSelection symbolIDList wireIDList dispatch
-//     dispatch <| SelectDragStart mousePos
 
 
 let cornersToString startCoord endCoord =
@@ -199,33 +138,25 @@ let mouseUp model mousePos dispatch =
 
     match Symbol.isPort model.Wire.Symbol model.DraggingPos with
     | Some (_, endPoint) ->
-        // let startPort =
         match model.SelectedPort with
-        | Some a -> 
-            dispatch <| Wire(BusWire.AddWire(a, endPoint))
-        | None -> () //failwithf "Error: tried to create port connection without starting port"
-
-        
+        | Some a -> dispatch <| Wire(BusWire.AddWire(a, endPoint))
+        | None -> ()
     | None -> ()
 
     if model.SelectingMultiple then
         let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
-
         dragSelectElements model boxInSelectedArea outerBoxCoords dispatch
-        // dragSelectElements model dispatch
 
+    dispatch <| SelectDragEnd
 
-    dispatch <| SelectDragEnd mousePos
+let increaseBoundingBox (a, topL, botR) = 
+    a, {X = topL.X - 10.; Y = topL.Y - 10.}, {X = botR.X + 10.; Y = botR.Y + 10.}
 
 let mouseMove model mousePos dispatch mDown = 
     let symbolIDList =
         Symbol.getBoundingBoxes model.Wire.Symbol mousePos
-        // |> getIDList inBoundingBox mousePos
-        |> getIDList (List.filter (fun (_, a, b) -> inBoundingBox mousePos (a, b)))
-    // let symbolIDList =
-    //     Symbol.getBoundingBoxes model.Wire.Symbol mousePos
-    //     |> List.filter (inBoundingBox mousePos)
-    //     |> List.map getID
+        |> List.map increaseBoundingBox
+        |> getIDList (List.filter (removeID inBoundingBox mousePos))
 
     dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
 
@@ -262,7 +193,6 @@ let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (di
 /// current scroll position, and chnage scroll position to keep centre of screen a fixed point.
 let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispatch<Msg>) =
     let sizeInPixels = sprintf "%.2fpx" ((1000. * model.Zoom))
-    /// Is the mouse button currently down?
 
     div [ Style [ Height "100vh"
                   MaxWidth "100vw"
@@ -363,7 +293,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               DragStartPos = dragMsg;
               DraggingPos = dragMsg },
         Cmd.none
-    | SelectDragEnd dragMsg ->
+    | SelectDragEnd ->
         { model with
               SelectedPort = None;
               SelectingMultiple = false },
