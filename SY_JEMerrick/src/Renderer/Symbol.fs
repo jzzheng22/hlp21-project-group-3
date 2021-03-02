@@ -165,6 +165,8 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
         elif pos.Y = sym.BotR.Y then (pos.Y + n)
         else pos.Y
     (x, y)
+let displaceNX (sym : Symbol) (i : XYPos) (n : float) : float = displace n i sym |> fst
+let displaceNY (sym : Symbol) (i : XYPos) (n : float) : float = displace n i sym |> snd
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
@@ -268,11 +270,6 @@ let trans func sym trans =
 
 ///Finds the log base 2 of an int and rounds up to the nearest int
 let log2 (n : int) : int = (log(float n) / log(2.)) |> ceil |> int
-
-///Displace an object by a float
-let displaceN (sym : Symbol) (i : XYPos) (n : float) : (float * float) = displace n i sym
-let displaceNX (sym : Symbol) (i : XYPos) (n : float) : float = displaceN sym i n |> fst
-let displaceNY (sym : Symbol) (i : XYPos) (n : float) : float = displaceN sym i n |> snd
 
 //Helpers for makePosList
 let makeLR (len : int) x func = List.map (fun i -> {X = x.X; Y = (func i).Y}) [0..len - 1]
