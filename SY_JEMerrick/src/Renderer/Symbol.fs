@@ -295,7 +295,7 @@ let tagCoords (sym : Symbol) : string =
         (sym.TopL.X + (i + (a * 5.))) (midY - 10.) 
         (sym.TopL.X + (i + (a * 5.))) (midY + 10.) 
         (midX - ((i/7.) + (a * 5.))) (midY + 10.) 
-        (sym.BotR.X - (i + (a * 15.))) midY 
+        (sym.BotR.X - ((i * 1.2) + (a * 5.))) midY 
         (midX - ((i/7.) + (a * 5.))) (midY - 10.))
 
 ///Returns the coordinates of a triangle where midpoint of the flat side = input position i
@@ -464,7 +464,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let n = max (numIn + left) (numOut + right) |> float //The max number of ports initially will always be on the left or right of the box
     let nBot = if bot > 0 then bot else (int (HW_RATIO * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
     let h = if numIn = 1 && numOut = 1 then STD_HEIGHT * 2. else STD_HEIGHT * n //ensures minimum height for 1 in 1 out components
-    let w =  if bot <= 0 then (HW_RATIO * h) else ((float nBot) * STD_HEIGHT * 1.5) //Width is either standard, or based on number of ports on the bottom
+    let w =  if bot <= 0 then (HW_RATIO * h) else ((float nBot) * STD_HEIGHT * 1.7) //Width is either standard, or based on number of ports on the bottom
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
     //Symbol's Component id creation
