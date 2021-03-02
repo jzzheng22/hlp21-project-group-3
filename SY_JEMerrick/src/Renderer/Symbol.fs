@@ -277,11 +277,7 @@ let log2 (n : int) : int = (log(float n) / log(2.)) |> ceil |> int
 
 ///Displace an object by a float
 let displaceN (sym : Symbol) (i : XYPos) (n : float) : (float * float) = displace n i sym
-
-///Displace an object and retrieve the X coordinate
 let displaceNX (sym : Symbol) (i : XYPos) (n : float) : float = displaceN sym i n |> fst
-
-///Displace an object and retrieve the Y coordinate
 let displaceNY (sym : Symbol) (i : XYPos) (n : float) : float = displaceN sym i n |> snd
 
 //Helpers for makePosList
