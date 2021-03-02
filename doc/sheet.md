@@ -34,13 +34,13 @@ To BusWire: (see [buswire.md](./buswire.md) for description)
  - WireInfo is tuple of portID `(startPort: string * endPort: string)`
  - Sent by Sheet on mouse click up depending on return value of `Symbol.isPort`
 
-`DeleteConnection of wireId`
+`DeleteWires of CommonTypes.ConnectionId list`
  - Deleting a BusWire does not delete any Symbols connected to it
 
-`MoveConnection of wireIdList * posX * posY`
+`MoveWires of wireIdList * XYPos`
 - wireSegmentIdList is a list of wire segment IDs
 
-`HighlightConnection of wireIdList`
+`HighlightWires of CommonTypes.ConnectionId list`
 - WireIdList is a list of wire IDs
 
 To Symbol: (see [symbol.md](./symbol.md) for description)

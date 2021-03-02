@@ -57,7 +57,7 @@ Note: `CommonTypes.ConnectionId` is a Wire ID
    - Highlights the source and target ports of the wire
  - Same functionality as highlighting a Symbol (need to send a Highlight message with an empty list to unhighlight everything)
 
-`Move of wireIdList *  XYPos`
+`MoveWires of wireIdList *  XYPos`
  - XYPos is translation vector
  - Not implemented yet, will do when incorporating manual routing
 

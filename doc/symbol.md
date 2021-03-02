@@ -36,7 +36,7 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
  - `None`
 
 `Symbol.getPortIds (model: Model) (symbolIds: ComponentID list)`
-- Returns list of lists of ports for each symbol ID.
+- Returns list of ports for each symbol ID.
 - Is used to find wires connected to symbol(s).
 
 
