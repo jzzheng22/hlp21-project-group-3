@@ -4,61 +4,59 @@ Module: Symbol
 
 Symbol Advisor  - Sacha Ayoun - Email not piazza
 
-DOCUMENTATION
+# DOCUMENTATION
 
-STATIC VARIABLES:
-    STD_HEIGHT - Standard Height to make Symbol from
-    HW_RATIO - Ratio of Height to Width for Symbol
-    RAD - Radius for inverters and port highlighting
+## STATIC VARIABLES:
+    - STD_HEIGHT - Standard Height to make Symbol from
+    - HW_RATIO - Ratio of Height to Width for Symbol
+    - RAD - Radius for inverters and port highlighting
 
-TYPES:
+##TYPES:
     
-    Portinfo
-        Port                        - From CommonTypes
-        NumWires                    - Keeps track of the number of wires connected to a port 
-        Name                        - Label to be printed for that port
-        Invert                      - A bool which = True if the port requires an inverter
-        width                       - A width indicating the wire/bus width into the component
+    - Portinfo
+        * Port                        - From CommonTypes
+        * NumWires                    - Keeps track of the number of wires connected to a port 
+        * Name                        - Label to be printed for that port
+        * Invert                      - A bool which = True if the port requires an inverter
+        * width                       - A width indicating the wire/bus width into the component
 
-    Symbol
-        TopL                        - The top left coordinate of the symbol
-        BotR                        - The bottom right coordinate of the symbol
-        Id                          - The component ID associated with the symbol
-        Type                        - The component type associated with the symbol
-        Name                        - The label to be prtined for the symbol
-        Highlight                   - A bool indicating which = True if the symbol should be highlighted
-        PortHighlight               - A bool indicating which = True if the ports should be highlighted
-        PortMap                     - A map of <XYPos, Portinfo Option> which will be None if no port is assigned to a particular position, and Some if there is a port assigned to a position
+    - Symbol
+        * TopL                        - The top left coordinate of the symbol
+        * BotR                        - The bottom right coordinate of the symbol
+        * Id                          - The component ID associated with the symbol
+        * Type                        - The component type associated with the symbol
+        * Name                        - The label to be prtined for the symbol
+        * Highlight                   - A bool indicating which = True if the symbol should be highlighted
+        * PortHighlight               - A bool indicating which = True if the ports should be highlighted
+        * PortMap                     - A map of <XYPos, Portinfo Option> which will be None if no port is assigned to a particular position, and Some if there is a port assigned to a position
 
-MESSAGES:
-    Move                            - Moves list of symbols by a translation vector XYPos
-    AddSymbol                       - Adds a new symbol to the model based on ComponentType, Position, Number of Inputs, Number of Outputs
-    DeleteSymbol                    - Removes a symbol from the model based on ComponentID
-    Highlight                       - Highlights symbols from a list of ComponentID, anything not in the list will be un-highlighted
-    HighlightPorts                  - Highlights the symbol ports of a single ComponentID 
-    Scale                           - Scales a symbol by an XYPos indicating the scale in the x and y directions respectively
-    Rotate                          - Rotates a symbol by an int indicating the number of degrees to rotate
-    UpdateSymbolModelWithComponent  - TODO
+## MESSAGES:
+    - Move                            - Moves list of symbols by a translation vector XYPos
+    - AddSymbol                       - Adds a new symbol to the model based on ComponentType, Position, Number of Inputs, Number of Outputs
+    - DeleteSymbol                    - Removes a symbol from the model based on ComponentID
+    - Highlight                       - Highlights symbols from a list of ComponentID, anything not in the list will be un-highlighted
+    - HighlightPorts                  - Highlights the symbol ports of a single ComponentID 
+    - HighlightError                  - Highlights symbols from a list of componentIds red, anything not in the list will be unhighlighted
+    - Scale                           - Scales a symbol by an XYPos indicating the scale in the x and y directions respectively
+    - Rotate                          - Rotates a symbol by an int indicating the number of degrees to rotate
+    - UpdateSymbolModelWithComponent  - TODO
 
-INTERFACE FUNCTIONS:
-    getPortCoords                   - Inputs(model, portId), Returns the XYPos of the portID
-    getBoundingBoxes                - Returns a list of bounding boxes in the form (ComponentID, TopLeftCoordinate, BotRightCoordinate)
-    getPortType                     - Takes a model and portID, Returns whether a port is input/output
-    isPort                          - Takes a model, XYpos and returns Some(XYPos, PortID) if the position was on a port, or None otherwise
-    getPortIds                      - Inputs(model, symbolID), returns list of portIDs
+## INTERFACE FUNCTIONS:
+    - getPortCoords                   - Inputs(model, portId), Returns the XYPos of the portID
+    - getBoundingBoxes                - Returns a list of bounding boxes in the form (ComponentID, TopLeftCoordinate, BotRightCoordinate)
+    - getPortType                     - Takes a model and portID, Returns whether a port is input/output
+    - isPort                          - Takes a model, XYpos and returns Some(XYPos, PortID) if the position was on a port, or None otherwise
+    - getPortIds                      - Inputs(model, symbolID), returns list of portIDs
     
-    As requested by Aditya for wire module:
-    getPortWidth                    - Inputs(model, portId), returns the width of that port
-    getHostId                       - Inputs(model, portId), returns the componentId associated with that port
-
-INTERFACE TO ISSIE
-    TODO
+    - As requested by Aditya for wire module:
+    * getPortWidth                    - Inputs(model, portId), returns the width of that port
+    * getHostId                       - Inputs(model, portId), returns the componentId associated with that port
 
 
 
-CHANGELOG (For me)
+##CHANGELOG (For me)
 
-24/02/21
+### 24/02/21
    
     COMPLETE: 
         Init symbol type
@@ -77,7 +75,7 @@ CHANGELOG (For me)
         Update movement from demo listen stuff to with messages
         Check all types done
 
-25/02/21
+### 25/02/21
 
     COMPLETE:
         Print inverters
@@ -109,7 +107,7 @@ CHANGELOG (For me)
         Manual rotation
         Manual scaling
 
-26/02/21
+### 26/02/21
     
     COMPLETE:
         Specification writeup
@@ -148,7 +146,7 @@ CHANGELOG (For me)
         Write something to show port movement
         Interface to ISSIE
         
-27/02/21
+### 27/02/21
     
     COMPLETE:
 
@@ -174,7 +172,7 @@ CHANGELOG (For me)
     NEXT TASKS:
 
 
-28/02/21
+### 28/02/21
 
     COMPLETE:
         
