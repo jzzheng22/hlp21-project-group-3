@@ -32,7 +32,7 @@ Might want to add in portID and symbolID and wireID as types instead of strings 
 
 `Symbol.isPort (symbolModel : Model) (portCoords: XYPos)`
  - Returns Option type indicating if mouse has clicked down on port. Called by sheet.
- - `Some (portCoords: XYPos * portID: string)`
+ - `Some (portCoords: XYPos * portID: CommonTypes.PortID)`
  - `None`
 
 `Symbol.getPortIds (model: Model) (symbolId: CommonTypes.ComponentID)`
