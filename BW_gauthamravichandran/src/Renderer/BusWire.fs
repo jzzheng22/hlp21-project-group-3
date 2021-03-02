@@ -270,7 +270,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 {w with Segments= segments})
 
         {model with Symbol=sm; WX=wires}, Cmd.map Symbol sCmd
-    | AddWire _ -> failwithf "Not implemented"
+    | AddWire (srcPort, tarPort) ->
+        let w= makeWire srcPort tarPort model.Symbol
+        {model with WX=w::model.WX}, Cmd.none
     | DeleteWires _ -> failwithf "Not implemented"
     | HighlightWires _ -> failwithf "Not implemented"
     | MoveWires _ -> failwithf "Not implemented"
@@ -279,7 +281,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 
 //---------------Other interface functions--------------------//
 let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list=
-    failwithf "not impl"
+    wModel.WX
+    |> List.collect (fun w->
+                    List.map (fun (segment:WireSegment)->
+                                (segment.Id,fst segment.BB, snd segment.BB))w.Segments)
 
 
 let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =
