@@ -23,16 +23,19 @@ open Helpers
 /// component coordinates are held in some other way, is up to groups.
 
 type WireSegment = {
+    wId: CommonTypes.ConnectionId
     Id: CommonTypes.ConnectionId 
     SrcPos: XYPos
     TargetPos: XYPos
     BB: XYPos * XYPos
+    Highlight: bool
     }
 type Wire = {
     Id: CommonTypes.ConnectionId 
     SrcPort: CommonTypes.PortId
     TargetPort: CommonTypes.PortId
     Segments: WireSegment list
+    WireHighlight: bool
     }
 
 type Model = {
@@ -43,19 +46,22 @@ type Model = {
 
 let makeWireBB (sPos:XYPos) (tPos:XYPos)=
     match sPos.X,sPos.Y, tPos.X, tPos.Y with
-    | (sx,sy,tx,ty) when tx>sx -> ({X=sx;Y=sy+2.},{X=tx;Y=ty-2.})
-    | (sx,sy,tx,ty) when tx<sx -> ({X=tx;Y=ty+2.},{X=sx;Y=sy-2.})
-    | (sx,sy,tx,ty) when ty>sy -> ({X=sx-2.;Y=sy},{X=tx+2.;Y=ty})
-    | (sx,sy,tx,ty) when ty<sy -> ({X=tx-2.;Y=ty},{X=sx+2.;Y=sy})
+    | (sx,sy,tx,ty) when tx>sx -> ({X=sx;Y=sy-5.},{X=tx;Y=ty+5.})
+    | (sx,sy,tx,ty) when tx<sx -> ({X=tx;Y=ty-5.},{X=sx;Y=sy+5.})
+    | (sx,sy,tx,ty) when ty>sy -> ({X=sx-5.;Y=sy},{X=tx+5.;Y=ty})
+    | (sx,sy,tx,ty) when ty<sy -> ({X=tx-5.;Y=ty},{X=tx+5.;Y=sy})
     | (sx,sy,tx,ty) when (tx=sx && ty=sy) -> ({X=tx;Y=ty},{X=sx;Y=sy})
     | _ -> failwithf "diagonal line error"
 
-let makeWireSegment (sPos) (tPos) = 
+let makeWireSegment (WId:CommonTypes.ConnectionId) (sPos) (tPos) = 
+    //printf "%A" (makeWireBB sPos tPos)
     {
+        wId=WId
         Id=CommonTypes.ConnectionId (uuid())
         SrcPos=sPos
         TargetPos=tPos
         BB= makeWireBB sPos tPos
+        Highlight=false
     }
 let bbCollision (bb1:XYPos*XYPos) (bb2:XYPos*XYPos) =
     match fst bb1, snd bb1, fst bb2, snd bb2 with
@@ -75,26 +81,26 @@ let findNearestBox (symbols: Symbol.Symbol list) (src:XYPos) =
         List.minBy (fun (sym,l,r)->l) list
         |> (fun (sym,l,r)->Some sym)
 *)
-let goPastBox (src:XYPos) (sym:Symbol.Symbol) =
+let goPastBox (wId:CommonTypes.ConnectionId) (src:XYPos) (sym:Symbol.Symbol) =
 
     
     let pos1= {X=src.X; Y=src.Y}
     let pos2= {X=pos1.X;Y=sym.BotR.Y}
     [   
-        makeWireSegment src pos1
-        makeWireSegment pos1 pos2
-        makeWireSegment pos2 sym.BotR
+        makeWireSegment wId src pos1
+        makeWireSegment wId pos1 pos2
+        makeWireSegment wId pos2 sym.BotR
     ], sym.BotR
     
-let goPastBox2 (src:XYPos) (sym:Symbol.Symbol) =
+let goPastBox2 (wId:CommonTypes.ConnectionId) (src:XYPos) (sym:Symbol.Symbol) =
 
     
     let pos1= {X=src.X; Y=src.Y}
     let pos2= {X=pos1.X;Y=sym.BotR.Y}
     [   
-        makeWireSegment src pos1
-        makeWireSegment pos1 pos2
-        makeWireSegment pos2 sym.BotR
+        makeWireSegment wId src pos1
+        makeWireSegment wId pos1 pos2
+        makeWireSegment wId pos2 sym.BotR
     ], sym.BotR
     
 
@@ -102,13 +108,13 @@ let goPastBox2 (src:XYPos) (sym:Symbol.Symbol) =
 
 
 
-let goToTarget (src:XYPos) (tar:XYPos) =
+let goToTarget (wId:CommonTypes.ConnectionId) (src:XYPos) (tar:XYPos) =
     let pos1= {X= (tar.X + src.X)/(2.) ; Y=src.Y}
     let pos2= {X=pos1.X;Y=tar.Y}
     [   
-        makeWireSegment src pos1
-        makeWireSegment pos1 pos2
-        makeWireSegment pos2 tar
+        makeWireSegment wId src pos1
+        makeWireSegment wId pos1 pos2
+        makeWireSegment wId pos2 tar
     ]
 
 (*
@@ -130,7 +136,7 @@ let findBoxesInPath (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol
         //|> (fun (l,r)->Some sym)
 *)
 
-let rec routing (symbols: Symbol.Symbol list) (src:XYPos) (tar:XYPos)=
+let rec routing (wId:CommonTypes.ConnectionId) (symbols: Symbol.Symbol list) (src:XYPos) (tar:XYPos) =
 (*
     match findNearestBox symbols src with
     | None -> goToTarget src tar
@@ -139,16 +145,17 @@ let rec routing (symbols: Symbol.Symbol list) (src:XYPos) (tar:XYPos)=
         let tuple= goPastBox src sym
         ( fst tuple) @ (routing (symbols) (snd tuple) tar)
 *)
-    goToTarget  src tar
+    goToTarget  wId src tar
 
 let makeWire (srcId:CommonTypes.PortId) (tarId:CommonTypes.PortId) (symbols: Symbol.Symbol list) =
-    
-    let segments = routing symbols (Symbol.getPortCoords symbols srcId) (Symbol.getPortCoords symbols tarId)
+    let wId= CommonTypes.ConnectionId (uuid())
+    let segments = routing wId symbols (Symbol.getPortCoords symbols srcId) (Symbol.getPortCoords symbols tarId)
     {
-    Id= CommonTypes.ConnectionId (uuid()) 
+    Id= wId 
     SrcPort= srcId
     TargetPort= tarId
     Segments= segments
+    WireHighlight=false
     }
 
 //----------------------------Message Type-----------------------------------//
@@ -180,7 +187,10 @@ type WireRenderProps = {
     SrcP: XYPos 
     TgtP: XYPos
     ColorP: string
-    StrokeWidthP: string }
+    StrokeWidthP: string
+    Highlight:bool
+    BB: XYPos * XYPos
+    }
 
 /// react virtual DOM SVG for one wire
 /// In general one wire will be multiple (right-angled) segments.
@@ -188,15 +198,28 @@ type WireRenderProps = {
 let singleWireView = 
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
-            line [
-                X1 props.SrcP.X
-                Y1 props.SrcP.Y
-                X2 props.TgtP.X
-                Y2 props.TgtP.Y
-                // Qualify these props to avoid name collision with CSSProp
-                SVGAttr.Stroke props.ColorP
-                SVGAttr.StrokeWidth props.StrokeWidthP ] [])
-
+            let segmentView=
+                line [
+                    X1 props.SrcP.X
+                    Y1 props.SrcP.Y
+                    X2 props.TgtP.X
+                    Y2 props.TgtP.Y
+                    // Qualify these props to avoid name collision with CSSProp
+                    SVGAttr.Stroke (if props.Highlight then "purple" else props.ColorP)
+                    SVGAttr.StrokeWidth props.StrokeWidthP ] []
+            let BBview=     
+                rect[
+                    let h= float (snd props.BB).Y - float (fst props.BB).Y
+                    let w= float (snd props.BB).X - float (fst props.BB).X
+                    X (fst props.BB).X
+                    Y (fst props.BB).Y
+                    SVGAttr.Height (h)
+                    SVGAttr.Width (w)
+                    //SVGAttr.Fill "purple"
+                    SVGAttr.Stroke "black"
+                    SVGAttr.StrokeWidth 0.5][]
+            segmentView (*:: [BBview] |> ofList*)        
+            )
 
 let view (model:Model) (dispatch: Dispatch<Msg>)=
 
@@ -204,9 +227,9 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
         model.WX
 
         |> List.map (fun w ->
-            List.map (fun segment->               
+            List.map (fun (segment:WireSegment)->               
                 let props = {
-                    key = w.Id
+                    key = segment.Id
                     WireP = segment
                     (*SrcP = Symbol.symbolPos model.Symbol w.SrcSymbol 
                     TgtP = Symbol. symbolPos model.Symbol w.TargetSymbol *)
@@ -215,7 +238,12 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
                     //SrcP=w.SrcPos
                     //TgtP=w.TargetPos
                     ColorP = model.Color.Text()
-                    StrokeWidthP = "2px" }
+                    StrokeWidthP = "2px" 
+                    Highlight=w.WireHighlight
+                    BB= segment.BB
+                    
+                    }
+                
                 singleWireView props) w.Segments)
     let symbols = Symbol.view model.Symbol (fun sMsg -> dispatch (Symbol sMsg))
     g [] [(g [] (List.concat wires)); symbols]
@@ -257,6 +285,15 @@ let init n () =
     //List.map (fun i -> makeRandomWire()) [1..n]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
 
+let isCommon lst1 lst2=
+    let set1= Set.ofList lst1
+    let set2 =Set.ofList lst2
+    let intersect= Set.intersect set1 set2
+    not (Set.isEmpty intersect)
+
+let isSegmentInCommon (w:Wire) (segIdlst:CommonTypes.ConnectionId list)=
+    let WireSegIds=List.map (fun (seg:WireSegment)->seg.Id) w.Segments
+    isCommon WireSegIds segIdlst 
 
 
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
@@ -266,7 +303,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wires = 
             model.WX
             |> List.map (fun w ->
-                let segments=routing sm (Symbol.getPortCoords sm w.SrcPort) (Symbol.getPortCoords sm w.TargetPort)
+                let segments=routing w.Id sm (Symbol.getPortCoords sm w.SrcPort) (Symbol.getPortCoords sm w.TargetPort)
                 {w with Segments= segments})
 
         {model with Symbol=sm; WX=wires}, Cmd.map Symbol sCmd
@@ -274,7 +311,18 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let w= makeWire srcPort tarPort model.Symbol
         {model with WX=w::model.WX}, Cmd.none
     | DeleteWires _ -> failwithf "Not implemented"
-    | HighlightWires _ -> failwithf "Not implemented"
+    | HighlightWires wIdList -> 
+
+        let wList =
+            model.WX
+            |> List.map (fun w ->
+                if List.contains w.Id wIdList then
+                    {w with WireHighlight = true}
+                else 
+                    {w with WireHighlight = false}
+            )
+        
+        {model with WX = wList}, Cmd.none
     | MoveWires _ -> failwithf "Not implemented"
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
@@ -284,7 +332,7 @@ let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.Connectio
     wModel.WX
     |> List.collect (fun w->
                     List.map (fun (segment:WireSegment)->
-                                (segment.Id,fst segment.BB, snd segment.BB))w.Segments)
+                                (segment.wId,fst segment.BB, snd segment.BB))w.Segments)
 
 
 let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =
