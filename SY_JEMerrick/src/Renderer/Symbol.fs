@@ -157,7 +157,7 @@ let absDiff a b =
     let diff = (posDiff a b)
     diff.X + diff.Y
 
-///Displace will move a port position _away_ from the box.
+///Displace will move a port position _away_ from the box by n pixels.
 ///
 ///For inverters call with positive n.
 ///For labels call with negative n.
@@ -182,8 +182,6 @@ let testBox (portPos : XYPos) (coord : XYPos) : bool =
 ///Calculates the port position where
 ///i = int indicating the index of the port on a side
 ///n = int indicating the total number of ports on a side
-///topL = the top left position of the box
-///botR = the bottom right position of the box
 let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos = 
     let h = getHW botR topL |> fst
     let w = getHW botR topL |> snd
@@ -257,19 +255,9 @@ let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
     let newBotR = {X = max topL.X botR.X; Y = max topL.Y botR.Y}
     (newTopL, newBotR)
 
-///Transforms a map with a given transformation and centre (2 parameters)
-let mapTrans myMap transf param centre = 
-    myMap 
-    |> Map.toList 
-    |> List.map (fun (k, x) -> (transf k param centre, x))
-    |> Map.ofList
-
-///Transforms a map with a given transformation (1 parameter)
-let mapAlter myMap transf param = 
-    myMap 
-    |> Map.toList 
-    |> List.map (fun (k, x) -> (transf k param, x)) 
-    |> Map.ofList
+///Converts map to list, applies a function, and returns back a map/list
+let genMapList myMap func = myMap |> Map.toList |> func
+let genMap myMap func = genMapList myMap func |> Map.ofList
 
 ///Generic transformation function that takes in a transformation function, symbol and transformation
 ///It returns an updated symbol object
@@ -281,7 +269,7 @@ let trans func sym trans =
     { sym with
         TopL = fst newBox
         BotR = snd newBox
-        PortMap = mapTrans sym.PortMap func trans centre
+        PortMap = genMap sym.PortMap (List.map (fun (k, x) -> (func k trans centre, x)))
     }
 
 ///Finds the log base 2 of an int and rounds up to the nearest int
@@ -342,10 +330,6 @@ let triangleCoords (i : XYPos) (sym : Symbol) : string =
     let pos = midSymX sym
     (sprintf "%f,%f %f,%f %f,%f" pos (i.Y + RAD) (pos + (RAD * 2.)) i.Y pos (i.Y - RAD))
 
-///Returns a map with only positions that have Some port assigned to them
-let getUsedPorts (portMap : Map<XYPos, Portinfo Option>) : Map<XYPos, Portinfo Option> =
-    portMap |> Map.toList |> List.filter (fun (v, k) -> k <> None) |> Map.ofList
-
 ///Finds the extra ports required for each side based on the symbol type in the form (left, right, bot)
 let numExPorts (symType : SymbolType) (numIn : int) : (int * int * int) = 
     match symType with
@@ -370,9 +354,7 @@ let getPortMap (ins: Portinfo list) (leftPort : Portinfo list) (outs : Portinfo 
 
 ///Returns the <key, value> of a specific port in the portmap
 let findPort (sym: Symbol) (pId : CommonTypes.PortId) = 
-    sym.PortMap
-    |> Map.toList
-    |> List.find (fun (_, k) -> getPortId k  = pId)
+    genMapList sym.PortMap (List.find (fun (_, k) -> getPortId k  = pId))
 
 ///Swaps two values in a map
 let swapPort portMap k1 k2 v1 v2 =
@@ -382,9 +364,7 @@ let swapPort portMap k1 k2 v1 v2 =
 
 //Finds the port with position closest to a coordinate, and swap the map values of that port with a given port
 let swapMap (sym : Symbol) (coord : XYPos) port = 
-    sym.PortMap
-    |> Map.toList
-    |> List.map (fun (v, k) -> (absDiff coord v, (v, k)))
+    genMapList sym.PortMap (List.map (fun (v, k) -> (absDiff coord v, (v, k))))
     |> List.minBy fst
     |> snd
     |> function
@@ -422,8 +402,7 @@ let drawCircle (sym : Symbol) (i : XYPos) (fill : string) (stroke : string) (opa
         SVGAttr.StrokeWidth width]
 
 ///Returns the portmap as a list with only the ports in use: i.e. (key ,value) where v != None
-let mapSetup (sym : Symbol) = sym.PortMap |> getUsedPorts |> Map.toList
-
+let mapSetup (sym : Symbol) = genMapList sym.PortMap (List.filter (fun (_, k) -> k <> None))
 
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
@@ -433,7 +412,7 @@ let mapSetup (sym : Symbol) = sym.PortMap |> getUsedPorts |> Map.toList
 
 /// Creates Symbol.PortInfo object. 
 ///
-/// i : Index of the port (e.g. INPUT1 : i = 0).
+/// i : Index of the port (e.g. IN0 : i = 0).
 /// portType : the portType of the port (Input/Output).
 /// genPort :  the generic porttype used to create any extra ports/labels
 /// compId : the Id of the component associated with the port
@@ -575,7 +554,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 { sym with
                     TopL = posAdd sym.TopL translate
                     BotR = posAdd sym.BotR translate
-                    PortMap = mapAlter sym.PortMap posAdd translate
+                    PortMap = genMap sym.PortMap (List.map (fun (k, x) -> (posAdd k translate, x))) 
                 }
             else
                 sym
@@ -706,9 +685,7 @@ let private renderObj =
                 ]
             
             let drawInvert =
-                props.Obj.PortMap
-                |> Map.toList
-                |> List.filter(fun (_, k) -> isPortInverse k)
+                genMapList props.Obj.PortMap (List.filter(fun (_, k) -> isPortInverse k))
                 |> List.map(fun (i, _) -> drawCircle props.Obj i color "black" 1. 0.5[])
 
             let ports =
@@ -742,7 +719,6 @@ let view (model : Model) (dispatch : Msg -> unit) =
             }
     )
     |> ofList
-
 
 
 //---------------Helpers for interface functions--------------------//
@@ -794,7 +770,7 @@ let getPortIds (model : Model) (sId : CommonTypes.ComponentId) : CommonTypes.Por
     model
     |> List.tryFind (fun sym -> sym.Id = sId)
     |> function
-    | Some sym -> sym.PortMap |> Map.toList |> List.map (fun (_, k) -> getPortId k)
+    | Some sym -> genMapList sym.PortMap (List.map (fun (_, k) -> getPortId k))
     | None -> failwithf "Error in getPortIds, couldn't find symbol"
 
 let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int = 
