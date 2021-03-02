@@ -11,7 +11,7 @@ Symbol Advisor  - Sacha Ayoun - Email not piazza
     - HW_RATIO - Ratio of Height to Width for Symbol
     - RAD - Radius for inverters and port highlighting
 
-##TYPES:
+## TYPES:
     
     - Portinfo
         * Port                        - From CommonTypes
@@ -54,7 +54,7 @@ Symbol Advisor  - Sacha Ayoun - Email not piazza
 
 
 
-##CHANGELOG (For me)
+## CHANGELOG (For me)
 
 ### 24/02/21
    
