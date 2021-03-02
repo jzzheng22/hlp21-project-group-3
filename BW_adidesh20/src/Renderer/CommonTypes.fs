@@ -142,6 +142,9 @@ module CommonTypes
     /// inputs and outputs some times (e.g. in simulation)
 
     [<Erase>]
+    type PortId = | PortId of string
+
+    [<Erase>]
     type InputPortId      = | InputPortId of string
     /// SHA hash unique to a component port - common between JS and F#.
     /// Connection ports and connected component ports have the same port Id
