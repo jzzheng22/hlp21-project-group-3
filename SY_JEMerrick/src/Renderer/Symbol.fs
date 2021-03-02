@@ -155,7 +155,7 @@ let absDiff a b =
 ///
 ///For inverters call with positive n.
 ///For labels call with negative n.
-let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
+let displace (n : float) (pos : XYPos) (sym : Symbol) : XYPos =
     let x = 
         if pos.X = sym.TopL.X then (pos.X - n)
         elif pos.X = sym.BotR.X then (pos.X + n)
@@ -164,9 +164,7 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
         if pos.Y = sym.TopL.Y then (pos.Y - n)
         elif pos.Y = sym.BotR.Y then (pos.Y + n)
         else pos.Y
-    (x, y)
-let displaceNX (sym : Symbol) (i : XYPos) (n : float) : float = displace n i sym |> fst
-let displaceNY (sym : Symbol) (i : XYPos) (n : float) : float = displace n i sym |> snd
+    {X = x; Y = y}
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
@@ -381,8 +379,8 @@ let drawPolygon (points : string) (stroke : string) (fill : string) (width : flo
 
 let drawCircle (sym : Symbol) (i : XYPos) (fill : string) (stroke : string) (opac : float) (width : float) =
     circle[
-        Cx (displaceNX sym i 3.)
-        Cy (displaceNY sym i 3.)
+        Cx (displace 3. i sym).X
+        Cy (displace 3. i sym).Y
         R RAD
         SVGAttr.Fill fill
         SVGAttr.Stroke stroke
@@ -662,7 +660,7 @@ let private renderObj =
                 props.Obj
                 |> mapSetup
                 |> List.map(fun (i, k) ->
-                    (drawText (displaceNX props.Obj i -10.) (displaceNY props.Obj i -10.) "6px")[str <| sprintf "%s" (getPortName k)])
+                    (drawText (displace -10. i props.Obj).X (displace -10. i props.Obj).Y "6px")[str <| sprintf "%s" (getPortName k)])
 
             let wires : ReactElement list =
             //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
