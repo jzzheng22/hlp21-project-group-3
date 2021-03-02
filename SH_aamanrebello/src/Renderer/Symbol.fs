@@ -575,7 +575,7 @@ let init () =
     //4 logic gates
     List.allPairs [1..2] [1..2]
     |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 pos)) 
+    |> List.map (fun pos -> (CreateNewSymbol (CommonTypes.ComponentType.Demux2) 1 4 pos)) 
     , Cmd.none
 
 /// update function which displays symbols
