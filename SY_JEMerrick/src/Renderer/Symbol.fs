@@ -116,7 +116,6 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int * Sy
 
 ///Returns a tuple of float = (Height, Width) from two coordinates
 let getHW (botR : XYPos) (topL : XYPos) = (botR.Y - topL.Y, botR.X - topL.X)
-
 let getHWObj (sym : Symbol) = getHW sym.BotR sym.TopL
 
 ///Finds the midpoint of two coordinates
@@ -126,25 +125,21 @@ let midXY (botR : XYPos) (topL : XYPos) : XYPos =
     {X = midX; Y = midY}
 
 let midSym (sym : Symbol) : XYPos = midXY sym.BotR sym.TopL
-
 let midSymX (sym : Symbol) : float = (midSym sym).X 
-
 let midSymY (sym : Symbol) : float = (midSym sym).Y
 
 ///Adds a float value onto an XYPos
 let addXYVal (xy : XYPos) (n : float) : XYPos = {X = xy.X + n; Y = xy.Y + n}
 
 let posDiff a b = {X=a.X-b.X; Y=a.Y-b.Y}
-
 let posAdd a b = {X=a.X+b.X; Y=a.Y+b.Y}
-
 let posOf x y = {X=x;Y=y}
 
 let absDiff a b = 
     let diff = (posDiff a b)
     diff.X + diff.Y
 
-///Displace will move a port position _away_ from the box by n pixels.
+///displace will move a port position _away_ from the box by n pixels.
 ///
 ///For inverters call with positive n.
 ///For labels call with negative n.
@@ -387,15 +382,10 @@ let mapSetup (sym : Symbol) = genMapList sym.PortMap (List.filter (fun (_, k) ->
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
 
-
-
 /// Creates Symbol.PortInfo object. 
 ///
 /// i : Index of the port (e.g. IN0 : i = 0).
-/// portType : the portType of the port (Input/Output).
 /// genPort :  the generic porttype used to create any extra ports/labels
-/// compId : the Id of the component associated with the port
-/// compType : the type of component associated with the port - used to determine inverters
 /// w : the port width
 let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (genPort : GenericPort) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) (w : int) : Portinfo = 
     //Object creation
@@ -723,10 +713,11 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
 //---------------Helpers for interface functions--------------------//
 
-///An exhaustive search through the model, which returns the Portinfo object corresponding to an input string port ID
+///Initialises the model for a port search by converting every symbol to a list portmap
 let initPortSearch (symModel: Model) : (XYPos * Portinfo Option) list = 
     symModel |> List.collect ((fun x -> x.PortMap) >> (Map.toList))
 
+///Gets a portinfo object from the model where PortId = pId
 let getPortinfo (symModel: Model) (pId : CommonTypes.PortId) =
     initPortSearch symModel
     |> List.map (fun (_, k) -> (k, getPortId k))
