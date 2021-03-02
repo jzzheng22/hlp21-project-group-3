@@ -23,19 +23,12 @@ TYPES:
     Symbol
         TopL                        - The top left coordinate of the symbol
         BotR                        - The bottom right coordinate of the symbol
-        LastDragPos                 - The position where dragging last occured (DO WE NEED THIS ?)
-        IsDragging                  - A bool which = True if dragging 
         Id                          - The component ID associated with the symbol
         Type                        - The component type associated with the symbol
         Name                        - The label to be prtined for the symbol
         Highlight                   - A bool indicating which = True if the symbol should be highlighted
         PortHighlight               - A bool indicating which = True if the ports should be highlighted
         PortMap                     - A map of <XYPos, Portinfo Option> which will be None if no port is assigned to a particular position, and Some if there is a port assigned to a position
-        
-        =========== FOR DEMO ONLY - THIS WILL ACTUALLY BE DONE WITH MESSAGES =============
-        Rotation                    - An int indicating how much to rotate an object
-        Scale                       - An XYPos indicating the scaling in the X and Y directions for the object
-
 
 MESSAGES:
     Move                            - Moves list of symbols by a translation vector XYPos
@@ -43,11 +36,9 @@ MESSAGES:
     DeleteSymbol                    - Removes a symbol from the model based on ComponentID
     Highlight                       - Highlights symbols from a list of ComponentID, anything not in the list will be un-highlighted
     HighlightPorts                  - Highlights the symbol ports of a single ComponentID 
-    UpdateSymbolModelWithComponent  - TODO
-
     Scale                           - Scales a symbol by an XYPos indicating the scale in the x and y directions respectively
     Rotate                          - Rotates a symbol by an int indicating the number of degrees to rotate
-
+    UpdateSymbolModelWithComponent  - TODO
 
 INTERFACE FUNCTIONS:
     getPortCoords                   - Inputs(model, portId), Returns the XYPos of the portID
@@ -55,7 +46,10 @@ INTERFACE FUNCTIONS:
     getPortType                     - Takes a model and portID, Returns whether a port is input/output
     isPort                          - Takes a model, XYpos and returns Some(XYPos, PortID) if the position was on a port, or None otherwise
     getPortIds                      - Inputs(model, symbolID), returns list of portIDs
-
+    
+    As requested by Aditya for wire module:
+    getPortWidth                    - Inputs(model, portId), returns the width of that port
+    getHostId                       - Inputs(model, portId), returns the componentId associated with that port
 
 INTERFACE TO ISSIE
     TODO
