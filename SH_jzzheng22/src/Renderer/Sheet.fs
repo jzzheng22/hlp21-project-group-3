@@ -39,6 +39,11 @@ type Msg =
     | SelectDragEnd of XYPos
     | SelectDragging of XYPos
 
+type MouseOps =
+    | MouseDown
+    | MouseUp
+    | MouseMove
+
 let origin = { X = 0.; Y = 0. }
 
 let inBoundingBox point box =
@@ -58,17 +63,21 @@ let getID tuple =
     let id, _, _ = tuple
     id
 
-let getIDList mousePos lst =
+let getIDList predicate mousePos lst =
     lst
-    |> List.filter (inBoundingBox mousePos)
+    |> List.filter (predicate mousePos)
     |> List.map getID
 
+
+// TODO: CHANGE THIS TO USE DRAGGINGPOS INSTEAD? CHECK MESSAGE UPDATES TO SEE IF POSSIBLE
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
     let symbolIDList =
-        getIDList mousePos (Symbol.getBoundingBoxes model.Wire.Symbol mousePos)
+        Symbol.getBoundingBoxes model.Wire.Symbol mousePos
+        |> getIDList inBoundingBox mousePos
 
     let wireIDList =
-        getIDList mousePos (BusWire.getBoundingBoxes model.Wire mousePos)
+        BusWire.getBoundingBoxes model.Wire mousePos
+        |> getIDList inBoundingBox mousePos
 
     dispatch <| SelectComponents symbolIDList
     dispatch <| Symbol(Symbol.Highlight symbolIDList)
@@ -76,6 +85,7 @@ let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
     dispatch <| Wire(BusWire.HighlightWires wireIDList)
     dispatch <| SelectDragStart mousePos
 
+//CHANGE TO CALL INBOUNDINGBOX FOR EACH CORNER
 let boxInSelectedArea startPos endPos box =
     let minX = min startPos.X endPos.X
     let minY = min startPos.Y endPos.Y
@@ -94,6 +104,8 @@ let boxInSelectedArea startPos endPos box =
         && minY <= topY
         && maxY >= botY
 
+
+//TODO: REFACTOR THIS TO USE SINGLE FUNCTION IN ALL CODE
 let dragSelectElements (model: Model) (dispatch: Dispatch<Msg>) =
     let symbolIDList =
         Symbol.getBoundingBoxes model.Wire.Symbol model.DraggingPos
@@ -142,13 +154,78 @@ let drawPortConnectionLine model =
                        StrokeDasharray "5,5"
                    FillOpacity 0.1 ] ] []
 
+let mouseDown model mousePos dispatch = 
+    match Symbol.isPort model.Wire.Symbol mousePos with
+    | Some (_, portId) -> dispatch <| SelectPort portId
+    | None ->
+        if boxInSelectedArea model.DragStartPos model.DraggingPos ((), mousePos, mousePos) then
+            ()
+        else
+            selectElements model mousePos dispatch
+
+    dispatch <| SelectDragStart mousePos
+
+let mouseUp model mousePos dispatch = 
+    dispatch <| SelectDragging mousePos
+
+    match Symbol.isPort model.Wire.Symbol model.DraggingPos with
+    | Some (_, endPoint) ->
+        let startPort =
+            match model.SelectedPort with
+            | Some a -> a
+            | None -> failwithf "Error: tried to create port connection without starting port"
+
+        dispatch <| Wire(BusWire.AddWire(startPort, endPoint))
+    | None -> ()
+
+    if model.SelectingMultiple then
+        dragSelectElements model dispatch
+
+    dispatch <| SelectDragEnd mousePos
+
+let mouseMove model mousePos dispatch mDown = 
+    let symbolIDList =
+        Symbol.getBoundingBoxes model.Wire.Symbol mousePos
+        |> List.filter (inBoundingBox mousePos)
+        |> List.map getID
+
+    dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
+
+    if mDown then // Drag
+        dispatch <| SelectDragging mousePos
+
+        match model.SelectedPort with
+        | Some _ -> ()
+        | None ->
+            let transVector =
+                { X = mousePos.X - model.DraggingPos.X
+                  Y = mousePos.Y - model.DraggingPos.Y }
+
+            if not (List.isEmpty model.SelectedComponents) then
+                dispatch <| Symbol(Symbol.Move(model.SelectedComponents, transVector))
+            else if not (List.isEmpty model.SelectedWires) then
+                dispatch <| Wire(BusWire.MoveWires(model.SelectedWires, transVector))
+            else
+                dispatch <| SelectMultiple mousePos
+
+let mDown (ev: Types.MouseEvent) = ev.buttons <> 0.
+
+let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (dispatch: Dispatch<Msg>) =
+    let coordX = ev.clientX / model.Zoom
+    let coordY = ev.clientY / model.Zoom
+    let mousePos = { X = coordX; Y = coordY }
+    match mouseOp with
+    | MouseDown -> mouseDown model mousePos dispatch
+    | MouseUp -> mouseUp model mousePos dispatch
+    | MouseMove -> 
+        mouseMove model mousePos dispatch (mDown ev)
+
 /// This function zooms an SVG canvas by transforming its content and altering its size.
 /// Currently the zoom expands based on top left corner. Better would be to collect dimensions
 /// current scroll position, and chnage scroll position to keep centre of screen a fixed point.
 let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispatch<Msg>) =
     let sizeInPixels = sprintf "%.2fpx" ((1000. * model.Zoom))
     /// Is the mouse button currently down?
-    let mDown (ev: Types.MouseEvent) = ev.buttons <> 0.
 
     div [ Style [ Height "100vh"
                   MaxWidth "100vw"
@@ -156,69 +233,15 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                   CSSProp.OverflowY OverflowOptions.Auto ]
           OnMouseDown
               (fun ev ->
-                  let coordX = ev.clientX / model.Zoom
-                  let coordY = ev.clientY / model.Zoom
-                  let mousePos = { X = coordX; Y = coordY }
+                  handleMouseOps MouseDown model ev dispatch)
 
-                  match Symbol.isPort model.Wire.Symbol mousePos with
-                  | Some (_, portId) -> dispatch <| SelectPort portId
-                  | None ->
-                      if boxInSelectedArea model.DragStartPos model.DraggingPos ((), mousePos, mousePos) then
-                          ()
-                      else
-                          selectElements model mousePos dispatch
-
-                  dispatch <| SelectDragStart mousePos)
-          OnMouseMove
-              (fun ev ->
-                  let coordX = ev.clientX / model.Zoom
-                  let coordY = ev.clientY / model.Zoom
-                  let mousePos = { X = coordX; Y = coordY }
-
-                  let symbolIDList =
-                      Symbol.getBoundingBoxes model.Wire.Symbol mousePos
-                      |> List.filter (inBoundingBox mousePos)
-                      |> List.map getID
-
-                  dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
-
-                  if mDown ev then // Drag
-                      dispatch <| SelectDragging mousePos
-
-                      match model.SelectedPort with
-                      | Some _ -> ()
-                      | None ->
-                          let transVector =
-                              { X = coordX - model.DraggingPos.X
-                                Y = coordY - model.DraggingPos.Y }
-
-                          if not (List.isEmpty model.SelectedComponents) then
-                              dispatch <| Symbol(Symbol.Move(model.SelectedComponents, transVector))
-                          else if not (List.isEmpty model.SelectedWires) then
-                              dispatch <| Wire(BusWire.MoveWires(model.SelectedWires, transVector))
-                          else
-                              dispatch <| SelectMultiple mousePos)
           OnMouseUp
               (fun ev ->
-                  let coordX = ev.clientX / model.Zoom
-                  let coordY = ev.clientY / model.Zoom
-                  let mousePos = { X = coordX; Y = coordY }
-                  dispatch <| SelectDragging mousePos
+                  handleMouseOps MouseUp model ev dispatch)
+          OnMouseMove
+              (fun ev ->
+                  handleMouseOps MouseMove model ev dispatch)] [
 
-                  match Symbol.isPort model.Wire.Symbol model.DraggingPos with
-                  | Some (_, endPoint) ->
-                      let startPort =
-                          match model.SelectedPort with
-                          | Some a -> a
-                          | None -> failwithf "Error: tried to create port connection without starting port"
-
-                      dispatch <| Wire(BusWire.AddWire(startPort, endPoint))
-                  | None -> ()
-
-                  if model.SelectingMultiple then
-                      dragSelectElements model dispatch
-
-                  dispatch <| SelectDragEnd mousePos) ] [
         svg [ Style [ Border "3px solid green"
                       Height sizeInPixels
                       Width sizeInPixels ] ] [
