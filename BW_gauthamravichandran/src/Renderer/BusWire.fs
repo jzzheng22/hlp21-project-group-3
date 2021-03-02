@@ -310,7 +310,11 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     | AddWire (srcPort, tarPort) ->
         let w= makeWire srcPort tarPort model.Symbol
         {model with WX=w::model.WX}, Cmd.none
-    | DeleteWires _ -> failwithf "Not implemented"
+    | DeleteWires wIdList -> 
+        let wList =
+            model.WX
+            |> List.filter (fun w -> List.contains w.Id wIdList = false)
+        {model with WX = wList}, Cmd.none
     | HighlightWires wIdList -> 
 
         let wList =
