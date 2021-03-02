@@ -57,6 +57,7 @@ These are called by adidesh20's BusWire and implemented in JEMerrick's Symbol:
  - compType: type of component.
  - pagePos: location on canvas.
  - numIn: number of input ports.
+    - This number does not include any enable or clock signals
  - numOut: number of output ports.
  - Properties like "inputPortList", "outputPortList", "highlighted", "Id", "boundingBoxCoordinates" (XYPos * XYPos) can be set up and calculated by Symbol in addition to what is provided.
  - Initial position of symbol:

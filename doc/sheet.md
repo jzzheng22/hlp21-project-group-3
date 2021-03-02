@@ -61,6 +61,7 @@ Sheet can also access Symbol directly if needed.
  - compType: type of component.
  - pagePos: location on canvas.
  - numIn: number of input ports.
+    - This number does not include any enable or clock signals
  - numOut: number of output ports.
 
 `Delete of CommonTypes.ComponentId list`
