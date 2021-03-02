@@ -12,14 +12,14 @@ Has list of BusWires and list of Symbols
 
 Wires should be selectable: should do autorouting initially but be selectable and moveable in end product
 
-Might want to add in portID and symbolID and wireID as types instead of strings for type safety.
+Might want to add in portID and symbolID and wireID as types instead of strings for type safety. **UPDATE:** We (group 3) have chosen to use CommonTypes.ComponentId, CommonTypes.ConnectionId, CommonTypes.PortId as types for Ids of symbols, wires and ports respectively. 
 
 
 ## Interface Functions
 
 `BusWire.getBoundingBoxes (mouseCoord: XYPos) (model : Model)`
  - Returns list containing IDs, and bounding box coords of wires
- - `(id: string * topleft: XYPos * bottomright: XYPos)`
+ - `(id: CommonTypes.ComponentId * topleft: XYPos * bottomright: XYPos)`
  - Initially just return all wires
 
  - Returns a flat list
