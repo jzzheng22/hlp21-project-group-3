@@ -148,6 +148,7 @@ let mouseDown model mousePos dispatch =
     
 
 let mouseUp model mousePos dispatch = 
+    printf "on mouse up"
     match validConnection model with
     | Some endPort ->
         match model.SelectedPort with
@@ -164,6 +165,7 @@ let increaseBoundingBox (a, topL, botR) =
     a, {X = topL.X - 10.; Y = topL.Y - 10.}, {X = botR.X + 10.; Y = botR.Y + 10.}
 
 let mouseMove model mousePos dispatch mDown = 
+    // printf "on mouse move"
     let symbolIDList =
         Symbol.getBoundingBoxes model.Wire.Symbol mousePos
         |> List.map increaseBoundingBox
@@ -172,6 +174,7 @@ let mouseMove model mousePos dispatch mDown =
     dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
 
     if mDown then // Drag
+        // printf "on mouse drag"
         // if not model.SelectingMultiple then
         //     dispatch <| SelectDragStart mousePos
         // else 
@@ -271,6 +274,9 @@ let moveElements model mousePos =
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
     else if not (List.isEmpty model.SelectedWires) then
+        printf "Demo: Send BusWire.MoveWires"
+        printf "%A" model.SelectedWires
+        printf "%A" transVector
         let wModel, wCmd = BusWire.update (BusWire.MoveWires(model.SelectedWires, transVector)) newModel.Wire
         {model with Wire = wModel}, Cmd.map Wire wCmd
 
