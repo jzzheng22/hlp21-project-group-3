@@ -6,11 +6,50 @@ open Elmish
 open Elmish.React
 open Helpers
 
+
+//interface functions are at the very bottom 
+
+
+
 //------------------------------------------------------------------------//
 //-------------------------------Symbol Types-----------------------------//
 //------------------------------------------------------------------------//
+type PortLocal =
+    {
 
+        Port: CommonTypes.Port
+        Pos: XYPos
+        Height: float
+        Width: float
+        Inverted: bool
+        Name: string
+        Highlight: bool
+        Wirewidth : int
+    }
 
+//global types
+let portGap = float 30
+let portVerticalOffset = int 40
+let symbolwidth =  float 200
+let portHeight = float 15
+let portWidth = float 15
+
+type EnablePort =
+    {
+        Pos: XYPos
+        Height:float
+        Width:float
+        Name:string
+        Highlight : bool
+        HostId :string
+        Id :string
+    }
+
+type ExtendedPortType =
+    |In 
+    |Out 
+    |En
+    
 /// Model to generate one symbol (skeleton). Id is a unique Id 
 /// for the symbol shared with Issie Component type.
 /// The real type will obviously be much larger.
@@ -24,6 +63,14 @@ type Symbol =
         LastDragPos : XYPos
         IsDragging : bool
         Id : CommonTypes.ComponentId
+        H: float
+        W: float
+        Inputport: PortLocal list
+        Outputport : PortLocal list
+        Name: string
+        Highlight: bool
+        HighlightAllPorts : bool
+        //EnablePort: EnablePort option
     }
 
 
@@ -45,7 +92,15 @@ type Msg =
     | EndDragging of sId : CommonTypes.ComponentId
     | AddCircle of XYPos // used by demo code to add a circle
     | DeleteSymbol of sId:CommonTypes.ComponentId 
-    | UpdateSymbolModelWithComponent of CommonTypes.Component // Issie interface
+    | UpdateSymbolModelWithComponent of CommonTypes.Component 
+    |Add of symbolInfo: CommonTypes.ComponentType * pos : XYPos * inputLength : int * outputLength : int
+    |Delete of sIdList : CommonTypes.ComponentId list
+    |Move of sIDListAndPos : CommonTypes.ComponentId list * Pos : XYPos
+    | Highlight of symbolIdList: CommonTypes.ComponentId list
+    | HighlightPorts of symbolIdList : CommonTypes.ComponentId list
+    | HighlightSinglePort of portId : string
+  //  | AddSymbol (SymbolType, Pos, input, output) ->
+    //    (CreateNewSymbol SYmbolType Pos inputLength outputLength) :: model, Cmd.none// Issie interface
 
 
 //---------------------------------helper types and functions----------------//
@@ -60,10 +115,37 @@ let posAdd a b =
 
 let posOf x y = {X=x;Y=y}
 
+let addPos (pos:XYPos) (translation:XYPos) : XYPos =
+    {
+        X = pos.X + translation.X;
+        Y = pos.Y + translation.Y
+    }
 
 //-----------------------------Skeleton Model Type for symbols----------------//
 
 
+//interface helper function
+let isPortinSymbol (portId:CommonTypes.PortId) (symbol: Symbol) = 
+    List.append symbol.Inputport symbol.Outputport
+    |> List.tryFind (fun port -> port.Port.Id = string(portId))
+    |> function
+    | Some p -> true
+    | None ->  false
+
+let findPortFromModel (model:Model) (portId:CommonTypes.PortId) :PortLocal =
+    model
+    |> List.tryFind (fun (symbol: Symbol) -> isPortinSymbol portId symbol)
+    |> function
+    |Some symbol -> List.append symbol.Inputport symbol.Outputport
+                    |> List.find (fun port -> port.Port.Id = string portId)              
+    |None -> failwithf "error: no port with ID: %s found" (string portId)
+
+let isWithinBox (topLeftCoord:XYPos) (H:float) (W:float) (searchCoord:XYPos) =
+    let cond1 = searchCoord.X > topLeftCoord.X
+    let cond2 = searchCoord.X < topLeftCoord.X + W
+    let cond3 = searchCoord.Y >  topLeftCoord.Y
+    let cond4 = searchCoord.Y <  topLeftCoord.Y + H
+    cond1 && cond2 && cond3 && cond4
 
 
 //-----------------------Skeleton Message type for symbols---------------------//
@@ -71,29 +153,142 @@ let posOf x y = {X=x;Y=y}
 /// Symbol creation: a unique Id is given to the symbol, found from uuid.
 /// The parameters of this function must be enough to specify the symbol completely
 /// in its initial form. This is called by the AddSymbol message and need not be exposed.
-let createNewSymbol (pos:XYPos) =
+let createNewSymbol (symbolType:CommonTypes.ComponentType) (pos:XYPos) (inputLength: int) (outputLength: int) : Symbol =
+
+    let symboliD = CommonTypes.ComponentId (Helpers.uuid())
+    let name = 
+        match symbolType with
+        |CommonTypes.ComponentType.And -> "And"
+        |CommonTypes.ComponentType.Not -> "Not"
+        |CommonTypes.ComponentType.Mux2 -> "Mux2"
+        |CommonTypes.ComponentType.AsyncROM a -> "AsyncRom"
+        |CommonTypes.ComponentType.BusSelection (a,b) ->"BusSelection"
+       // |CommonTypes.ComponentType.Circle -> "Circle"
+        |CommonTypes.ComponentType.Constant (a,b) ->"Constant"
+        |CommonTypes.ComponentType.Decode4 -> "Decode4"
+        |CommonTypes.ComponentType.Demux2 -> "Demux2"
+        |CommonTypes.ComponentType.DFF -> "DFF"
+        |CommonTypes.ComponentType.DFFE -> "DFFE"
+        |CommonTypes.ComponentType.Input i ->"Input"
+        |CommonTypes.ComponentType.IOLabel -> "IO Label" //what is this
+        |CommonTypes.ComponentType.MergeWires -> "Merge Wires"
+        |CommonTypes.ComponentType.Nand -> "Nand"
+        |CommonTypes.ComponentType.NbitsAdder i -> "%i Bit Adder" 
+        |CommonTypes.ComponentType.Nor -> "Nor"
+        |CommonTypes.ComponentType.Or -> "Or"
+        |CommonTypes.ComponentType.Output i ->"Output"
+        |CommonTypes.ComponentType.RAM m -> "RAM"
+        |CommonTypes.ComponentType.Register i -> "Register"
+        |CommonTypes.ComponentType.RegisterE i -> "RegisterE"
+        |CommonTypes.ComponentType.ROM m -> "ROM"
+        |CommonTypes.ComponentType.SplitWire i -> "SplitWire"
+        |CommonTypes.ComponentType.Xnor -> "XNOR"
+        |CommonTypes.ComponentType.Xor -> "XOR"
+        |CommonTypes.ComponentType.Custom c-> "Custom"
+        
+    
+    let ifInverter =  
+        match symbolType with   
+        |CommonTypes.ComponentType.Nand -> true
+        |CommonTypes.ComponentType.Nor -> true
+        |CommonTypes.ComponentType.Not -> true
+        |CommonTypes.ComponentType.Xnor -> true
+        |_ -> false
+
+    
+       
+    let createPort  (portT: CommonTypes.PortType) (extendedport: ExtendedPortType)  (index:int): PortLocal =
+
+        let px =if portT = CommonTypes.PortType.Input then 
+                    pos.X
+                   
+                else
+                    pos.X + symbolwidth
+
+        let invert =if portT = CommonTypes.PortType.Input then 
+                        false
+                    else
+                        ifInverter
+        
+        {
+            Height = portHeight
+            Width = portWidth
+            Inverted = invert
+            Pos = {X=px ;Y= pos.Y + 40.0 + (float(index) * portGap)}
+            Name = match extendedport with
+                    |In -> sprintf "In %i" index
+                    |Out -> sprintf "Out %i" index
+                    |En -> sprintf "En" 
+                    
+                    
+            Port = {
+                Id = Helpers.uuid();
+                PortNumber = Some index
+                PortType = portT
+                HostId = string(symboliD)
+            }
+            Highlight = false
+            Wirewidth = 1
+        }
+    
+    let createPortList (portSize:int) (portType:CommonTypes.PortType) (extendedport:ExtendedPortType) = 
+        [0..portSize-1]
+        |>List.map (createPort portType extendedport)
+    
+    let inputList =createPortList inputLength CommonTypes.PortType.Input ExtendedPortType.In
+    let outputList =createPortList outputLength CommonTypes.PortType.Output ExtendedPortType.Out
+    let createHightFromPortLength = (portVerticalOffset) + ( int portGap * List.max [inputList.Length; outputList.Length] )
+    let height = float createHightFromPortLength
+
+    let createEnablePort: EnablePort =
+        {
+            Pos = {X=pos.X + (symbolwidth/2.0) ;Y= pos.Y + height }
+            Height = portHeight
+            Width = portWidth
+            Name = "En"
+            Highlight = false
+            HostId = string(symboliD)
+            Id = Helpers.uuid();
+
+        }        
+    
+
+    let ifEnable =
+            match symbolType with
+            |CommonTypes.ComponentType.DFFE -> Some (createEnablePort)
+            |CommonTypes.ComponentType.RegisterE i -> Some (createEnablePort)
+            |_ -> None
     {
-        Pos = pos
+        Pos = pos 
         LastDragPos = {X=0. ; Y=0.} // initial value can always be this
         IsDragging = false // initial value can always be this
-        Id = CommonTypes.ComponentId (Helpers.uuid()) // create a unique id for this symbol
+        Id = symboliD// create a unique id for this symbol
+        H = height
+        W = symbolwidth
+        Inputport = inputList
+        Outputport = outputList
+        Name = name
+        Highlight = false
+        HighlightAllPorts = false
+        //EnablePort = ifEnable
     }
 
 
 /// Dummy function for test. The real init would probably have no symbols.
 let init () =
-    List.allPairs [1..14] [1..14]
-    |> List.map (fun (x,y) -> {X = float (x*64+30); Y=float (y*64+30)})
-    |> List.map createNewSymbol
+    
+    [(createNewSymbol CommonTypes.ComponentType.And {X=0.;Y=0.} 3 4 );
+      (createNewSymbol CommonTypes.ComponentType.And {X=100.;Y=100.} 3 4 )]
+    
     , Cmd.none
-
+    
 /// update function which displays symbols
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     match msg with
-    | AddCircle pos -> 
-        createNewSymbol pos :: model, Cmd.none
-    | DeleteSymbol sId -> 
-        List.filter (fun sym -> sym.Id <> sId) model, Cmd.none
+    | Add  (symbolType, pos,inputLength ,outputLength)  -> 
+        createNewSymbol symbolType pos inputLength outputLength :: model, Cmd.none
+    | Delete sIdList -> 
+        List.filter (fun symbol -> List.contains symbol.Id sIdList = false) model, Cmd.none
     | StartDragging (sId, pagePos) ->
         model
         |> List.map (fun sym ->
@@ -132,8 +327,71 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 }
         )
         , Cmd.none
-    | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
-    | _ -> failwithf "Not implemented"
+
+    |Move (sIDList, translation) ->
+        model
+        |> List.map (fun symbol ->
+            if List.contains symbol.Id sIDList then
+                { symbol with
+                    Pos = addPos symbol.Pos translation
+                    
+                    Inputport = List.map (fun port -> {port with Pos = (addPos port.Pos translation) } ) symbol.Inputport
+                    Outputport = List.map (fun port -> {port with Pos = (addPos port.Pos translation) } ) symbol.Outputport
+                    //printfn "moveX %A movey " Pos
+                }
+            else
+                symbol
+        )
+        , Cmd.none
+
+    | Highlight symbolIdList ->
+        model
+        |> List.map (fun symbol ->
+            if List.contains symbol.Id symbolIdList then 
+                { symbol with
+                    Highlight = true
+                }
+            else
+                { symbol with
+                    Highlight = false 
+                }
+        )
+        , Cmd.none
+
+    | HighlightPorts symbolIdList ->
+        model
+        |> List.map (fun symbol ->
+            if List.contains symbol.Id  symbolIdList then 
+                { symbol with
+                    HighlightAllPorts = true
+                }
+            else
+                { symbol with
+                    HighlightAllPorts= false 
+                }
+        )
+        , Cmd.none
+(*
+    | HighlightSinglePort portID ->
+        model
+        |> List.map (fun symbol ->
+            let result =List.append symbol.Inputport symbol.Outputport
+                        |> List.map (fun port -> port.Port.Id )
+            if List.contains portID result  then 
+                { symbol with
+                    if 
+                }
+            else
+                { symbol with
+                    HighlightAllPorts= false 
+                }
+        )
+        , Cmd.none
+*)
+
+
+   // | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
+    //| _ -> failwithf "Not implemented"
 
 //----------------------------View Function for Symbols----------------------------//
 
@@ -145,6 +403,14 @@ type private RenderCircleProps =
         Dispatch : Dispatch<Msg>
         key: string // special field used by react to detect whether lists have changed, set to symbol Id
     }
+
+type private RenderSymbolProps =
+    {
+        Symbol: Symbol // name works for the demo!
+        Dispatch : Dispatch<Msg>
+        key: string // special field used by react to detect whether lists have changed, set to symbol Id
+    }
+
 
 /// View for one symbol with caching for efficient execution when input does not change
 let private renderCircle =
@@ -180,7 +446,7 @@ let private renderCircle =
                     )
                     Cx props.Circle.Pos.X
                     Cy props.Circle.Pos.Y
-                    R 20.
+                    R 0.
                     SVGAttr.Fill color
                     SVGAttr.Stroke color
                     SVGAttr.StrokeWidth 1
@@ -190,7 +456,244 @@ let private renderCircle =
     , equalsButFunctions
     )
 
+let private renderSymbol =
+    FunctionComponent.Of(
+        
+        fun (props : RenderSymbolProps) ->
+            let handleMouseMove =
+                Hooks.useRef(fun (ev : Types.Event) ->
+                    let ev = ev :?> Types.MouseEvent
+                    // x,y coordinates here do not compensate for transform in Sheet
+                    // and are wrong unless zoom=1.0 MouseMsg coordinates are correctly compensated.
+                    Dragging(props.Symbol.Id, posOf ev.pageX ev.pageY)
+                    |> props.Dispatch
+                )
+
+            let boxcolor =
+                if props.Symbol.Highlight then
+                    "red"
+                else
+                    "grey"
+
+            let fX = props.Symbol.Pos.X
+            let fY = props.Symbol.Pos.Y
+            let bWidth = props.Symbol.W
+            let bHeight = props.Symbol.H
+            let outputPortSize = props.Symbol.Outputport.Length
+            let inputPortSize = props.Symbol.Inputport.Length
+            let scaleFactor=1.0 // to demonstrate svg scaling
+            let rotation=0 // to demonstrate svg rotation (in degrees)
+          
+
+            let makeBoxCoordinates (xCoord: float) (yCoord: float) (height:float) (width:float) = 
+                let (x1,y1) = (xCoord,yCoord)
+                let (x2,y2) = (xCoord+width,yCoord)
+                let (x3,y3) = (xCoord+width,yCoord+height)
+                let (x4,y4) = (xCoord,yCoord+height)
+                string(x1)+","+string(y1)+" "+string(x2)+","+string(y2)+" "+string(x3)+","+string(y3)+" "+string(x4)+","+string(y4)
+        
+            let boxCoordinates = makeBoxCoordinates fX fY (float bHeight) (float bWidth)
+
+            
+
+            let makeBox : ReactElement list =
+                let strokecolour =if props.Symbol.HighlightAllPorts then
+                                    "green"
+                                  else
+                                    "black"
+                [
+                    polygon[
+                        SVGAttr.Points boxCoordinates
+                        SVGAttr.StrokeWidth "3px"
+                        SVGAttr.Stroke strokecolour
+                        SVGAttr.FillOpacity 0.2
+                        SVGAttr.Fill boxcolor
+                    ][]
+                    
+                    text [ // Bus Decode Text
+                        X (fX + ((float bWidth)/2.0)); 
+                        Y (fY + 5.0); 
+                        Style [
+                            TextAnchor "middle" // left/right/middle: horizontal algnment vs (X,Y)
+                            DominantBaseline "hanging" // auto/middle/hanging: vertical alignment vs (X,Y)
+                            FontSize "25px"
+                            FontWeight "Bold"
+                            Fill strokecolour // demo font color
+                        ]
+                    ] [str <| sprintf "%s" props.Symbol.Name]
+
+                ]
+
+            (*
+            let drawEnablePortCircle  =
+                let portoption = props.Symbol.EnablePort
+                let draw (port:EnablePort) :ReactElement list =
+                    let (x1,y1) = ( port.Pos.X - (port.Width/2.0) , port.Pos.Y - ( port.Height / 2.0) )
+                    let (x2,y2) = (port.Pos.X + (port.Width/2.0) , port.Pos.Y - ( port.Height / 2.0))
+                    let (x3,y3) = (port.Pos.X - (port.Width/2.0) , port.Pos.Y )
+                    let (x4,y4) = (port.Pos.X + (port.Width/2.0) , port.Pos.Y)
+                    let coordstring =string(x1)+","+string(y1)+" "+string(x2)+","+string(y2)+" "+string(x3)+","+string(y3)+" "+string(x4)+","+string(y4)
+                    
+                    [
+                    circle[
+                        Cx port.Pos.X
+                        Cy (port.Pos.Y - port.Height/2.0)
+                        R (port.Height/2.0)
+                        SVGAttr.Fill "White"
+                        SVGAttr.Stroke "Black"
+                        SVGAttr.Opacity 1
+                        SVGAttr.StrokeWidth "2px"][]
+                    
+
+                    text [ // Bus Decode Text
+                        let fontSize = 10.0
+                        
+
+                        X (port.Pos.X); 
+                        Y (port.Pos.Y - port.Height - 20.0 - fontSize/2.0); 
+                        Style [
+                            TextAnchor "middle" // left/right/middle: horizontal algnment vs (X,Y)
+                            DominantBaseline "middle" // auto/middle/hanging: vertical alignment vs (X,Y)
+                            FontSize (string fontSize)
+                            FontWeight "Bold"
+                            Fill "Black" // demo font color
+                        ]
+                    ] [str <| sprintf "%s" port.Name]
+                    ]
+
+                match portoption with   
+                |Some port -> draw port
+                |None ->[]: ReactElement List        
+
+            let drawEnablePort  =
+                let portoption = props.Symbol.EnablePort
+                let draw (port:EnablePort) =
+                    let (x1,y1) = ( port.Pos.X - (port.Width/2.0) , port.Pos.Y - ( port.Height / 2.0) )
+                    let (x2,y2) = (port.Pos.X + (port.Width/2.0) , port.Pos.Y - ( port.Height / 2.0))
+                    let (x3,y3) = (port.Pos.X - (port.Width/2.0) , port.Pos.Y )
+                    let (x4,y4) = (port.Pos.X + (port.Width/2.0) , port.Pos.Y)
+                    let coordstring =string(x1)+","+string(y1)+" "+string(x2)+","+string(y2)+" "+string(x3)+","+string(y3)+" "+string(x4)+","+string(y4)
+                    
+                    [
+                    polygon[
+                        SVGAttr.Points coordstring
+                        SVGAttr.StrokeWidth "1px"
+                        SVGAttr.Stroke "Black"
+                        SVGAttr.FillOpacity 1
+                        SVGAttr.Fill "White"
+                    ][]
+
+                    text [ // Bus Decode Text
+                        let fontSize = 10.0
+                        
+
+                        X (port.Pos.X); 
+                        Y (port.Pos.Y - port.Height - 20.0 - fontSize/2.0); 
+                        Style [
+                            TextAnchor "middle" // left/right/middle: horizontal algnment vs (X,Y)
+                            DominantBaseline "middle" // auto/middle/hanging: vertical alignment vs (X,Y)
+                            FontSize (string fontSize)
+                            FontWeight "Bold"
+                            Fill "Black" // demo font color
+                        ]
+                    ] [str <| sprintf "%s" port.Name]
+                ]
+
+                match portoption with   
+                |Some port -> draw port
+                |None ->[]: ReactElement List
+*)
+
+
+            
+
+            let drawport (port:PortLocal)  =
+                let x = if port.Port.PortType = CommonTypes.PortType.Input then
+                            port.Pos.X
+                        else
+                            port.Pos.X - port.Width
+                let strokecolour =if props.Symbol.HighlightAllPorts then
+                                    "red"
+                                  else if port.Highlight  then
+                                    "green"
+                                  else
+                                    "black"
+
+
+                let (x1,y1) = ( x, port.Pos.Y - ( port.Height / 2.0) )
+                let (x2,y2) = (x +  port.Width ,port.Pos.Y - ( port.Height / 2.0))
+                let (x3,y3) = (x + float port.Width ,port.Pos.Y + (port.Height / 2.0))
+                let (x4,y4) = ( x , port.Pos.Y + (port.Height / 2.0) )
+                
+                let coordstring = string(x1)+","+string(y1)+" "+string(x2)+","+string(y2)+" "+string(x3)+","+string(y3)+" "+string(x4)+","+string(y4) 
+                
+                let colour = if port.Inverted  then
+                                "Black"
+                             else 
+                                "White"
+                
+                [
+                    polygon[
+                        SVGAttr.Points coordstring
+                        SVGAttr.StrokeWidth "3px"
+                        SVGAttr.Stroke strokecolour
+                        SVGAttr.FillOpacity 1
+                        SVGAttr.Fill colour
+                    ][]
+
+                    text [ // Bus Decode Text
+                        let fontSize = 10
+                        let textXPos =  if port.Port.PortType = CommonTypes.PortType.Input then
+                                            port.Pos.X + port.Width + float 2.0
+                                        else
+                                           port.Pos.X + port.Width - float fontSize - (float fontSize * float port.Name.Length) 
+
+                        X (textXPos); 
+                        Y (port.Pos.Y); 
+                        Style [
+                            TextAnchor "right" // left/right/middle: horizontal algnment vs (X,Y)
+                            DominantBaseline "middle" // auto/middle/hanging: vertical alignment vs (X,Y)
+                            FontSize (string fontSize)
+                            FontWeight "Bold"
+                            Fill "Black" // demo font color
+                        ]
+                    ] [str <| sprintf "%s" port.Name]
+                ]
+
+            let portlistDraw = 
+                List.append props.Symbol.Outputport props.Symbol.Inputport
+                |> List.map drawport
+
+            let all =  
+                List.concat portlistDraw 
+                |> List.append makeBox
+                //|> List.append drawEnablePortCircle
+            //printfn "where it thinks x:%A y:%A h:%A w:%A" props.Symbol.Pos.X props.Symbol.Pos.Y props.Symbol.H props.Symbol.W
+            //printfn "draw %A" boxCoordinates
+
+            g   [ Style [ 
+                    // the transform here does rotation, scaling, and translation
+                    // the rotation and scaling happens with TransformOrigin as fixed point first
+                    //TransformOrigin "0px 50px" // so that rotation is around centre of line
+                    //Transform (sprintf "translate(%fpx,%fpx) rotate(%ddeg) scale(%f) " fX fY rotation scaleFactor )
+                    ]
+                
+                ]  // g optional attributes in first list
+                // use g svg element (SVG equivalent of div) to group any number of ReactElements into one.
+                // use transform with scale and/or translate and/or rotate to transform group
+                
+                all
+        
+    )     
+
+
+
+
+
+
 /// View function for symbol layer of SVG
+
+(*
 let view (model : Model) (dispatch : Msg -> unit) = 
     model
     |> List.map (fun ({Id = CommonTypes.ComponentId id} as circle) ->
@@ -202,7 +705,19 @@ let view (model : Model) (dispatch : Msg -> unit) =
             }
     )
     |> ofList
+*)
 
+let view (model : Model) (dispatch : Msg -> unit) = 
+    model
+    |> List.map (fun ({Id = CommonTypes.ComponentId id} as shape) ->
+        renderSymbol
+            {
+                Symbol = shape
+                Dispatch = dispatch
+                key = id
+            }
+    )
+    |> ofList
 
 //---------------Other interface functions--------------------//
 
@@ -235,3 +750,78 @@ let extractComponent
 
 let extractComponents (symModel: Model) : CommonTypes.Component list = 
     failwithf "Not implemented"
+
+
+
+        
+   
+    
+
+
+
+//interface function
+
+let getBoundingBoxes  (model : Model) (mouseCoord: XYPos) : (CommonTypes.ComponentId * XYPos * XYPos) list =
+    model
+    |>List.map (fun symbol -> (symbol.Id, symbol.Pos, {X= symbol.Pos.X + symbol.W; Y = symbol.Pos.Y+symbol.H} ) )
+
+
+let getPortType  (model : Model) (portID: CommonTypes.PortId) =
+    let extractType (port:PortLocal) =
+        port.Port.PortType
+
+    findPortFromModel model portID
+    |>extractType
+
+let getPortCoords  (model : Model) (portID: CommonTypes.PortId) =
+    let extractCoord (port:PortLocal) =
+        port.Pos
+
+    findPortFromModel model portID
+    |> extractCoord
+    
+let getPortWidth (model : Model) (portID : CommonTypes.PortId) : int =
+    let extractWirewidth (port:PortLocal) =
+        port.Wirewidth
+
+    findPortFromModel model portID
+    |>extractWirewidth
+
+
+
+
+let getPortIds (model: Model) (symbolIds: CommonTypes.ComponentId) :  CommonTypes.PortId list =
+    model
+    |> List.tryFind (fun symbol -> symbol.Id = symbolIds)
+    |> function
+    | Some symbol -> List.append symbol.Inputport symbol.Outputport 
+                    |> List.map (fun port -> CommonTypes.PortId (port.Port.Id))
+    | None -> failwithf "Symbol %A not found"  symbolIds
+
+
+
+let isPort  (model : Model) (portCoords: XYPos)  : (XYPos * CommonTypes.PortId) Option =
+    
+
+    let isCoordWithinSymbolPorts  (symbol:Symbol) = 
+        List.append symbol.Inputport symbol.Outputport
+        |> List.tryFind (fun port -> if port.Port.PortType = CommonTypes.PortType.Input then
+                                        isWithinBox {X= port.Pos.X; Y=port.Pos.Y - (port.Height/2.) } port.Height port.Width portCoords
+                                     else 
+                                        isWithinBox {X= port.Pos.X - port.Width; Y=port.Pos.Y - (port.Height/2.) } port.Height port.Width portCoords)
+
+    model
+    |> List.tryFind ( fun symbol -> match isCoordWithinSymbolPorts symbol with
+                                    |Some port ->true
+                                    |None->false  )                         
+    |>function
+    |Some(symbol) ->match isCoordWithinSymbolPorts symbol with
+                    |Some port -> Some (port.Pos , (CommonTypes.PortId (port.Port.Id)) )
+                    |None -> None 
+    |None ->  None
+
+//helper function
+
+    
+
+       
