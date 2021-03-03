@@ -7,28 +7,32 @@
 The module implemented here is **Sheet**.
 
 As compared to the project demo skeleton code:
-- *sheet.fs* was modified to enter code for the sheet module.
-- *renderer.fs* was modified to add drop-down menu options for certain features e.g. zooming.
+- *Sheet.fs* was modified to enter my code for the sheet module.
+- *Renderer.fs* was modified to add drop-down menu options for certain features e.g. zooming.
+- *Symbol.fs* was modified with code provided by group member JEMerrick for purposes of the demonstration.
+- *BusWire.fs* was modified with code provided by group member adidesh20 for purposes of the demonstration.
 
-A documentation of how this module interfaces with the Symbol and Sheet modules may be found in the main part of the repo.
+A documentation of how this module interfaces with the Symbol and BusWire modules may be found in the main part of the repo under the folder *doc*.
 
-The code may be run by entering
+The code may be run by entering on the command line
 
 ```
 npm run dev
 
 ```
 
-from within this directory.
+from within this directory (on the first run the code has to be built).
+
+Symbol code is provided by group member JEMerrick. BusWire code is provided by group member adidesh. The code may not be 100% up to date with the latest commits/submission of the members to this repo. However the interface and functionality implemented is the same.
 
 
 ## Sequence of Steps for the Demo
 
-1. *Highlighting of ports* on moving mouse over symbol. Demonstrate it working for multiple symbols simultaneously i.e. when mouse is inside >1 bounding box.
+1. *Highlighting of ports* on moving mouse over symbol. Demonstrate it working for multiple symbols simultaneously i.e. when mouse is inside more than one bounding box.
 
-2. *Selection* of single and multiple symbols with highlighting.
+2. *Selection and highlighting* of single (with click) and multiple symbols (with drag-box).
 
-3. *Dragging and snap-to-grid*. For single and multiple symbols (the multiple symbols can be done by dragging mouse from any of the selected components)
+3. *Dragging and snap-to-grid*. For single and multiple symbols (the multiple symbols can be done by dragging mouse from any of the selected components). Correct behaviour in presence of scrolling.
 
 4. *Automatic aligning* of multiple selected symbols horizontally/vertically. Illustrating utility of vertical alignment with Joanna's functionality to rotate/scale symbols (may skip this if pushed for time).
 
@@ -36,8 +40,8 @@ from within this directory.
 
 6. *Deleting* wires and symbols which automatically delete connected wires.  
 
-7. *Adding symbols* - illustrate algorithm to initialise positions.
+7. *Adding symbols* - illustrate algorithm to initialise positions of added components.
 
-7. *Zooming behaviour*: Points 1-7 (may not cover all) briefly demonstrated to work when zooming in/out on canvas.
+7. *Zooming behaviour*: Points 1-7 (may not cover all) briefly demonstrated in presence of zooming in/out on the canvas.
 
-Target time: 300s.
+Target time for demo: 300s.

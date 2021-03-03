@@ -147,6 +147,15 @@ let stringIdBoxes (model: Model) (boxType: Selection) (mousePos: XYPos) =
     | _ -> []
 
 
+///Function that filters symbol or wire bounding boxes down to a list of string ids for which the box contains the input
+///mouse position.
+let obtainFilteredIds (model: Model) (boxType: Selection) (mousePos: XYPos) =
+    //Obtain the boxes as a list of string Ids
+    stringIdBoxes model boxType mousePos
+    //filter the boxes based on whether they enclose mouse
+    |> filterBoxes mousePos
+
+
 ///Finds the top left corner point of the bounding box for a symbol, given the id. Currently searches through all the
 ///bounding boxes for the symbol ID. Return as option.
 let findTopLeft (model: Model) (point: XYPos) (symId: CommonTypes.ComponentId) = 
@@ -358,10 +367,8 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                             | None -> 
                                 //CASE 2: Mouse Click within a symbol 
                                 //Get symbol bounding boxes and filter based on whether they contain the click point
-                                let filteredSymbolList = stringIdBoxes model ComponentSymbol scaledMousePos
-                                                         //filter the boxes based on whether they enclose mouse
-                                                         |> filterBoxes scaledMousePos
-                                                         //Convert strings back to component IDs when done. 
+                                let filteredSymbolList = obtainFilteredIds model ComponentSymbol scaledMousePos 
+                                                         //Convert returned string IDs to component ID type. 
                                                          |> List.map CommonTypes.ComponentId
                                 //Check if we have something in the above list
                                 if not (List.isEmpty filteredSymbolList) then 
@@ -374,10 +381,8 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                                 else 
                                     //CASE 3: Mouse Click on a wire
                                     //Filter wire bounding boxes on whether they contain the click point
-                                    let filteredWireList = stringIdBoxes model ComponentWire scaledMousePos
-                                                           //filter the boxes based on whether they enclose mouse
-                                                           |> filterBoxes scaledMousePos
-                                                           //Convert back to component IDs when done. 
+                                    let filteredWireList = obtainFilteredIds model ComponentWire scaledMousePos
+                                                           //Convert returned string Ids to connection ID type. 
                                                            |> List.map CommonTypes.ConnectionId
                                     //Check if we have something.
                                     if not (List.isEmpty filteredWireList) then
@@ -410,7 +415,6 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                             //"Scaled down" version of coordinates to interface with other modules for zoom
                             let scaledMousePos = zoomScale model.Zoom mousePos
 
-                            //In response to mouse dragging send message.
                             //In ALL cases, we need to highlight the ports of a symbol if our mouse enters the bounding box
 
                             //Find all symbol IDs for which the mouse is within bounding box. We want to highlight ports on all of these symbols.
@@ -420,7 +424,7 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                             //Highlight the list of symbol ports.
                             WireMsg (BusWire.Symbol (Symbol.HighlightPorts symIds)) |> dispatch
                             
-
+                            //In response to mouse dragging send message.
                             if mDown ev 
                             then SelectGrow mousePos |> dispatch
                             )
@@ -515,21 +519,23 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             //First find all the top left corners of symbols. 
             let topleftCorners = 
                 model.SelectedComponentIDs
-                //Find top left bounding box corners for each symbol - convert options to values. 
+                //Find top left bounding box corners for each symbol. 
                 |> List.map (findTopLeft model model.SelectBoxCurrent
+                             //Convert options to values.
                              >> function 
                                 | Some a -> a 
                                 //We do not expect None - getting it would signify incorrect behaviour.
                                 | None -> failwithf "ERROR: A selected ID does not have an assigned bounding box")           
+            //Find the necessary translation vectors for horizontal/vertical alignment.
             let vectors = 
                 match msg with 
-                //Horizontal alignment
+                //A horizontal alignment
                 | KeyPress AltC -> 
                     //We align based on the leftmost top-Left corner
                     let leftMost =  List.minBy (fun a -> a.X) topleftCorners
                     //We convert the topLeftCorners list into a list of translation vectors (translation along y axis)
                     List.map (fun a -> {X = 0.0; Y = leftMost.Y - a.Y}) topleftCorners
-                //Vertical alignment 
+                //A vertical alignment 
                 | KeyPress AltV -> 
                      //We align based on the downmost top-Left corner
                     let downmost = List.maxBy (fun a -> a.Y) topleftCorners
