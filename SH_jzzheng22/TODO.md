@@ -9,6 +9,6 @@
     - [ ] CtrlA
     - [ ] Check Piazza for more
 6. [ ] Clicking up multiple times when doing multi select isn't working. Works for first click down but second click down only selects the component you clicked on, not all the ones that were selected
-7. [ ] Need to account for page scroll
+7. [x] Need to account for page scroll
 8. [x] Highlight box drawn on first click for some reason
-9. [ ] Cannot connect input port to output port on same symbol
+9. [ ] Send error message if wrong connection added
