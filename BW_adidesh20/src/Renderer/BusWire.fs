@@ -134,6 +134,26 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
 
+    | Symbol.Right,Symbol.Top ->
+        if diff.X > 0. && diff.Y > 0. then // Two Segment Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y - yOffset}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        else if diff.X > 0. && diff.Y < 0. then // Four Segment Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y - yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y) - yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else //if diff.X < 0 && diff.Y < 0 then
+           let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+           let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + diff.Y - yOffset}
+           let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+           [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
 
     | _,_ -> // Symbol is probably rotated, so reusing the basic algorithm. Will sort in Group Stage
         if diff.X >= 0. then 
