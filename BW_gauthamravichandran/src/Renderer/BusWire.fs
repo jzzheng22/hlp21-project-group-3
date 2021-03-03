@@ -104,7 +104,7 @@ let goPastBox (wId:CommonTypes.ConnectionId) (src:XYPos) (bb:XYPos*XYPos) (width
 
 
 let goToTarget (wId:CommonTypes.ConnectionId) (src:XYPos) (tar:XYPos) (width:int) =
-    let pos1= {X= ( tar.X + src.X)/(2.) ; Y=src.Y}
+    let pos1= {X= ( 12. * tar.X + src.X)/(13.) ; Y=src.Y}
     let pos2= {X=pos1.X;Y=tar.Y}
     [   
         makeWireSegment wId src pos1 width
@@ -136,16 +136,16 @@ let findBoxesInPath (srcSym: CommonTypes.ComponentId) (tarSym: CommonTypes.Compo
 
 
 let rec routing (srcSym: CommonTypes.ComponentId) (tarSym: CommonTypes.ComponentId) (wId:CommonTypes.ConnectionId) (symbols: Symbol.Symbol list) (src:XYPos) (tar:XYPos) (width:int)=
-    (*
+    
     match findBoxesInPath srcSym tarSym symbols src tar with
     | None -> goToTarget wId src tar width
     //| Some sym when sym.Id = tar.Id-> goToTarget wId src tar
     | Some bb -> 
         let tuple= goPastBox wId src bb width
         ( fst tuple) @ (routing srcSym tarSym wId (symbols) (snd tuple) tar width)
-    *)
+    
 
-    goToTarget  wId src tar width
+    //goToTarget  wId src tar width
 
 let editHead (lst: WireSegment list) :  WireSegment list=
     match lst with
