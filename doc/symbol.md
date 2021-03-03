@@ -38,12 +38,17 @@ Each Symbol owns its ports.
  - Is used to find wires connected to symbol(s).
 
 *Optional interface functions*
-These are called by adidesh20's BusWire and implemented in JEMerrick's Symbol:
+
+The following are called by adidesh20's BusWire and implemented in JEMerrick's Symbol:
 `Symbol.getPortWidth (model : Model) (pId : CommonTypes.PortId) : int`
  - Returns width of specified port.
 
 `Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
  - Returns the ComponentID which the PortID belongs to.
+
+ The following are called by aamanrebello's Sheet and implemented in JEMerrick's Symbol:
+`getPortIds (model : Model) (sId : CommonTypes.ComponentId) : CommonTypes.PortId list`
+- Returns a list of Port Ids for a given symbol ID.
 
 ## Messages
 **Received from Sheet via BusWire**
