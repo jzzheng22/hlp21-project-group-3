@@ -10,16 +10,16 @@ As compared to the project demo skeleton code:
 - *sheet.fs* was modified to enter code for the sheet module.
 - *renderer.fs* was modified to add drop-down menu options for certain features e.g. zooming.
 
-A documentation of how this module interfaces with the Symbol and BusWire modules may be found in the main part of the repo.
+A documentation of how this module interfaces with the Symbol and BusWire modules may be found in the [main part](..) of the repo.
 
-The code may be run by entering
+The code may be run by entering on the command line
 
 ```
 npm run dev
 
 ```
 
-from within this directory (of course, on the first run it has to be built).
+from within this directory (on the first run the code has to be built).
 
 
 ## Sequence of Steps for the Demo
