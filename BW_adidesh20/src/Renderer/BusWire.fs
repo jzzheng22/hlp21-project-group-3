@@ -12,6 +12,9 @@ open Helpers
 //------------------------------BusWire Types-----------------------------//
 //------------------------------------------------------------------------//
 
+
+type Edge = Top | Bottom | Left | Right
+
 /// type for buswires
 /// for demo only. The real wires will
 /// connect to Ports - not symbols, where each symbol has
@@ -23,7 +26,9 @@ open Helpers
 type Wire = {
     Id: CommonTypes.ConnectionId 
     SourcePortId: CommonTypes.PortId
+    SourcePortEdge: Edge
     TargetPortId: CommonTypes.PortId
+    TargetPortEdge: Edge
     Vertices: XYPos list
     BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
     Width: int
@@ -54,8 +59,9 @@ type Msg =
 
 //-------------------Helpers for functions------------------------//
 
-type Edge = Top | Bottom | Left | Right
 
+/// Takes a point and a line (edge) and returns the minimum distance
+/// between the point and the line
 let distanceToEdge (point: XYPos) (edge: XYPos * XYPos) : float =
     let ptA = fst edge
     let ptB = snd edge
@@ -72,6 +78,7 @@ let distanceToEdge (point: XYPos) (edge: XYPos * XYPos) : float =
     else
         (abs (ab.X * ap.Y - ab.Y * ap.X))/(sqrt(ab.X**2. + ab.Y**2.))
 
+/// Determines which edge of a symbol a port lies on
 let findEdgeFromPortId (model: Model) (pId: CommonTypes.PortId) : Edge =
     let portPos = Symbol.getPortCoords model.Symbol pId
     let hostId = Symbol.getSymbolIdFromPortId model.Symbol pId
@@ -94,12 +101,14 @@ let findEdgeFromPortId (model: Model) (pId: CommonTypes.PortId) : Edge =
     |> List.minBy snd
     |> fst
 
+/// Takes Source and Target ports of a wire and returns the 
+/// vertices of the path it should follow
 let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : XYPos list =
     let sourcePos = Symbol.getPortCoords model.Symbol sourcePortId
     let targetPos = Symbol.getPortCoords model.Symbol targetPortId
     let diff = Symbol.posDiff targetPos sourcePos
     let xOffset = 15. // Length of Horizontal line coming out of/going into port
-    let yOffset = 10.
+    let yOffset = 10. // Length of Vertical line coming out of/going into port
     match findEdgeFromPortId model sourcePortId, findEdgeFromPortId model targetPortId with 
     | Right,Left -> 
         if diff.X >= 0. then // Three Segement Case
@@ -136,26 +145,8 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
 
     | _,_ -> [] // Not yet implemented, shouldn't occur anyways AFAIK
 
-/// Takes Source and Target positions of a wire and returns the 
-/// vertices of the path it should follow
-///
-/// NOTE: Currently only supports inputs on left, outputs on right
-(*let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
-    let diff = Symbol.posDiff targetPos sourcePos
 
-    if diff.X >= 0. then // Three Segement Case
-        let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
-        let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
-        [sourcePos;endPosSeg0;endPosSeg1;targetPos]
 
-    else // Five Segment Case
-        let xOffset = 15. // Length of Horizontal line coming out of/going into port
-        let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
-        let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
-        let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X - (2.*xOffset)}
-        let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
-        [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
-*)
 let posLeftMost (posList: XYPos list) : XYPos list =
     let posX pos = pos.X
     posList
@@ -188,7 +179,7 @@ let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionI
 
     vertices
     |> List.pairwise
-    |> List.map (fun x -> lineToBox (fst x) (snd x))
+    |> List.map (fun (p1,p2) -> lineToBox p1 p2)
     |> List.map (fun (topL,botR) ->  (wID,topL,botR))
 
 
@@ -200,13 +191,18 @@ let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
 /// Creates a new wire 
 let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: CommonTypes.PortId) (width: int): Wire = 
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
+    let srcEdge = findEdgeFromPortId model srcPortId
+    let tgtEdge = findEdgeFromPortId model tgtPortId
     let newVertices = routeWire model srcPortId tgtPortId
     let newBB = singleWireBoundingBoxes newVertices wId
+    
   
     {
         Id = wId
         SourcePortId = srcPortId
+        SourcePortEdge = srcEdge
         TargetPortId = tgtPortId
+        TargetPortEdge = tgtEdge
         Vertices = newVertices
         BoundingBoxes = newBB
         Width = width
@@ -256,15 +252,20 @@ let singleWireView =
                     ]
                 ] [str <| sprintf "%i" props.Width]   
             let highlightCircles =
-                    let srcPortPos = List.head props.Vertices
-                    let tgtPortPos = List.last props.Vertices
+                    
                     if props.Highlight = false then
                         []
                     else
+                        let srcHighlightPos = Symbol.posAdd (List.head props.Vertices) {X=3.;Y=0.}
+                        let tgtHighlightPos = 
+                            match props.WireP.TargetPortEdge with
+                            | Left -> Symbol.posAdd (List.last props.Vertices) {X= -3.;Y=0.}
+                            | Bottom -> Symbol.posAdd (List.last props.Vertices) {X=0.;Y=3.}
+                            | _ -> failwithf "Shouldn't happen"
                         [
                         circle [
-                           Cx (srcPortPos.X + 3.)
-                           Cy srcPortPos.Y
+                           Cx srcHighlightPos.X
+                           Cy srcHighlightPos.Y
                            R 3.
 
                            SVGAttr.Fill "deepskyblue"
@@ -273,8 +274,8 @@ let singleWireView =
                            SVGAttr.StrokeWidth 1][]
                            ;
                         circle [
-                            Cx (tgtPortPos.X - 3.)
-                            Cy tgtPortPos.Y
+                            Cx tgtHighlightPos.X
+                            Cy tgtHighlightPos.Y
                             R 3.
 
                             SVGAttr.Fill "deepskyblue"
