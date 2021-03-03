@@ -54,11 +54,93 @@ type Msg =
 
 //-------------------Helpers for functions------------------------//
 
+type Edge = Top | Bottom | Left | Right
+
+let distanceToEdge (point: XYPos) (edge: XYPos * XYPos) : float =
+    let ptA = fst edge
+    let ptB = snd edge
+    let ab = Symbol.posDiff ptB ptA
+    let bp = Symbol.posDiff point ptB
+    let ap = Symbol.posDiff point ptA
+    let abDOTbp = ab.X * bp.X + ab.Y * bp.Y
+    let abDOTap = ab.X * ap.X + ab.Y * ap.Y
+
+    if abDOTbp > 0. then
+        sqrt ((bp.X **2.) + (bp.Y **2.))
+    else if abDOTap < 0. then
+        sqrt ((ap.X **2.) + (ap.Y **2.))
+    else
+        (abs (ab.X * ap.Y - ab.Y * ap.X))/(sqrt(ab.X**2. + ab.Y**2.))
+
+let findEdgeFromPortId (model: Model) (pId: CommonTypes.PortId) : Edge =
+    let portPos = Symbol.getPortCoords model.Symbol pId
+    let hostId = Symbol.getSymbolIdFromPortId model.Symbol pId
+    let topL,botR = 
+        Symbol.getBoundingBoxes model.Symbol {X =0.;Y=0.}
+        |> List.tryFind (fun (sId,_,_) -> sId = hostId)
+        |> function
+        | Some (id,tL,bR) -> (tL,bR)
+        | None -> failwithf "Should not happen"
+    let topEdge = (topL,{X=botR.X;Y=topL.Y})
+    let botEdge = ({X=topL.X;Y=botR.Y},botR)
+    let leftEdge = (topL,{X=topL.X;Y=botR.Y})
+    let rightEdge = ({X=botR.X;Y=topL.Y},botR)
+    [
+        (Top,distanceToEdge portPos topEdge);
+        (Bottom,distanceToEdge portPos botEdge);
+        (Left,distanceToEdge portPos leftEdge);
+        (Right,distanceToEdge portPos rightEdge)
+    ]
+    |> List.minBy snd
+    |> fst
+
+let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : XYPos list =
+    let sourcePos = Symbol.getPortCoords model.Symbol sourcePortId
+    let targetPos = Symbol.getPortCoords model.Symbol targetPortId
+    let diff = Symbol.posDiff targetPos sourcePos
+    let xOffset = 15. // Length of Horizontal line coming out of/going into port
+    let yOffset = 10.
+    match findEdgeFromPortId model sourcePortId, findEdgeFromPortId model targetPortId with 
+    | Right,Left -> 
+        if diff.X >= 0. then // Three Segement Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        
+        else // Five Segment Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+            let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X - (2.*xOffset)}
+            let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
+    
+    | Right,Bottom ->
+        if diff.X > 0. && diff.Y > 0. then // Two Segment Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X > 0. && diff.Y < 0. then // Four Segment Case
+            let endPosSeg0 = {sourcePos with X = targetPos.X}
+            [sourcePos;endPosSeg0;targetPos]
+        else if diff.X < 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y) + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else //if diff.X < 0 && diff.Y < 0 then
+           let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+           let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+           let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+           [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+
+    | _,_ -> [] // Not yet implemented, shouldn't occur anyways AFAIK
+
 /// Takes Source and Target positions of a wire and returns the 
 /// vertices of the path it should follow
 ///
 /// NOTE: Currently only supports inputs on left, outputs on right
-let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
+(*let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
     let diff = Symbol.posDiff targetPos sourcePos
 
     if diff.X >= 0. then // Three Segement Case
@@ -73,7 +155,7 @@ let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
         let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X - (2.*xOffset)}
         let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
         [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
-
+*)
 let posLeftMost (posList: XYPos list) : XYPos list =
     let posX pos = pos.X
     posList
@@ -118,7 +200,7 @@ let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
 /// Creates a new wire 
 let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: CommonTypes.PortId) (width: int): Wire = 
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
-    let newVertices = routeWire (Symbol.getPortCoords model.Symbol srcPortId) (Symbol.getPortCoords model.Symbol tgtPortId)
+    let newVertices = routeWire model srcPortId tgtPortId
     let newBB = singleWireBoundingBoxes newVertices wId
   
     {
@@ -231,7 +313,7 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
 let init n () =
     let symbols, cmd = Symbol.init()
     let symIds = List.map (fun (sym:Symbol.Symbol) -> sym.Id) symbols
-    let rng = System.Random 0
+    (*let rng = System.Random 0
     let ports = Symbol.initPortSearch symbols 
     let outPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Output) ports).Value
     let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
@@ -247,8 +329,8 @@ let init n () =
             BoundingBoxes = bb
             Width = Symbol.getPortWidth symbols (CommonTypes.PortId outPort.Port.Id)
             Highlight = false
-        }
-    [testWire]
+        }*)
+    []
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
 
 //-------------------Helpers for Update Function-------------------//
@@ -260,10 +342,10 @@ let ruleOutToIn (model: Model) (wire: Wire) : bool =
     | CommonTypes.Output , CommonTypes.Input -> true
     | _ , _ -> false
 
-/// Checks if a new wire does not already exist in the model
+/// Checks if the wire's target port already has a wire driving it. By-product of this is that it disallows duplicate wire creation.
 let ruleUnique (model: Model) (wire: Wire) : bool =
     model.WX
-    |> List.filter (fun w -> w.SourcePortId = wire.SourcePortId && w.TargetPortId = wire.TargetPortId)
+    |> List.filter (fun w -> w.TargetPortId = wire.TargetPortId)
     |> List.isEmpty
 
 /// Checks if the Width of the Source Port is equal to that of the Target Port
@@ -295,7 +377,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wList = 
             model.WX
             |> List.map (fun w -> 
-                let newVertices = routeWire (Symbol.getPortCoords sm w.SourcePortId) (Symbol.getPortCoords sm w.TargetPortId)
+                let newVertices = routeWire model w.SourcePortId  w.TargetPortId
                 let newBB = singleWireBoundingBoxes newVertices w.Id
                 {w with 
                     Vertices = newVertices
