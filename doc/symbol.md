@@ -34,8 +34,8 @@ Each Symbol owns its ports.
  - `None`
 
 `Symbol.getPortIds (model: Model) (symbolId: CommonTypes.ComponentID)`
- - Returns list of ports for each symbol ID.
- - Is used to find wires connected to symbol(s).
+ - Returns list of port IDs for a given symbol ID.
+ - Used to find wires connected to a symbol.
 
 *Optional interface functions*
 These are called by adidesh20's BusWire and implemented in JEMerrick's Symbol:
