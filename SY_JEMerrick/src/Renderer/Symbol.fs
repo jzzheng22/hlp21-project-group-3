@@ -112,7 +112,7 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int * Sy
     | CommonTypes.ComponentType.IOLabel -> ("", 0, 0, IO) //Check generic type WHAT IS THIS?? 
     | CommonTypes.ComponentType.BusSelection (x, y) -> ("", x, y, Wires)
     | CommonTypes.ComponentType.MergeWires -> ("", 0, 0, Wires)
-    | CommonTypes.ComponentType.SplitWire x -> ("", x, x, Wires)
+    | CommonTypes.ComponentType.SplitWire x -> ("", x, 1, Wires)
 
 ///Returns a tuple of float = (Height, Width) from two coordinates
 let getHW (botR : XYPos) (topL : XYPos) = (botR.Y - topL.Y, botR.X - topL.X)
@@ -513,15 +513,16 @@ let init () =
         CommonTypes.Memory.Data = [(1L, 0L); (2L, 0L); (3L, 0L)] |> Map.ofList
     }
     [
-        (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 {X = 100.; Y = 0.})
+        (CreateNewSymbol (CommonTypes.ComponentType.SplitWire 4) 1 4 {X = 10.; Y = 0.})
         (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 {X = 200.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 {X = 300.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Demux2) 1 2 {X = 400.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Input 1) 0 1 {X = 200.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Decode4) 2 4 {X = 300.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Decode4) 2 4 {X = 10.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.Register 1) 1 1 {X = 500.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.DFFE) 1 1 {X = 600.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 700.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Register 2) 1 1 {X = 600.; Y = 200.}) //To show getbuswidth interface func
+        (CreateNewSymbol (CommonTypes.ComponentType.DFFE) 1 1 {X = 200.; Y = 300.})
+        (CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 400.; Y = 300.})
     ]
     , Cmd.none
 
