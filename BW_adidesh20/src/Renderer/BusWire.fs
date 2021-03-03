@@ -13,8 +13,6 @@ open Helpers
 //------------------------------------------------------------------------//
 
 
-type Edge = Top | Bottom | Left | Right
-
 /// type for buswires
 /// for demo only. The real wires will
 /// connect to Ports - not symbols, where each symbol has
@@ -26,9 +24,9 @@ type Edge = Top | Bottom | Left | Right
 type Wire = {
     Id: CommonTypes.ConnectionId 
     SourcePortId: CommonTypes.PortId
-    SourcePortEdge: Edge
+    SourcePortEdge: Symbol.Edge
     TargetPortId: CommonTypes.PortId
-    TargetPortEdge: Edge
+    TargetPortEdge: Symbol.Edge
     Vertices: XYPos list
     BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
     Width: int
@@ -59,48 +57,6 @@ type Msg =
 
 //-------------------Helpers for functions------------------------//
 
-
-/// Takes a point and a line (edge) and returns the minimum distance
-/// between the point and the line
-let distanceToEdge (point: XYPos) (edge: XYPos * XYPos) : float =
-    let ptA = fst edge
-    let ptB = snd edge
-    let ab = Symbol.posDiff ptB ptA
-    let bp = Symbol.posDiff point ptB
-    let ap = Symbol.posDiff point ptA
-    let abDOTbp = ab.X * bp.X + ab.Y * bp.Y
-    let abDOTap = ab.X * ap.X + ab.Y * ap.Y
-
-    if abDOTbp > 0. then
-        sqrt ((bp.X **2.) + (bp.Y **2.))
-    else if abDOTap < 0. then
-        sqrt ((ap.X **2.) + (ap.Y **2.))
-    else
-        (abs (ab.X * ap.Y - ab.Y * ap.X))/(sqrt(ab.X**2. + ab.Y**2.))
-
-/// Determines which edge of a symbol a port lies on
-let findEdgeFromPortId (model: Model) (pId: CommonTypes.PortId) : Edge =
-    let portPos = Symbol.getPortCoords model.Symbol pId
-    let hostId = Symbol.getSymbolIdFromPortId model.Symbol pId
-    let topL,botR = 
-        Symbol.getBoundingBoxes model.Symbol {X =0.;Y=0.}
-        |> List.tryFind (fun (sId,_,_) -> sId = hostId)
-        |> function
-        | Some (id,tL,bR) -> (tL,bR)
-        | None -> failwithf "Should not happen"
-    let topEdge = (topL,{X=botR.X;Y=topL.Y})
-    let botEdge = ({X=topL.X;Y=botR.Y},botR)
-    let leftEdge = (topL,{X=topL.X;Y=botR.Y})
-    let rightEdge = ({X=botR.X;Y=topL.Y},botR)
-    [
-        (Top,distanceToEdge portPos topEdge);
-        (Bottom,distanceToEdge portPos botEdge);
-        (Left,distanceToEdge portPos leftEdge);
-        (Right,distanceToEdge portPos rightEdge)
-    ]
-    |> List.minBy snd
-    |> fst
-
 /// Takes Source and Target ports of a wire and returns the 
 /// vertices of the path it should follow
 let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : XYPos list =
@@ -109,8 +65,8 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
     let diff = Symbol.posDiff targetPos sourcePos
     let xOffset = 15. // Length of Horizontal line coming out of/going into port
     let yOffset = 10. // Length of Vertical line coming out of/going into port
-    match findEdgeFromPortId model sourcePortId, findEdgeFromPortId model targetPortId with 
-    | Right,Left -> 
+    match Symbol.getPortEdge model.Symbol sourcePortId, Symbol.getPortEdge model.Symbol targetPortId with 
+    | Symbol.Right,Symbol.Left -> 
         if diff.X >= 0. then // Three Segement Case
             let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
             let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
@@ -123,7 +79,7 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
             let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
             [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
     
-    | Right,Bottom ->
+    | Symbol.Right,Symbol.Bottom ->
         if diff.X > 0. && diff.Y > 0. then // Two Segment Case
             let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
             let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y + yOffset}
@@ -143,7 +99,7 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
 
-    | _,_ -> [] // Not yet implemented, shouldn't occur anyways AFAIK
+    | _,_ -> [] // Not implemented, shouldn't occur anyways AFAIK
 
 
 
@@ -191,8 +147,8 @@ let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
 /// Creates a new wire 
 let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: CommonTypes.PortId) (width: int): Wire = 
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
-    let srcEdge = findEdgeFromPortId model srcPortId
-    let tgtEdge = findEdgeFromPortId model tgtPortId
+    let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
+    let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
     let newVertices = routeWire model srcPortId tgtPortId
     let newBB = singleWireBoundingBoxes newVertices wId
     
@@ -259,8 +215,8 @@ let singleWireView =
                         let srcHighlightPos = Symbol.posAdd (List.head props.Vertices) {X=3.;Y=0.}
                         let tgtHighlightPos = 
                             match props.WireP.TargetPortEdge with
-                            | Left -> Symbol.posAdd (List.last props.Vertices) {X= -3.;Y=0.}
-                            | Bottom -> Symbol.posAdd (List.last props.Vertices) {X=0.;Y=3.}
+                            | Symbol.Left -> Symbol.posAdd (List.last props.Vertices) {X= -3.;Y=0.}
+                            | Symbol.Bottom -> Symbol.posAdd (List.last props.Vertices) {X=0.;Y=3.}
                             | _ -> failwithf "Shouldn't happen"
                         [
                         circle [
