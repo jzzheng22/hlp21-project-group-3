@@ -10,7 +10,7 @@ As compared to the project demo skeleton code:
 - *sheet.fs* was modified to enter code for the sheet module.
 - *renderer.fs* was modified to add drop-down menu options for certain features e.g. zooming.
 
-A documentation of how this module interfaces with the Symbol and BusWire modules may be found in the [main part](..) of the repo.
+A documentation of how this module interfaces with the Symbol and BusWire modules may be found in the main part of the repo under the folder *doc*.
 
 The code may be run by entering on the command line
 
