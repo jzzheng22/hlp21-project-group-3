@@ -29,6 +29,8 @@ type WireSegment = {
     TargetPos: XYPos
     BB: XYPos * XYPos
     Highlight: bool
+    WidthAnnotate: bool
+    Width:int
     }
 type Wire = {
     Id: CommonTypes.ConnectionId 
@@ -36,6 +38,8 @@ type Wire = {
     TargetPort: CommonTypes.PortId
     Segments: WireSegment list
     WireHighlight: bool
+    Width: int
+    
     }
 
 type Model = {
@@ -53,7 +57,7 @@ let makeWireBB (sPos:XYPos) (tPos:XYPos)=
     | (sx,sy,tx,ty) when (tx=sx && ty=sy) -> ({X=tx;Y=ty},{X=sx;Y=sy})
     | _ -> failwithf "diagonal line error"
 
-let makeWireSegment (WId:CommonTypes.ConnectionId) (sPos) (tPos) = 
+let makeWireSegment (WId:CommonTypes.ConnectionId) (sPos) (tPos) (width:int) = 
     //printf "%A" (makeWireBB sPos tPos)
     {
         wId=WId
@@ -62,14 +66,17 @@ let makeWireSegment (WId:CommonTypes.ConnectionId) (sPos) (tPos) =
         TargetPos=tPos
         BB= makeWireBB sPos tPos
         Highlight=false
+        WidthAnnotate= false
+        Width=width
     }
+
 let bbCollision (bb1:XYPos*XYPos) (bb2:XYPos*XYPos) =
     match fst bb1, snd bb1, fst bb2, snd bb2 with
     | (tL1, bR1, tL2, bR2) when bR2.Y < tL1.Y -> false
     | (tL1, bR1, tL2, bR2) when tL2.X > bR1.X -> false
-    | (tL1, bR1, tL2, bR2) when bR2.Y > tL1.Y -> false
+    | (tL1, bR1, tL2, bR2) when tL2.Y > bR1.Y -> false
     | (tL1, bR1, tL2, bR2) when bR2.X < tL1.X -> false
-    |_ ->true
+    |  _ ->true
 (*
 let findNearestBox (symbols: Symbol.Symbol list) (src:XYPos) =
     let list =
@@ -81,81 +88,80 @@ let findNearestBox (symbols: Symbol.Symbol list) (src:XYPos) =
         List.minBy (fun (sym,l,r)->l) list
         |> (fun (sym,l,r)->Some sym)
 *)
-let goPastBox (wId:CommonTypes.ConnectionId) (src:XYPos) (sym:Symbol.Symbol) =
-
-    
-    let pos1= {X=src.X; Y=src.Y}
-    let pos2= {X=pos1.X;Y=sym.BotR.Y}
-    [   
-        makeWireSegment wId src pos1
-        makeWireSegment wId pos1 pos2
-        makeWireSegment wId pos2 sym.BotR
-    ], sym.BotR
-    
-let goPastBox2 (wId:CommonTypes.ConnectionId) (src:XYPos) (sym:Symbol.Symbol) =
-
-    
-    let pos1= {X=src.X; Y=src.Y}
-    let pos2= {X=pos1.X;Y=sym.BotR.Y}
-    [   
-        makeWireSegment wId src pos1
-        makeWireSegment wId pos1 pos2
-        makeWireSegment wId pos2 sym.BotR
-    ], sym.BotR
-    
-
-
-
-
-
-let goToTarget (wId:CommonTypes.ConnectionId) (src:XYPos) (tar:XYPos) =
-    let pos1= {X= (tar.X + src.X)/(2.) ; Y=src.Y}
+let goPastBox (wId:CommonTypes.ConnectionId) (src:XYPos) (bb:XYPos*XYPos) (width:int) =
+    let tar= snd bb
+    let pos1= {X= (tar.X + 12.* src.X)/(13.) ; Y=src.Y}
     let pos2= {X=pos1.X;Y=tar.Y}
     [   
-        makeWireSegment wId src pos1
-        makeWireSegment wId pos1 pos2
-        makeWireSegment wId pos2 tar
+        makeWireSegment wId src pos1 width
+        makeWireSegment wId pos1 pos2 width
+        makeWireSegment wId pos2 tar width
+    ], tar
+    
+
+
+
+
+
+let goToTarget (wId:CommonTypes.ConnectionId) (src:XYPos) (tar:XYPos) (width:int) =
+    let pos1= {X= (12.* tar.X + src.X)/(13.) ; Y=src.Y}
+    let pos2= {X=pos1.X;Y=tar.Y}
+    [   
+        makeWireSegment wId src pos1 width
+        makeWireSegment wId pos1 pos2 width
+        makeWireSegment wId pos2 tar width
     ]
 
-(*
-let findBoxesInPath (symbols: Symbol.Symbol list) (src:XYPos) (tar:Symbol.Symbol)=
-    let pos1= {X= (tar.TopL.X + src.X)/(2.) ; Y=src.Y}
-    let pos2= {X=pos1.X;Y=tar.TopL.Y}
-    let bb1= makeWireBB src pos1
-    let bb2= makeWireBB pos1 pos2
-    let bb3= makeWireBB pos2 tar.TopL
 
+let findBoxesInPath (srcSym: CommonTypes.ComponentId) (tarSym: CommonTypes.ComponentId) (symbols: Symbol.Symbol list) (src:XYPos) (tar:XYPos)=
+    let newsrc= {X= src.X + 5. ; Y= src.Y}
+    let newtar= {X= tar.X - 5. ; Y= tar.Y}
+    let pos1= {X= (12.* tar.X + src.X)/(13.) ; Y=src.Y}
+    let pos2= {X=pos1.X;Y=tar.Y}
+    let bb1= makeWireBB newsrc pos1
+    let bb2= makeWireBB pos1 pos2
+    let bb3= makeWireBB pos2 newtar
+    // printf "%A" (bb1,bb2,bb3)
     let list =
-        Symbol.getBoundingBoxes symbols
-        |> List.map (fun (sym,l,r)->(l,r))
+        Symbol.getBoundingBoxes symbols src
+        |> List.filter (fun (sym,a,b)-> not (sym=srcSym || sym=tarSym))
+        |> List.map (fun(a,b,c)->(b,c)) 
         |> List.filter (fun x-> (bbCollision bb1 x || bbCollision bb2 x || bbCollision bb3 x))
     if List.isEmpty list 
         then None
     else 
-        Some (List.minBy (fun (l,r)->l) list)
+        printf "%A" (List.minBy id list)
+        Some (List.minBy id list)
         //|> (fun (l,r)->Some sym)
-*)
 
-let rec routing (wId:CommonTypes.ConnectionId) (symbols: Symbol.Symbol list) (src:XYPos) (tar:XYPos) =
-(*
-    match findNearestBox symbols src with
-    | None -> goToTarget src tar
-    | Some sym when sym.Id = tar.Id-> goToTarget src tar
-    | Some sym -> 
-        let tuple= goPastBox src sym
-        ( fst tuple) @ (routing (symbols) (snd tuple) tar)
-*)
-    goToTarget  wId src tar
 
-let makeWire (srcId:CommonTypes.PortId) (tarId:CommonTypes.PortId) (symbols: Symbol.Symbol list) =
+let rec routing (srcSym: CommonTypes.ComponentId) (tarSym: CommonTypes.ComponentId) (wId:CommonTypes.ConnectionId) (symbols: Symbol.Symbol list) (src:XYPos) (tar:XYPos) (width:int)=
+
+    match findBoxesInPath srcSym tarSym symbols src tar with
+    | None -> goToTarget wId src tar width
+    //| Some sym when sym.Id = tar.Id-> goToTarget wId src tar
+    | Some bb -> 
+        let tuple= goPastBox wId src bb width
+        ( fst tuple) @ (routing srcSym tarSym wId (symbols) (snd tuple) tar width)
+
+    //goToTarget  wId src tar
+let editHead (lst: WireSegment list) :  WireSegment list=
+    match lst with
+    | hd::tl -> ({hd with WidthAnnotate=true}  :: tl)
+    | _ -> failwithf "empty"
+
+let makeWire (srcId:CommonTypes.PortId) (tarId:CommonTypes.PortId) (symbols: Symbol.Symbol list) (width:int) =
+    let srcSym= Symbol.getHostId symbols srcId
+    let tarSym= Symbol.getHostId symbols tarId 
     let wId= CommonTypes.ConnectionId (uuid())
-    let segments = routing wId symbols (Symbol.getPortCoords symbols srcId) (Symbol.getPortCoords symbols tarId)
+    let segments = routing srcSym tarSym wId symbols (Symbol.getPortCoords symbols srcId) (Symbol.getPortCoords symbols tarId) width
     {
     Id= wId 
     SrcPort= srcId
     TargetPort= tarId
-    Segments= segments
+    Segments= editHead segments
     WireHighlight=false
+    Width=width
     }
 
 //----------------------------Message Type-----------------------------------//
@@ -178,8 +184,9 @@ type Msg =
 
 
 /// look up wire in WireModel
-let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire =
-    failwithf "Not impelmented"
+let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
+    wModel.WX
+    |> List.tryFind (fun wire -> wire.Id = wId)
 
 type WireRenderProps = {
     key : CommonTypes.ConnectionId
@@ -190,6 +197,8 @@ type WireRenderProps = {
     StrokeWidthP: string
     Highlight:bool
     BB: XYPos * XYPos
+    Width: int
+    WidthAnnotate :bool
     }
 
 /// react virtual DOM SVG for one wire
@@ -199,26 +208,52 @@ let singleWireView =
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
             let segmentView=
+                [
                 line [
                     X1 props.SrcP.X
                     Y1 props.SrcP.Y
                     X2 props.TgtP.X
                     Y2 props.TgtP.Y
                     // Qualify these props to avoid name collision with CSSProp
-                    SVGAttr.Stroke (if props.Highlight then "purple" else props.ColorP)
+                    SVGAttr.Stroke (if props.Width =1 then props.ColorP else "purple" )
                     SVGAttr.StrokeWidth props.StrokeWidthP ] []
-            let BBview=     
-                rect[
-                    let h= float (snd props.BB).Y - float (fst props.BB).Y
-                    let w= float (snd props.BB).X - float (fst props.BB).X
-                    X (fst props.BB).X
-                    Y (fst props.BB).Y
-                    SVGAttr.Height (h)
-                    SVGAttr.Width (w)
-                    //SVGAttr.Fill "purple"
-                    SVGAttr.Stroke "black"
-                    SVGAttr.StrokeWidth 0.5][]
-            segmentView (*:: [BBview] |> ofList*)        
+                ]
+            let widthAnnotation = 
+                let textPos = Symbol.posAdd props.SrcP {X = 5. ; Y = 5.}
+                if not props.WidthAnnotate then 
+                    []
+                else
+                    [
+                    text [
+                        X textPos.X
+                        Y textPos.Y
+                        Style [
+                            TextAnchor "middle"
+                            DominantBaseline "hanging"
+                            FontSize "10px"
+                            FontWeight "Bold"
+                            Fill "Black"
+                        ]
+                    ] [str <| sprintf "%i" props.Width] 
+                    ]  
+            let highlightBox =
+                    if props.Highlight = false then
+                        []
+                    else
+                        [
+                        rect[
+                            let h= float (snd props.BB).Y - float (fst props.BB).Y
+                            let w= float (snd props.BB).X - float (fst props.BB).X
+                            X (fst props.BB).X
+                            Y (fst props.BB).Y
+                            SVGAttr.Height (h)
+                            SVGAttr.Width (w)
+                            SVGAttr.Fill "deepskyblue"
+                            SVGAttr.Stroke "deepskyblue"
+                            SVGAttr.Opacity 0.4
+                            SVGAttr.StrokeWidth 0.5][]
+                        ]
+            segmentView @ widthAnnotation @ highlightBox |> ofList      
             )
 
 let view (model:Model) (dispatch: Dispatch<Msg>)=
@@ -241,6 +276,8 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
                     StrokeWidthP = "2px" 
                     Highlight=w.WireHighlight
                     BB= segment.BB
+                    Width=segment.Width
+                    WidthAnnotate=segment.WidthAnnotate
                     
                     }
                 
@@ -279,8 +316,8 @@ let init n () =
 
     [
         //printfn (Symbol.getPortIds symbols symbols.[0].Id)
-        makeWire  ((Symbol.getPortIds symbols symbols.[0].Id).[0]) ((Symbol.getPortIds symbols symbols.[1].Id).[0]) symbols
-        makeWire  ((Symbol.getPortIds symbols symbols.[2].Id).[0]) ((Symbol.getPortIds symbols symbols.[3].Id).[0]) symbols
+        //makeWire  ((Symbol.getPortIds symbols symbols.[0].Id).[0]) ((Symbol.getPortIds symbols symbols.[1].Id).[0]) symbols
+        //makeWire  ((Symbol.getPortIds symbols symbols.[2].Id).[0]) ((Symbol.getPortIds symbols symbols.[3].Id).[0]) symbols
     ]
     //List.map (fun i -> makeRandomWire()) [1..n]
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
@@ -303,12 +340,14 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wires = 
             model.WX
             |> List.map (fun w ->
-                let segments=routing w.Id sm (Symbol.getPortCoords sm w.SrcPort) (Symbol.getPortCoords sm w.TargetPort)
-                {w with Segments= segments})
+                let srcSym= Symbol.getHostId sm w.SrcPort
+                let tarSym= Symbol.getHostId sm w.TargetPort 
+                let segments=routing srcSym tarSym w.Id sm (Symbol.getPortCoords sm w.SrcPort) (Symbol.getPortCoords sm w.TargetPort) (Symbol.getPortWidth model.Symbol w.SrcPort)
+                {w with Segments= editHead segments})
 
         {model with Symbol=sm; WX=wires}, Cmd.map Symbol sCmd
     | AddWire (srcPort, tarPort) ->
-        let w= makeWire srcPort tarPort model.Symbol
+        let w= makeWire srcPort tarPort model.Symbol (Symbol.getPortWidth model.Symbol srcPort)
         {model with WX=w::model.WX}, Cmd.none
     | DeleteWires wIdList -> 
         let wList =

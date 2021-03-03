@@ -553,9 +553,9 @@ let init () =
     [
     CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=100.;Y=300.}
     CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=700.;Y=300.}
-    CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=100.;Y=500.}
-    CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=700.;Y=500.}
-    //CreateNewSymbol CommonTypes.ComponentType.Demux2 7 1 {X=200.;Y=200.}
+    //CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=100.;Y=500.}
+    //CreateNewSymbol CommonTypes.ComponentType.Nand 2 1 {X=700.;Y=500.}
+    CreateNewSymbol CommonTypes.ComponentType.Demux2 7 1 {X=200.;Y=200.}
     //CreateNewSymbol CommonTypes.ComponentType.Demux2 7 1 {X=500.;Y=300.}
     ]
     , Cmd.none
