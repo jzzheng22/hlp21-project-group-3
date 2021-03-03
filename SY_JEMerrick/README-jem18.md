@@ -38,6 +38,7 @@ npm run dev
     * getPortCoords -> Used by sheet and buswire to create wires: I will show wires being created to demonstrate the function correctness
     * getPortType -> Used by buswire to prevent input-input and output-output connections, I will show the wire not being created in these cases
     * getPortIds -> Used by sheet to delete wires connected to a symbol when a symbol is deleted. I will show this in operation.
+    * getPortEdge -> Used by buswire to determine wire routing correctly, I will show wires being connected from different ports to show function correctness
 10. HighlightError message
     * I will show the code/message which will highlight the symbol in red when there is an error
 11. DragPort message - Move ports manually

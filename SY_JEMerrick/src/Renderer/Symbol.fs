@@ -107,8 +107,8 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int * Sy
     | CommonTypes.ComponentType.AsyncROM x -> ("AROM", x.AddressWidth, x.WordWidth, LogMem)
     | CommonTypes.ComponentType.ROM x -> ("ROM", x.AddressWidth, x.WordWidth, FF)
     | CommonTypes.ComponentType.RAM x -> ("RAM", x.AddressWidth, x.WordWidth, RAM)
-    | CommonTypes.ComponentType.Input x -> ((sprintf "In<%d:0>" x), x, x, IO) 
-    | CommonTypes.ComponentType.Output x -> ((sprintf "Out<%d:0>" x), x, x, IO) 
+    | CommonTypes.ComponentType.Input x -> ((sprintf "In<%d:0>" (x - 1)), x, x, IO) 
+    | CommonTypes.ComponentType.Output x -> ((sprintf "Out<%d:0>" (x - 1)), x, x, IO) 
     | CommonTypes.ComponentType.IOLabel -> ("", 0, 0, IO) //Check generic type WHAT IS THIS?? 
     | CommonTypes.ComponentType.BusSelection (x, y) -> ("", x, y, Wires)
     | CommonTypes.ComponentType.MergeWires -> ("", 0, 0, Wires)
@@ -769,7 +769,16 @@ let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int =
     (getPortinfo model pId).Width
 
 let getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId =
-    CommonTypes.ComponentId (getPortinfo model pId).Port.HostId
+    CommonTypes.ComponentId ((getPortinfo model pId).Port.HostId)
+
+type Edge = Top | Bottom | Left | Right
+let getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge =
+    let pos = getPortCoords model pId
+    let sym = List.item 0 (List.filter (fun sym -> sym.Id = getHostId model pId) model)
+    if pos.X = sym.BotR.X then Right
+    elif pos.Y = sym.TopL.Y then Top
+    elif pos.Y = sym.BotR.Y then Bottom
+    else Left
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
