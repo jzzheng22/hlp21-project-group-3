@@ -1,8 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
-
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Remove="Draw2dWrapper\**" />
@@ -11,11 +10,8 @@
     <EmbeddedResource Remove="UI\**" />
   </ItemGroup>
   <ItemGroup>
-    
     <!-- JS and File interface -->
-
     <!-- Draw2D diagram -->
-    
     <!-- UI -->
     <Compile Include="Helpers.fs" />
     <Compile Include="CommonTypes.fs" />
