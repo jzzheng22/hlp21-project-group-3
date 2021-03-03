@@ -172,12 +172,12 @@ let hasCommon ls1 ls2 =
 
 
 ///Function that translates the addKey value of model to an initial position for adding a symbol
-let iniPos zoom addkey =
+let iniPos addkey =
     let yOffset = float (addkey%10)
     let xOffset = float (addkey/10)
     //define x-y gap between each new symbol in absence of zoom.
     let gap = 9.0*UNZOOMEDGRID
-    {X = (UNZOOMEDGRID + gap*xOffset)*zoom; Y = (UNZOOMEDGRID + gap*yOffset)*zoom}
+    {X = (UNZOOMEDGRID + gap*xOffset); Y = (UNZOOMEDGRID + gap*yOffset)}
 
 ///Snap-to-grid. Takes in a point (will be top-left coord of bounding box) and returns a 
 ///translation vector indicating where the point should move to be on a grid intersection point.
@@ -607,7 +607,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     //To test adding an AND symbol
     | KeyPress AltA -> 
         //AND gate with 2 inputs, one output. Position set based on model.AddKey.
-        let msg = (Symbol.Add (CommonTypes.ComponentType.And, (iniPos model.Zoom model.AddKey), 2, 1))
+        let msg = (Symbol.Add (CommonTypes.ComponentType.And, (iniPos model.AddKey), 2, 1))
         //Update the model (including AddKey)
         updateSymbolModel {model with AddKey = (model.AddKey + 1)%100} msg
 
