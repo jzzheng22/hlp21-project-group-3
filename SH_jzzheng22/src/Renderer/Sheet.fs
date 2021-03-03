@@ -38,6 +38,7 @@ type Msg =
     | SelectDragStart of XYPos
     | SelectDragging of XYPos
     | SelectDragEnd
+    | DispatchMove of XYPos
 
 type MouseOps =
     | MouseDown
@@ -125,17 +126,17 @@ let drawPortConnectionLine model =
                    FillOpacity 0.1 ] ] []
 
 let mouseDown model mousePos dispatch = 
+    dispatch <| SelectDragStart mousePos
     match Symbol.isPort model.Wire.Symbol mousePos with
     | Some (_, portId) -> dispatch <| SelectPort portId
     | None ->
         let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
         if not (boxInSelectedArea outerBoxCoords (mousePos, mousePos)) then
             selectElements model mousePos dispatch
-    dispatch <| SelectDragStart mousePos
+    printf "mousedown: %A" mousePos
 
 let mouseUp model mousePos dispatch = 
-    dispatch <| SelectDragging mousePos
-
+    // dispatch <| SelectDragging mousePos
     match Symbol.isPort model.Wire.Symbol model.DraggingPos with
     | Some (_, endPoint) ->
         match model.SelectedPort with
@@ -146,7 +147,7 @@ let mouseUp model mousePos dispatch =
     if model.SelectingMultiple then
         let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
         dragSelectElements model boxInSelectedArea outerBoxCoords dispatch
-
+    printf "mouseup: %A" mousePos
     dispatch <| SelectDragEnd
 
 let increaseBoundingBox (a, topL, botR) = 
@@ -159,23 +160,32 @@ let mouseMove model mousePos dispatch mDown =
         |> getIDList (List.filter (removeID inBoundingBox mousePos))
 
     dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
+    printf "inMouseMove: %A" model.DraggingPos
 
     if mDown then // Drag
-        dispatch <| SelectDragging mousePos
-
+        // dispatch <| SelectDragging mousePos
         match model.SelectedPort with
         | Some _ -> ()
         | None ->
-            let transVector =
-                { X = mousePos.X - model.DraggingPos.X
-                  Y = mousePos.Y - model.DraggingPos.Y }
+            dispatch <| DispatchMove mousePos
+            // let transVector =
+            //     { X = (mousePos.X - model.DraggingPos.X) / model.Zoom
+            //       Y = (mousePos.Y - model.DraggingPos.Y) / model.Zoom }
+            // printf "Moving components"
+            // printf "mousePos: %A" mousePos
+            // printf "DraggingPos: %A" model.DraggingPos
+            // printf "transVector: %A" transVector
 
-            if not (List.isEmpty model.SelectedComponents) then
-                dispatch <| Symbol(Symbol.Move(model.SelectedComponents, transVector))
-            else if not (List.isEmpty model.SelectedWires) then
-                dispatch <| Wire(BusWire.MoveWires(model.SelectedWires, transVector))
-            else
-                dispatch <| SelectMultiple mousePos
+            // if not (List.isEmpty model.SelectedComponents) then
+            //     dispatch <| Symbol(Symbol.Move(model.SelectedComponents, transVector))
+            // else if not (List.isEmpty model.SelectedWires) then
+            //     dispatch <| Wire(BusWire.MoveWires(model.SelectedWires, transVector))
+            // else
+            //     dispatch <| SelectMultiple mousePos
+        // {model with DraggingPos = mousePos}
+        dispatch <| SelectDragging mousePos
+        // {model with DraggingPos = mousePos}
+
 
 let mDown (ev: Types.MouseEvent) = ev.buttons <> 0.
 
@@ -193,7 +203,7 @@ let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (di
 /// current scroll position, and chnage scroll position to keep centre of screen a fixed point.
 let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispatch<Msg>) =
     let sizeInPixels = sprintf "%.2fpx" ((1000. * model.Zoom))
-
+    // printf "%A" "ase"
     div [ Style [ Height "100vh"
                   MaxWidth "100vw"
                   CSSProp.OverflowX OverflowOptions.Auto
@@ -221,6 +231,7 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
 let view (model: Model) (dispatch: Msg -> unit) =
     let wDispatch wMsg = dispatch (Wire wMsg)
     let wireSvg = BusWire.view model.Wire wDispatch
+    printf "In view function DraggingPos: %A" model.DraggingPos
     displaySvgWithZoom model wireSvg dispatch
 
 
@@ -240,6 +251,16 @@ let deleteWires model =
 let deleteSymbols model wModel =
     BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
 
+
+///Send message to Symbol
+let sendSymbolMsg (model: Model) (msg: Symbol.Msg) = 
+    BusWire.update (BusWire.Symbol msg) model.Wire
+
+let updateSymbolModel (model: Model) (msg: Symbol.Msg) =
+    let wModel, wCmd = BusWire.update (BusWire.Symbol msg) model.Wire
+
+    // sendSymbolMsg model msg
+    {model with Wire = wModel}, Cmd.map Wire wCmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -298,7 +319,43 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               SelectedPort = None;
               SelectingMultiple = false },
         Cmd.none
-    | SelectDragging dragMsg -> { model with DraggingPos = dragMsg }, Cmd.none
+    | SelectDragging dragMsg ->
+        printf "Update DraggingPos: %A" dragMsg
+        { model with DraggingPos = dragMsg }, Cmd.none
+    | DispatchMove mousePos ->
+        let transVector =
+            { X = (mousePos.X - model.DraggingPos.X) / model.Zoom
+              Y = (mousePos.Y - model.DraggingPos.Y) / model.Zoom }
+        printf "Moving components"
+        printf "mousePos: %A" mousePos
+        printf "DraggingPos: %A" model.DraggingPos
+        printf "transVector: %A" transVector
+        // let msgList = []
+        if not (List.isEmpty model.SelectedComponents) then
+            let newModel = {model with DraggingPos = mousePos}
+            let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) newModel.Wire
+            {model with Wire = sModel}, Cmd.map Wire sCmd
+
+
+            // updateSymbolModel {model with DraggingPos = mousePos} (Symbol.Move(model.SelectedComponents, transVector))
+            // let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire
+            // { model with DraggingPos = mousePos}, sCmd
+        else if not (List.isEmpty model.SelectedWires) then
+            let newModel = {model with DraggingPos = mousePos}
+            let wModel, wCmd = BusWire.update (BusWire.MoveWires(model.SelectedWires, transVector)) newModel.Wire
+            {model with Wire = wModel}, Cmd.map Wire wCmd
+            // updateBusWireModel
+            // { model with DraggingPos = mousePos}, Wire(BusWire.MoveWires(model.SelectedWires, transVector))
+        else
+            { model with DraggingPos = mousePos; SelectingMultiple = true}, Cmd.none
+            // update SelectMultiple mouseMsg model
+            //     dispatch <| SelectMultiple mousePos
+
+            // let newModel = {model with DraggingPos = mousePos}
+            // let newModel, newCmd = 
+            // { model with DraggingPos = mousePos}, Cmd.none
+                // (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1)))
+    // BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
 
 
 let init () =
