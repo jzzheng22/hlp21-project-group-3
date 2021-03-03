@@ -7,8 +7,10 @@
 The module implemented here is **Sheet**.
 
 As compared to the project demo skeleton code:
-- *sheet.fs* was modified to enter code for the sheet module.
-- *renderer.fs* was modified to add drop-down menu options for certain features e.g. zooming.
+- *Sheet.fs* was modified to enter my code for the sheet module.
+- *Renderer.fs* was modified to add drop-down menu options for certain features e.g. zooming.
+- *Symbol.fs* was modified with code provided by group member JEMerrick for purposes of the demonstration.
+- *BusWire.fs* was modified with code provided by group member adidesh20 for purposes of the demonstration.
 
 A documentation of how this module interfaces with the Symbol and BusWire modules may be found in the main part of the repo under the folder *doc*.
 
@@ -20,6 +22,8 @@ npm run dev
 ```
 
 from within this directory (on the first run the code has to be built).
+
+Symbol code is provided by group member JEMerrick. BusWire code is provided by group member adidesh. The code may not be 100% up to date with the latest commits/submission of the members to this repo. However the interface and functionality implemented is the same.
 
 
 ## Sequence of Steps for the Demo
