@@ -45,6 +45,9 @@ These are called by adidesh20's BusWire and implemented in JEMerrick's Symbol:
 `Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
  - Returns the ComponentID which the PortID belongs to.
 
+ `Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge'
+ -Returns the edge that the port is on from Top | Bottom | Left | Right
+
 ## Messages
 **Received from Sheet via BusWire**
 
