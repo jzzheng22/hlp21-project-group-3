@@ -122,6 +122,10 @@ Called by jzzheng22's Sheet and implemented by JEMerrick's Symbol:
 `Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
  - Returns the ComponentID which the PortID belongs to.
 
+`Symbol.getBoundingBox symModel symID`
+ - Returns the bounding box for a given Symbol ID
+ - Called in jzzheng22's Sheet
+
 ## Bounding Box
  - Each buswire and symbol owns its bounding box. 
  - Can be fully defined using top left and bottom right corners. 

@@ -47,6 +47,11 @@ These are called by BusWire and implemented in JEMerrick's Symbol:
  - Returns the ComponentID which the PortID belongs to.
  - This function is also called by jzzheng22's Sheet
 
+`Symbol.getBoundingBox symModel symID`
+ - Returns the bounding box for a given Symbol ID
+ - Called in jzzheng22's Sheet
+
+
 ## Messages
 **Received from Sheet via BusWire**
 
