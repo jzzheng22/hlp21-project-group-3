@@ -78,7 +78,42 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
             let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X - (2.*xOffset)}
             let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
             [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
-    
+
+    | Symbol.Right,Symbol.Right ->
+        if diff.X >= 0. then // Three Segement Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X + xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        
+        else 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y)}
+            
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+
+    | Symbol.Left,Symbol.Right ->
+        if diff.X > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+            let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X + (2.*xOffset)}
+            let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X + xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        
+    | Symbol.Left,Symbol.Left ->
+        if diff.X >= 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        
+        else 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + diff.X - xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+            
     | Symbol.Right,Symbol.Bottom ->
         if diff.X > 0. && diff.Y > 0. then // Two Segment Case
             let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
@@ -99,13 +134,14 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
 
+
     | _,_ -> // Symbol is probably rotated, so reusing the basic algorithm. Will sort in Group Stage
-        if diff.X >= 0. then // Three Segement Case
+        if diff.X >= 0. then 
             let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
             let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
             [sourcePos;endPosSeg0;endPosSeg1;targetPos]
         
-        else // Five Segment Case
+        else 
             let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
             let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
             let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X - (2.*xOffset)}
@@ -227,8 +263,10 @@ let singleWireView =
                         let tgtHighlightPos = 
                             match props.WireP.TargetPortEdge with
                             | Symbol.Left -> Symbol.posAdd (List.last props.Vertices) {X= -3.;Y=0.}
+                            | Symbol.Right -> Symbol.posAdd (List.last props.Vertices) {X= 3.;Y=0.}
                             | Symbol.Bottom -> Symbol.posAdd (List.last props.Vertices) {X=0.;Y=3.}
-                            | _ -> failwithf "Shouldn't happen"
+                            | Symbol.Top -> Symbol.posAdd (List.last props.Vertices) {X=0.;Y= -3.}
+                            
                         [
                         circle [
                            Cx srcHighlightPos.X
