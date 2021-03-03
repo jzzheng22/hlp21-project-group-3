@@ -107,8 +107,8 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int * Sy
     | CommonTypes.ComponentType.AsyncROM x -> ("AROM", x.AddressWidth, x.WordWidth, LogMem)
     | CommonTypes.ComponentType.ROM x -> ("ROM", x.AddressWidth, x.WordWidth, FF)
     | CommonTypes.ComponentType.RAM x -> ("RAM", x.AddressWidth, x.WordWidth, RAM)
-    | CommonTypes.ComponentType.Input x -> ((sprintf "In<%d:0>" x), x, x, IO) 
-    | CommonTypes.ComponentType.Output x -> ((sprintf "Out<%d:0>" x), x, x, IO) 
+    | CommonTypes.ComponentType.Input x -> ((sprintf "In<%d:0>" (x - 1)), x, x, IO) 
+    | CommonTypes.ComponentType.Output x -> ((sprintf "Out<%d:0>" (x - 1)), x, x, IO) 
     | CommonTypes.ComponentType.IOLabel -> ("", 0, 0, IO) //Check generic type WHAT IS THIS?? 
     | CommonTypes.ComponentType.BusSelection (x, y) -> ("", x, y, Wires)
     | CommonTypes.ComponentType.MergeWires -> ("", 0, 0, Wires)
@@ -517,13 +517,12 @@ let init () =
         (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 {X = 200.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 {X = 300.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Demux2) 1 2 {X = 400.; Y = 50.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Input 2) 0 1 {X = 200.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Output 2) 1 0 {X = 300.; Y = 300.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Input 1) 0 1 {X = 200.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.Decode4) 2 4 {X = 10.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.Register 1) 1 1 {X = 500.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.Register 2) 1 1 {X = 600.; Y = 200.}) //To show getbuswidth interface func
         (CreateNewSymbol (CommonTypes.ComponentType.DFFE) 1 1 {X = 200.; Y = 300.})
-        //(CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 400.; Y = 300.})
+        (CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 400.; Y = 300.})
     ]
     , Cmd.none
 
