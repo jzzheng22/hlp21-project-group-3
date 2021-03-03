@@ -10,7 +10,7 @@ As compared to the project demo skeleton code:
 - *sheet.fs* was modified to enter code for the sheet module.
 - *renderer.fs* was modified to add drop-down menu options for certain features e.g. zooming.
 
-A documentation of how this module interfaces with the Symbol and Sheet modules may be found in the main part of the repo.
+A documentation of how this module interfaces with the Symbol and BusWire modules may be found in the main part of the repo.
 
 The code may be run by entering
 
@@ -19,16 +19,16 @@ npm run dev
 
 ```
 
-from within this directory.
+from within this directory (of course, on the first run it has to be built).
 
 
 ## Sequence of Steps for the Demo
 
-1. *Highlighting of ports* on moving mouse over symbol. Demonstrate it working for multiple symbols simultaneously i.e. when mouse is inside >1 bounding box.
+1. *Highlighting of ports* on moving mouse over symbol. Demonstrate it working for multiple symbols simultaneously i.e. when mouse is inside more than one bounding box.
 
-2. *Selection* of single and multiple symbols with highlighting.
+2. *Selection and highlighting* of single (with click) and multiple symbols (with drag-box).
 
-3. *Dragging and snap-to-grid*. For single and multiple symbols (the multiple symbols can be done by dragging mouse from any of the selected components)
+3. *Dragging and snap-to-grid*. For single and multiple symbols (the multiple symbols can be done by dragging mouse from any of the selected components). Correct behaviour in presence of scrolling.
 
 4. *Automatic aligning* of multiple selected symbols horizontally/vertically. Illustrating utility of vertical alignment with Joanna's functionality to rotate/scale symbols (may skip this if pushed for time).
 
@@ -36,8 +36,8 @@ from within this directory.
 
 6. *Deleting* wires and symbols which automatically delete connected wires.  
 
-7. *Adding symbols* - illustrate algorithm to initialise positions.
+7. *Adding symbols* - illustrate algorithm to initialise positions of added components.
 
-7. *Zooming behaviour*: Points 1-7 (may not cover all) briefly demonstrated to work when zooming in/out on canvas.
+7. *Zooming behaviour*: Points 1-7 (may not cover all) briefly demonstrated in presence of zooming in/out on the canvas.
 
-Target time: 300s.
+Target time for demo: 300s.
