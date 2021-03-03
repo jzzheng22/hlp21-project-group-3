@@ -89,7 +89,6 @@ let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>)
 /// Selects elements where mousePos is inside bounding box
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
     dragSelectElements model inBoundingBox mousePos dispatch
-    // dispatch <| SelectDragStart mousePos
 
 let validConnection model =
     match Symbol.isPort model.Wire.Symbol model.DraggingPos with
@@ -133,22 +132,19 @@ let drawPortConnectionLine model =
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
 let mouseDown model mousePos dispatch = 
-    // dispatch <| SelectDragStart mousePos
-    printf "on mouse down"
     match Symbol.isPort model.Wire.Symbol mousePos with
     | Some (_, portId) -> dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
     | None ->
-        let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
-        printf "%A" outerBoxCoords
-        printf "%A" mousePos
-        if not (boxInSelectedArea outerBoxCoords (mousePos, mousePos)) then
-            printf "not in selected area"
+        let componentList = 
+            model.SelectedComponents
+            |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
+            |> List.filter (inBoundingBox mousePos)
+        if List.isEmpty componentList then
             selectElements model mousePos dispatch
     dispatch <| SelectDragStart mousePos
     
 
 let mouseUp model mousePos dispatch = 
-    printf "on mouse up"
     match validConnection model with
     | Some endPort ->
         match model.SelectedPort with
@@ -165,7 +161,6 @@ let increaseBoundingBox (a, topL, botR) =
     a, {X = topL.X - 10.; Y = topL.Y - 10.}, {X = botR.X + 10.; Y = botR.Y + 10.}
 
 let mouseMove model mousePos dispatch mDown = 
-    // printf "on mouse move"
     let symbolIDList =
         Symbol.getBoundingBoxes model.Wire.Symbol mousePos
         |> List.map increaseBoundingBox
@@ -174,13 +169,6 @@ let mouseMove model mousePos dispatch mDown =
     dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
 
     if mDown then // Drag
-        // printf "on mouse drag"
-        // if not model.SelectingMultiple then
-        //     dispatch <| SelectDragStart mousePos
-        // else 
-        //     dispatch <| SelectDragging mousePos
-
-
         match model.SelectedPort with
         | (Some _, _) -> ()
         | _ ->
@@ -265,11 +253,7 @@ let moveElements model mousePos =
         { X = (mousePos.X - model.DraggingPos.X) / model.Zoom
           Y = (mousePos.Y - model.DraggingPos.Y) / model.Zoom }
     let newModel = {model with DraggingPos = mousePos}
-    printf "Selected components"
-    printf "%A" model.SelectedComponents
-    printf "%A" model.SelectedWires
     if not (List.isEmpty model.SelectedComponents) then
-        printf "Move symbols"
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) newModel.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
@@ -281,7 +265,6 @@ let moveElements model mousePos =
         {model with Wire = wModel}, Cmd.map Wire wCmd
 
     else
-        printf "SelectingMultiple true"
         { model with SelectingMultiple = true}, Cmd.none
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
@@ -327,13 +310,11 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         { model with SelectedComponents = scMsg }, Cmd.none
     | SelectWires swMsg -> { model with SelectedWires = swMsg }, Cmd.none
     | SelectDragStart dragMsg ->
-        printf "DragStartPos = %A" dragMsg
         { model with
               DragStartPos = dragMsg;
               DraggingPos = dragMsg },
         Cmd.none
     | SelectDragEnd ->
-        printf "SelectingMultiple: false"
         { model with
               SelectedPort = None, CommonTypes.PortType.Input;
               SelectingMultiple = false },
