@@ -769,7 +769,7 @@ let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int =
     (getPortinfo model pId).Width
 
 let getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId =
-    CommonTypes.ComponentId (getPortinfo model pId).Port.HostId
+    CommonTypes.ComponentId ((getPortinfo model pId).Port.HostId)
 
 type Edge = Top | Bottom | Left | Right
 let getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge =
