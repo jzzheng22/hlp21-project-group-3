@@ -124,7 +124,7 @@ let drawPortConnectionLine model =
                        StrokeDasharray "5,5"
                    FillOpacity 0.1 ] ] []
 
-/// this will be set when the canvas is first created and then provide info about how the canvas is scrolled.
+/// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
 let mouseDown model mousePos dispatch = 
@@ -135,7 +135,6 @@ let mouseDown model mousePos dispatch =
         let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
         if not (boxInSelectedArea outerBoxCoords (mousePos, mousePos)) then
             selectElements model mousePos dispatch
-    printf "mousedown: %A" mousePos
 
 let mouseUp model mousePos dispatch = 
     // dispatch <| SelectDragging mousePos
@@ -150,7 +149,6 @@ let mouseUp model mousePos dispatch =
     if model.SelectingMultiple then
         let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
         dragSelectElements model boxInSelectedArea outerBoxCoords dispatch
-    printf "mouseup: %A" mousePos
     dispatch <| SelectDragEnd
 
 let increaseBoundingBox (a, topL, botR) = 
@@ -163,7 +161,6 @@ let mouseMove model mousePos dispatch mDown =
         |> getIDList (List.filter (removeID inBoundingBox mousePos))
 
     dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
-    printf "inMouseMove: %A" model.DraggingPos
 
     if mDown then // Drag
         // dispatch <| SelectDragging mousePos
@@ -171,7 +168,6 @@ let mouseMove model mousePos dispatch mDown =
         | (Some _, _) -> ()
         | _ ->
             dispatch <| DispatchMove mousePos
-        printf "%A" model.Wire.Symbol.[8]
 
         dispatch <| SelectDragging mousePos
 
@@ -182,24 +178,13 @@ let mDown (ev: Types.MouseEvent) = ev.buttons <> 0.
 let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (dispatch: Dispatch<Msg>) =
     let coordX = ev.clientX / model.Zoom
     let coordY = ev.clientY / model.Zoom
-    // printf "%A" (ev.pageX / model.Zoom)
-    // printf "%A" (ev.pageY / model.Zoom)
-    printf "%A" (ev.clientX / model.Zoom)
-    printf "%A" (ev.clientY / model.Zoom)
-    // printf "%A" (ev.offsetX / model.Zoom)
-    // printf "%A" (ev.offsetY / model.Zoom)
-
     let offsetX, offsetY =
         match getSvgClientRect () with
         | Some a ->
             a.left, a.top
         | None ->
             0., 0.
-    // let mousePos = { X = coordX; Y = coordY}
-    printf "%A %A" offsetX offsetY
-    // let offsetX = ev.offsetX
     let mousePos = { X = coordX - offsetX; Y = coordY - offsetY}
-    printf "%A" mousePos
     match mouseOp with
     | MouseDown -> mouseDown model mousePos dispatch
     | MouseUp -> mouseUp model mousePos dispatch
@@ -214,19 +199,6 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                   MaxWidth "100vw"
                   CSSProp.OverflowX OverflowOptions.Auto
                   CSSProp.OverflowY OverflowOptions.Auto ]
-        //   let scrollEvent (ev: Types.UIEvent) =
-        //     let element = ref None
-        //     match !element  with
-        //     | Some e ->
-        //         printf "%A" e.scrollWidth
-        //         printf "%A" e.clientWidth
-        //         printf "%A" e.scrollLeft
-            // let scrollOffset = 
-            // printf "%A" ev.pageX
-            // printf "%A" ev.pageY
-            // printf "%A" ev.scrollWidth
-            // dispatch <| Scroll scrollOffset
-        //   OnScroll (fun ev -> scrollEvent ev)
           OnMouseDown (fun ev -> handleMouseOps MouseDown model ev dispatch)
           OnMouseUp (fun ev -> handleMouseOps MouseUp model ev dispatch)
           OnMouseMove (fun ev -> handleMouseOps MouseMove model ev dispatch)
