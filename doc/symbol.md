@@ -34,16 +34,23 @@ Each Symbol owns its ports.
  - `None`
 
 `Symbol.getPortIds (model: Model) (symbolId: CommonTypes.ComponentID)`
- - Returns list of ports for each symbol ID.
- - Is used to find wires connected to symbol(s).
+ - Returns list of port IDs for a given symbol ID.
+ - Used to find wires connected to a symbol.
 
 *Optional interface functions*
-These are called by adidesh20's BusWire and implemented in JEMerrick's Symbol:
+
+These are called by BusWire and implemented in JEMerrick's Symbol:
 `Symbol.getPortWidth (model : Model) (pId : CommonTypes.PortId) : int`
  - Returns width of specified port.
 
 `Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
  - Returns the ComponentID which the PortID belongs to.
+ - This function is also called by jzzheng22's Sheet
+
+`Symbol.getBoundingBox symModel symID`
+ - Returns the bounding box for a given Symbol ID
+ - Called in jzzheng22's Sheet
+
 
  `Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge'
  - Returns the edge of the symbol that the port is on

@@ -66,7 +66,8 @@ Wires should be selectable: should do autorouting initially but be selectable an
  - Returns if port is input or output.
 
 *Optional interface functions:*
-These are called by adidesh20's BusWire and implemented in JEMerrick's Symbol:
+
+These are called by BusWire and implemented in JEMerrick's Symbol:
 `Symbol.getPortWidth (model : Model) (pId : CommonTypes.PortId) : int`
  - Returns width of specified port.
 

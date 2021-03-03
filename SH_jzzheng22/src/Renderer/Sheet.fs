@@ -11,7 +11,7 @@ open Helpers
 type Model =
     { Wire: BusWire.Model
       Zoom: float
-      SelectedPort: CommonTypes.PortId option
+      SelectedPort: CommonTypes.PortId option * CommonTypes.PortType
       SelectedComponents: CommonTypes.ComponentId list
       SelectedWires: CommonTypes.ConnectionId list
       SelectingMultiple: bool
@@ -31,13 +31,13 @@ type Msg =
     | Wire of BusWire.Msg
     | Symbol of Symbol.Msg
     | KeyPress of KeyboardMsg
-    | SelectPort of CommonTypes.PortId
+    | SelectPort of CommonTypes.PortId * CommonTypes.PortType
     | SelectComponents of CommonTypes.ComponentId list
     | SelectWires of CommonTypes.ConnectionId list
-    | SelectMultiple of XYPos
     | SelectDragStart of XYPos
     | SelectDragging of XYPos
     | SelectDragEnd
+    | DispatchMove of XYPos
 
 type MouseOps =
     | MouseDown
@@ -89,8 +89,12 @@ let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>)
 /// Selects elements where mousePos is inside bounding box
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
     dragSelectElements model inBoundingBox mousePos dispatch
-    dispatch <| SelectDragStart mousePos
 
+let validConnection model =
+    match Symbol.isPort model.Wire.Symbol model.DraggingPos with
+    | Some (_, portID) when Symbol.getPortType model.Wire.Symbol portID <> snd model.SelectedPort ->
+        Some portID
+    | _ -> None
 
 let cornersToString startCoord endCoord =
     sprintf
@@ -113,7 +117,7 @@ let drawPortConnectionLine model =
            Y1 model.DragStartPos.Y
            X2 model.DraggingPos.X
            Y2 model.DraggingPos.Y
-           Style [ match Symbol.isPort model.Wire.Symbol model.DraggingPos with
+           Style [ match validConnection model with
                    | Some _ ->
                        Stroke "darkblue"
                        StrokeWidth "5px"
@@ -124,29 +128,33 @@ let drawPortConnectionLine model =
                        StrokeDasharray "5,5"
                    FillOpacity 0.1 ] ] []
 
+/// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
+let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
+
 let mouseDown model mousePos dispatch = 
     match Symbol.isPort model.Wire.Symbol mousePos with
-    | Some (_, portId) -> dispatch <| SelectPort portId
+    | Some (_, portId) -> dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
     | None ->
-        let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
-        if not (boxInSelectedArea outerBoxCoords (mousePos, mousePos)) then
+        let componentList = 
+            model.SelectedComponents
+            |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
+            |> List.filter (inBoundingBox mousePos)
+        if List.isEmpty componentList then
             selectElements model mousePos dispatch
     dispatch <| SelectDragStart mousePos
+    
 
 let mouseUp model mousePos dispatch = 
-    dispatch <| SelectDragging mousePos
-
-    match Symbol.isPort model.Wire.Symbol model.DraggingPos with
-    | Some (_, endPoint) ->
+    match validConnection model with
+    | Some endPort ->
         match model.SelectedPort with
-        | Some a -> dispatch <| Wire(BusWire.AddWire(a, endPoint))
-        | None -> ()
+        | (Some startPort, _) when Symbol.getPortType model.Wire.Symbol endPort <> snd model.SelectedPort 
+            -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
+        | _ -> ()
     | None -> ()
-
     if model.SelectingMultiple then
         let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
         dragSelectElements model boxInSelectedArea outerBoxCoords dispatch
-
     dispatch <| SelectDragEnd
 
 let increaseBoundingBox (a, topL, botR) = 
@@ -161,28 +169,26 @@ let mouseMove model mousePos dispatch mDown =
     dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
 
     if mDown then // Drag
+        match model.SelectedPort with
+        | (Some _, _) -> ()
+        | _ ->
+            dispatch <| DispatchMove mousePos
+
         dispatch <| SelectDragging mousePos
 
-        match model.SelectedPort with
-        | Some _ -> ()
-        | None ->
-            let transVector =
-                { X = mousePos.X - model.DraggingPos.X
-                  Y = mousePos.Y - model.DraggingPos.Y }
-
-            if not (List.isEmpty model.SelectedComponents) then
-                dispatch <| Symbol(Symbol.Move(model.SelectedComponents, transVector))
-            else if not (List.isEmpty model.SelectedWires) then
-                dispatch <| Wire(BusWire.MoveWires(model.SelectedWires, transVector))
-            else
-                dispatch <| SelectMultiple mousePos
 
 let mDown (ev: Types.MouseEvent) = ev.buttons <> 0.
 
 let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (dispatch: Dispatch<Msg>) =
     let coordX = ev.clientX / model.Zoom
     let coordY = ev.clientY / model.Zoom
-    let mousePos = { X = coordX; Y = coordY }
+    let offsetX, offsetY =
+        match getSvgClientRect () with
+        | Some a ->
+            a.left, a.top
+        | None ->
+            0., 0.
+    let mousePos = { X = coordX - offsetX; Y = coordY - offsetY}
     match mouseOp with
     | MouseDown -> mouseDown model mousePos dispatch
     | MouseUp -> mouseUp model mousePos dispatch
@@ -193,7 +199,6 @@ let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (di
 /// current scroll position, and chnage scroll position to keep centre of screen a fixed point.
 let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispatch<Msg>) =
     let sizeInPixels = sprintf "%.2fpx" ((1000. * model.Zoom))
-
     div [ Style [ Height "100vh"
                   MaxWidth "100vw"
                   CSSProp.OverflowX OverflowOptions.Auto
@@ -204,12 +209,15 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
         ] [
         svg [ Style [ Border "3px solid green"
                       Height sizeInPixels
-                      Width sizeInPixels ] ] [
+                      Width sizeInPixels ] 
+                      
+              Ref (fun html -> 
+                        getSvgClientRect <- fun () -> (Some (html.getBoundingClientRect()))) ] [
             g [ Style [ Transform(sprintf "scale(%f)" model.Zoom) ] ] [  // top-level transform style attribute for zoom
                 svgReact // the application code
                 match model.SelectedPort with
-                | Some _ -> drawPortConnectionLine model
-                | None -> ()
+                | (Some _, _) -> drawPortConnectionLine model
+                | _ -> ()
 
                 if model.SelectingMultiple then
                     drawSelectionBox model
@@ -240,6 +248,24 @@ let deleteWires model =
 let deleteSymbols model wModel =
     BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
 
+let moveElements model mousePos =
+    let transVector =
+        { X = (mousePos.X - model.DraggingPos.X) / model.Zoom
+          Y = (mousePos.Y - model.DraggingPos.Y) / model.Zoom }
+    let newModel = {model with DraggingPos = mousePos}
+    if not (List.isEmpty model.SelectedComponents) then
+        let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) newModel.Wire
+        {model with Wire = sModel}, Cmd.map Wire sCmd
+
+    else if not (List.isEmpty model.SelectedWires) then
+        printf "Demo: Send BusWire.MoveWires"
+        printf "%A" model.SelectedWires
+        printf "%A" transVector
+        let wModel, wCmd = BusWire.update (BusWire.MoveWires(model.SelectedWires, transVector)) newModel.Wire
+        {model with Wire = wModel}, Cmd.map Wire wCmd
+
+    else
+        { model with SelectingMultiple = true}, Cmd.none
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -258,7 +284,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
 
         { model with
               Wire = sModel
-              SelectedPort = None
+              SelectedPort = None, CommonTypes.PortType.Input
               SelectedComponents = []
               SelectedWires = [] },
         Cmd.batch [ Cmd.map Wire wCmd;
@@ -279,15 +305,10 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             | _ -> CommonTypes.Grey
 
         model, Cmd.ofMsg (Wire <| BusWire.SetColor c)
-    | SelectPort spMsg -> { model with SelectedPort = Some spMsg }, Cmd.none
+    | SelectPort (portID, portType) -> { model with SelectedPort = Some portID, portType }, Cmd.none
     | SelectComponents scMsg ->
         { model with SelectedComponents = scMsg }, Cmd.none
     | SelectWires swMsg -> { model with SelectedWires = swMsg }, Cmd.none
-    | SelectMultiple multMsg ->
-        { model with
-              DraggingPos = multMsg;
-              SelectingMultiple = true },
-        Cmd.none
     | SelectDragStart dragMsg ->
         { model with
               DragStartPos = dragMsg;
@@ -295,18 +316,20 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         Cmd.none
     | SelectDragEnd ->
         { model with
-              SelectedPort = None;
+              SelectedPort = None, CommonTypes.PortType.Input;
               SelectingMultiple = false },
         Cmd.none
-    | SelectDragging dragMsg -> { model with DraggingPos = dragMsg }, Cmd.none
-
+    | SelectDragging dragMsg ->
+        { model with DraggingPos = dragMsg }, Cmd.none
+    | DispatchMove mousePos ->
+        moveElements model mousePos
 
 let init () =
     let model, cmds = (BusWire.init 400) ()
 
     { Wire = model
       Zoom = 1.0
-      SelectedPort = None
+      SelectedPort = None, CommonTypes.PortType.Input
       SelectedComponents = []
       SelectedWires = []
       SelectingMultiple = false
