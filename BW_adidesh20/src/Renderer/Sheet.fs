@@ -26,12 +26,25 @@ type Model = {
     SelectedComponentIDs: CommonTypes.ComponentId list
     SelectedWireIDs: CommonTypes.ConnectionId list
     SelectedPort: CommonTypes.PortId option
+    AddKey: int
     Zoom: float
     }
 
 //Keyboard messages (see Renderer.fs)
 type KeyboardMsg =
-    | CtrlS | AltC | AltV | AltZ | AltShiftZ | DEL | ZoomCanvasIn | ZoomCanvasOut
+    | CtrlS 
+    | AltC 
+    | AltV 
+    | AltZ 
+    | AltShiftZ 
+    | RotateSymbol 
+    | ScaleUpSymbol
+    | ScaleDownSymbol
+    | AltA
+    | DEL 
+    | ZoomCanvasIn 
+    | ZoomCanvasOut 
+    
     
 //The message type
 type Msg =
@@ -51,9 +64,19 @@ type Msg =
 //Define the origin point for future reference
 let origin = {X = 0.0; Y = 0.0}
 
+//The canvas is square - we define length of one side in pixels without zoom
+let UNZOOMEDCANVAS = 1000.0
 
+//We define side-length of a grid square (1/100 of canvas)
+let UNZOOMEDGRID = UNZOOMEDCANVAS/100.0
 
 //DEFINE HELPER FUNCTIONS:
+
+
+//NOTE: Functions from here onwards use the coordinate system of symbol and buswire as they are concerned with bounding box calculations -
+//these cocrdinates are not scaled with the zoom i.e. they are the coordinates when zoom = 1.0.
+
+
 
 //We work with data structures of the form (ComponentID, topleft corner, bottomright corner) when representing bounding boxes.
 //This obtains the component ID
@@ -65,6 +88,8 @@ let obtainID (data: (string * XYPos * XYPos)) =
 let obtainCorners (data: (string * XYPos * XYPos)) =
     let id, topLeft, bottomRight = data 
     (topLeft, bottomRight)
+
+
 
 //Bool function that determines whether a point is within a bounding box. The bounding box is a tuple of 
 //(topleft corner, bottomright corner)
@@ -115,6 +140,36 @@ let boxEncloses (encloser: (XYPos * XYPos)) (enclosed: (string * XYPos * XYPos))
 let hasCommon ls1 ls2 = 
     Set.isEmpty (Set.intersect (Set.ofList ls1) (Set.ofList ls2)) |> not   
 
+
+//Function that translates the addKey value of model to an initial position for adding a symbol
+let iniPos zoom addkey =
+    let yOffset = float (addkey%10)
+    let xOffset = float (addkey/10)
+    //define x-y gap for no zoom between each new symbol
+    let gap = 9.0*UNZOOMEDGRID
+    {X = (UNZOOMEDGRID + gap*xOffset)*zoom; Y = (UNZOOMEDGRID + gap*yOffset)*zoom}
+
+//Snap-to-grid. Takes in a point (will be top-left coord of bounding box) and returns a 
+//translation vector indicating where the point should move to be one a grid intersection point.
+let snapgrid (point: XYPos) = 
+    let newXSquare = round (point.X/UNZOOMEDGRID)
+    let newYSquare = round (point.Y/UNZOOMEDGRID)
+    //return translation vector
+    {X = (UNZOOMEDGRID*newXSquare - point.X); Y = (UNZOOMEDGRID*newYSquare - point.Y)}
+
+
+
+
+//NOTE: Functions from here onwards use the coordinate system of sheet as they are concerned with display - 
+//these cocrdinates can be scaled with the zoom.
+
+
+
+//It is not efficient to transfer zooming to coordinates held in symbol and busWire - instead we define 
+//a function to scale down the coordinates in sheet so that an interface with other modules in the presence
+//of zooming is possible.
+let zoomScale (zoom: float) (pt: XYPos) = 
+    {X = pt.X/zoom; Y = pt.Y/zoom}
 
     
 //Functions to generate string of corner points of rectangle
@@ -178,8 +233,8 @@ let selectGraphic model =
 
 // This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
-    let canvasSize = 1000.0*zoom
-    let step = 10.0*zoom
+    let canvasSize = UNZOOMEDCANVAS*zoom
+    let step = UNZOOMEDGRID*zoom
 
     let vertLineMap n = 
         line [
@@ -209,18 +264,17 @@ let backgroundGrid zoom  =
     ]
 
 
-
  /// this will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None)
 
 /// This function zooms an SVG canvas by transforming its content and altering its size.
 /// Currently the zoom expands based on top left corner. Better would be to collect dimensions
-/// current scroll position, and chnage scroll position to keep centre of screen a fixed point.
+/// current scroll position, and chnage scroll position to keep centre of screen a fixed point
 let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: ReactElement option) (dispatch: Dispatch<Msg>)=
     
     let zoom = model.Zoom
 
-    let sizeInPixels = sprintf "%.2fpx" (1000. * zoom)
+    let sizeInPixels = sprintf "%.2fpx" (UNZOOMEDCANVAS * zoom)
     
     let rightscroll, downscroll = 
         match getSvgClientRect () with 
@@ -230,10 +284,8 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
             0.0, 0.0 
 
     //Finding the scroll position
-    let rightScrollOffset = 1000.0*zoom - rightscroll
-    let downScrollOffset = 1000.0*zoom - downscroll
-
-    printfn "Scrolls: %A, %A" rightScrollOffset downScrollOffset
+    let rightScrollOffset = UNZOOMEDCANVAS*zoom - rightscroll
+    let downScrollOffset = UNZOOMEDCANVAS*zoom - downscroll
 
     /// Is the mouse button currently down?
     let mDown (ev:Types.MouseEvent) = 
@@ -266,18 +318,21 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                             //mousePos contains the mouse coordinates adjusted for scrolling
                             let mousePos = {X = mouseX + rightScrollOffset ; Y = mouseY + downScrollOffset}
 
+                            //"Scaled down" version of coordinates to interface with other modules for zoom
+                            let scaledMousePos = zoomScale model.Zoom mousePos
+
                             //CASE 1: Click at Port
-                            match (Symbol.isPort (model.Wire.Symbol) mousePos) with 
+                            match (Symbol.isPort (model.Wire.Symbol) scaledMousePos) with 
                             | Some (a: (XYPos * CommonTypes.PortId)) -> 
                                 let portcoord, portid = a
                                 SelectPort (mousePos, portid) |> dispatch
                             | None -> 
                                 //CASE 2: Mouse Click within a symbol 
                                 //Get symbol bounding boxes and filter based on whether they contain the click point
-                                let filteredSymbolList = Symbol.getBoundingBoxes (model.Wire.Symbol) mousePos
+                                let filteredSymbolList = Symbol.getBoundingBoxes (model.Wire.Symbol) scaledMousePos
                                                          //Convert IDs to strings to use in generic helper functions
                                                          |> List.map (fun (a,b,c) -> (string a, b, c))
-                                                         |> filterBoxes mousePos
+                                                         |> filterBoxes scaledMousePos
                                                          //Convert back to component IDs when done. 
                                                          |> List.map CommonTypes.ComponentId
                                 //Check if we have something
@@ -291,15 +346,15 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                                 else 
                                     //CASE 3: Mouse Click on a wire
                                     //Filter wire bounding boxes on whether they contain the click point
-                                    let filteredWireList = BusWire.getBoundingBoxes (model.Wire) mousePos 
+                                    let filteredWireList = BusWire.getBoundingBoxes (model.Wire) scaledMousePos 
                                                            //Convert IDs to strings to use in generic helper functions
                                                            |> List.map (fun (a,b,c) -> (string a, b, c))
-                                                           |> filterBoxes mousePos
+                                                           |> filterBoxes scaledMousePos
                                                            //Convert back to component IDs when done. 
                                                            |> List.map CommonTypes.ConnectionId
                                     //Check if we have something.
                                     if not (List.isEmpty filteredWireList) then
-                                        //If we select an ID that is already highlighted we don't change anything
+                                        //If we select a wire ID that is already highlighted we don't change anything
                                         if hasCommon filteredWireList model.SelectedWireIDs then
                                             UpdateMouse mousePos |> dispatch
                                         //Else we initiate a new selection
@@ -324,24 +379,22 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                             let mouseY = ev.pageY 
                             //mousePos contains the mouse coordinates adjusted for scrolling
                             let mousePos = {X = mouseX + rightScrollOffset ; Y = mouseY + downScrollOffset}
+
+                            //"Scaled down" version of coordinates to interface with other modules for zoom
+                            let scaledMousePos = zoomScale model.Zoom mousePos
+
                             //In response to mouse dragging send message.
 
                             //In ALL cases, we need to highlight the ports of a symbol if our mouse enters the bounding box
 
-                            //See if we can find a symbol for which the mouse is within bounding box. We will just take the first such symbol we find 
-                            //and ignore any overlapping ones.
-                            let stringIdBoxes = Symbol.getBoundingBoxes (model.Wire.Symbol) mousePos 
-                                                |> List.map (fun (a,b,c) -> (string a, b, c))
-                            match List.tryFind (pointInBoundingBox mousePos) stringIdBoxes with 
-                            //We get something then highlight the symbol ports.
-                            | Some a ->
-                                printfn "Gotcha!"
-                                let symid, tl, br = a 
-                                WireMsg (BusWire.Symbol (Symbol.HighlightPorts (CommonTypes.ComponentId symid))) |> dispatch
-                            //Else just return unit.
-                            | None ->
-                                printfn "Nothing" 
-                                WireMsg (BusWire.Symbol (Symbol.HighlightPorts (CommonTypes.ComponentId ""))) |> dispatch
+                            //Find all symbol IDs for which the mouse is within bounding box. We want to highlight ports on all of these symbols.
+                            let symIds = Symbol.getBoundingBoxes (model.Wire.Symbol) scaledMousePos 
+                                            |> List.map (fun (a,b,c) -> (string a, b, c))
+                                            |> List.filter (pointInBoundingBox scaledMousePos)
+                                            |> List.map (fun (strid, tl, br) -> CommonTypes.ComponentId strid)
+                            //Highlight the list of symbol ports.
+                            WireMsg (BusWire.Symbol (Symbol.HighlightPorts symIds)) |> dispatch
+                            
 
                             if mDown ev 
                             then SelectGrow mousePos |> dispatch
@@ -369,6 +422,8 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
             ]
         ]
 
+// END OF UBIQUITOUS HELPER FUNCTIONS
+
 
 //View function
 let view (model:Model) (dispatch : Msg -> unit) =
@@ -383,24 +438,103 @@ let view (model:Model) (dispatch : Msg -> unit) =
     displaySvgWithZoom model svgComponents (selectGraphic model) dispatch
        
 
+//DEFINE SOME HELPER FUNCTIONS FOR UPDATE TO SEND MESSAGES
+
+//Send message to BusWire
+let sendBusWireMsg (model: Model) (msg: BusWire.Msg) =
+    BusWire.update msg model.Wire
+
+//Send message to Symbol
+let sendSymbolMsg (model: Model) (msg: Symbol.Msg) = 
+    BusWire.update (BusWire.Symbol msg) model.Wire
+
+//Send BusWire message and update model
+let updateBusWireModel (model: Model) (msg: BusWire.Msg) =
+    let wModel, wCmd = sendBusWireMsg model msg
+    {model with Wire = wModel}, Cmd.map WireMsg wCmd
+
+//Send BusWire message and update model
+let updateSymbolModel (model: Model) (msg: Symbol.Msg) =
+    let wModel, wCmd = sendSymbolMsg model msg
+    {model with Wire = wModel}, Cmd.map WireMsg wCmd
 
 
+//Update function begins here
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     //A wire message - pass on to BusWire
     | WireMsg wMsg -> 
-        let wModel, wCmd = BusWire.update wMsg model.Wire
-        {model with Wire = wModel}, Cmd.map WireMsg wCmd
+        updateBusWireModel model wMsg
+
     //Zooming in
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
+
     //Zooming out
     | KeyPress ZoomCanvasOut -> 
         ({model with Zoom = model.Zoom/1.25}, Cmd.none)
+
+    //NOTE: The following case is part of Joanna's demo. It implements:
+    //          - Rotating symbol utility. Rotates symbol clockwise by 90 degrees.
+    //          - Scaling up symbol utility. Magnifies symbol by 1.25.
+    //          - Scaling down symbol utility. Shrinks symbol to scale 0.8 = 1/1.25.
+    // Stretching and clockwise rotation NOT implemented.
+    | KeyPress k when (k = RotateSymbol || k = ScaleUpSymbol || k = ScaleDownSymbol) -> 
+        if List.isEmpty model.SelectedComponentIDs then 
+            model, Cmd.none
+        else 
+            let symid = List.head model.SelectedComponentIDs
+            match k with 
+            //Rotation
+            | RotateSymbol -> 
+                updateSymbolModel model  (Symbol.Rotate (symid, 90))
+            //Magnification
+            | ScaleUpSymbol -> 
+                let scaleamt = 1.25
+                updateSymbolModel model (Symbol.Scale (symid, {X = scaleamt; Y = scaleamt}))
+            //Shrinking
+            | ScaleDownSymbol -> 
+                let scaleamt = 0.8 
+                updateSymbolModel model (Symbol.Scale (symid, {X = scaleamt; Y = scaleamt}))
+            | _ -> 
+                failwithf "Unexpected input in symbol transformation."
+
+    //Deleting a selected symbol(s)/wire(s).
+    | KeyPress DEL -> 
+        match model.SelectionType with 
+        //Delete symbol(s)
+        | ComponentSymbol -> 
+            //We first need to find and delete all connected wires of the symbol(s)
+            let connectedWires = model.SelectedComponentIDs
+                                 //Obtain portID lists for each selected component
+                                 |> List.map (Symbol.getPortIds model.Wire.Symbol) 
+                                 //Obtain the wires corresponding to all these ports into a single list
+                                 |> List.collect (BusWire.getWireIdsFromPortIds model.Wire)
+                                 //Remove repeated elements 
+                                 |> List.distinct
+            //Delete the wires first.                  
+            let wModel1, wCmd1 = sendBusWireMsg model (BusWire.DeleteWires connectedWires)
+            //Then delete the symbols.
+            let wModel2, wCmd2 = BusWire.update (BusWire.Symbol (Symbol.Delete model.SelectedComponentIDs)) wModel1
+            //return updated model
+            {model with Wire = wModel2}, Cmd.batch [Cmd.map WireMsg wCmd2; Cmd.map WireMsg wCmd1]
+        //delete wire(s)
+        | ComponentWire -> 
+            updateBusWireModel model (BusWire.DeleteWires model.SelectedWireIDs)
+        | _ -> 
+            model, Cmd.none
+
+
+    //To test adding an AND symbol
+    | KeyPress AltA -> 
+        let wModel, wCmd = sendSymbolMsg model (Symbol.Add (CommonTypes.ComponentType.And, (iniPos model.Zoom model.AddKey), 2, 1))
+        {model with Wire = wModel; AddKey = (model.AddKey + 1)%100}, Cmd.map WireMsg wCmd
+
     //Printing performace stats
     | KeyPress AltShiftZ -> 
         printStats() // print and reset the performance statistics in dev tools window
         model, Cmd.none // do nothing else and return model unchanged
+
     // all other keys are turned into SetColor commands
     | KeyPress s -> 
         let c =
@@ -409,14 +543,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             | AltV -> CommonTypes.Green
             | AltZ -> CommonTypes.Red
             | _ -> CommonTypes.Grey
-        printfn "Key:%A" c
         model, Cmd.ofMsg (WireMsg <| BusWire.SetColor c)
         
+
     | UpdateMouse pos -> 
         {model with SelectBoxStart = pos; SelectBoxCurrent = pos}, Cmd.none
 
+
     //Begin Selection from a port i.e pull a dotted line
     | SelectPort data -> 
+
         let startPoint, port = data
         {model with 
             SelectBoxStart = startPoint;
@@ -426,8 +562,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             SelectedWireIDs = [];
             SelectedPort = Some port}, Cmd.none
 
+
     //Begin selection of symbols
     | SelectSymbols data ->
+
         let startPoint, symbols = data
         {model with 
             SelectBoxStart = startPoint;
@@ -437,8 +575,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             SelectedWireIDs = [];
             SelectedPort = None}, Cmd.none
 
+
     //Begin selection of wires 
     | SelectWires data -> 
+
          let startPoint, wires = data
          {model with 
             SelectBoxStart = startPoint;
@@ -448,8 +588,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             SelectedWireIDs = wires;
             SelectedPort = None}, Cmd.none
 
+
     //Begin dragging of a multi-select
     | SelectMulti startPoint ->
+
         {model with 
             SelectBoxStart = startPoint;
             SelectBoxCurrent = startPoint;
@@ -458,41 +600,50 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             SelectedWireIDs = [];
             SelectedPort = None}, Cmd.none
 
+
     //Continue a selection - generated by mouse drag   
     | SelectGrow point ->
+
         //Obtain a translation vector indicating how the mouse position has moved
         let startPoint = model.SelectBoxCurrent
         let vector = {X = point.X - startPoint.X; Y = point.Y - startPoint.Y}
+        let scaledVector = zoomScale model.Zoom vector
         //The selection type will not change until a mouse lift i.e SelectEnd is sent.
         match model.SelectionType with
         //This corresponds to a symbol being moved
         | ComponentSymbol -> 
             //Movement must notify bus wire so that rerouting can be done.           
-            let wmodel, wCmd = BusWire.update (BusWire.Symbol (Symbol.Move (model.SelectedComponentIDs, vector))) model.Wire 
+            let wmodel, wCmd = sendSymbolMsg model (Symbol.Move (model.SelectedComponentIDs, scaledVector))
             {model with Wire = wmodel; SelectBoxCurrent = point}, Cmd.map WireMsg wCmd
         //This corresponds to a wire being moved
         | ComponentWire ->
-            let wModel, wCmd = BusWire.update (BusWire.MoveWires (model.SelectedWireIDs, vector)) model.Wire
+            let wModel, wCmd = sendBusWireMsg model (BusWire.MoveWires (model.SelectedWireIDs, scaledVector))
             {model with Wire = wModel; SelectBoxCurrent = point}, Cmd.map WireMsg wCmd
         //Otherwise we don't need to dispatch any messages to Symbol/BusWire components
         | _ ->
             {model with SelectBoxCurrent = point}, Cmd.none
 
+
     //Finish a selection operation - generated by a mouse click being released.    
     | SelectEnd endPoint ->
+
+        let scale = zoomScale model.Zoom
+        let scaledEndPoint = scale endPoint
         match model.SelectionType with 
         //If we're dragging from a port
         | Port ->
-            match (Symbol.isPort (model.Wire.Symbol) endPoint) with 
+            match (Symbol.isPort (model.Wire.Symbol) scaledEndPoint) with 
             //If we get a port, create a wire between the ports.
             | Some a ->
+                //Find the start and end port IDs
                 let endportcoord, endportid = a
                 let startportid = 
                     match model.SelectedPort with 
                     | Some port -> 
                         port 
                     | None -> failwithf "Unexpected case in selection type port - unable to create connection."
-                let wModel, wCmd = BusWire.update (BusWire.AddWire (startportid, endportid)) model.Wire
+                //Create new wire and update model
+                let wModel, wCmd = sendBusWireMsg model (BusWire.AddWire (startportid, endportid))
                 {model with
                      Wire = wModel;
                      SelectBoxStart = origin;
@@ -501,7 +652,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                      SelectedComponentIDs = [];
                      SelectedWireIDs = [];
                      SelectedPort = None}, Cmd.none
-            //Else revert to default.
+            //Else revert to default model state.
             | None ->
                 {model with
                     SelectBoxStart = origin;
@@ -512,19 +663,33 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     SelectedPort = None}, Cmd.none
         //If we're selecting multiple components in a box         
         | MultiBox ->
-            //Prepare this tuple so that we can find the symbols inside the box.
-            let draggedBox = (model.SelectBoxStart, endPoint)
+            //Prepare this tuple so that we can find the symbols inside the box. Must be scaled as we are interfacing 
+            //with coordinates from other modules.
+            let draggedBox = ((scale model.SelectBoxStart), (scale endPoint))
             //Find all symbols inside the dragged box and select them. Selection mode is now ComponentSymbol. 
             let selectedSymbols = 
-                Symbol.getBoundingBoxes (model.Wire.Symbol) endPoint
+                Symbol.getBoundingBoxes (model.Wire.Symbol) scaledEndPoint
                 |> List.map (fun (a,b,c) -> (string a, b, c))
                 |> List.filter (boxEncloses draggedBox)
                 |> List.map (obtainID >> CommonTypes.ComponentId)
-            //If we get something then we move to ComponentSymbol state with the selected symbols.
-            let selectedWires =
-                BusWire.getBoundingBoxes (model.Wire) endPoint
-                |> List.map (fun (a,b,c) -> a)
+           
+            //If we get something then we move to ComponentSymbol state with the selected symbols and associated wires.
             if not (List.isEmpty selectedSymbols) then 
+
+                //We are finding all wires that are connected to at least 2 of the selected symbols.
+                let selectedWires =
+                    selectedSymbols
+                    //Obtain portID lists for each selected component
+                    |> List.map (Symbol.getPortIds model.Wire.Symbol) 
+                    //Obtain the wires corresponding to all these ports
+                    |> List.collect (BusWire.getWireIdsFromPortIds model.Wire)
+                    //Count how many of each ID there are (note: id below is identity mapping) 
+                    |> List.countBy id
+                    //Filter out wireIDs that only appear once 
+                    |> List.filter (fun (id, count) -> count > 1)
+                    //Only interested in the first elements of tuples i.e. ids
+                    |> List.map fst
+                    
                 {model with
                     SelectBoxStart = origin;
                     SelectBoxCurrent = origin;
@@ -540,8 +705,26 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     SelectionType = Nothing;
                     SelectedComponentIDs = [];
                     SelectedWireIDs = [];
-                    SelectedPort = None}, Cmd.none 
-        //Otherwise for ComponentSymbol and ComponentWire, we just keep the selected and set selection coordinates to default.
+                    SelectedPort = None}, Cmd.none
+        //For a symbol we will implement snap-to-grid. We move the box according to the returned translation vector. 
+        | ComponentSymbol ->
+            let pointToShift = 
+                //Find the top-left corner of symbol bounding box based on id - we only search for id of the first selected symbol in the list 
+                //and perform the translation based on this symbol.
+                Symbol.getBoundingBoxes (model.Wire.Symbol) scaledEndPoint 
+                //We are sure that we will find a box with the searched id. We return this box.
+                |> List.find (fun (id, tl, br) -> id = List.head (model.SelectedComponentIDs))
+                |> (fun (id,tl,br) -> tl)
+            
+            //The vector is already scaled to zoom = 1.0 as the point we pass it is from the coordinate system of 
+            //symbol and busWire.
+            let scaledVector = snapgrid pointToShift
+            //Send move message based on translation vector
+            let wmodel, wCmd = sendSymbolMsg model (Symbol.Move (model.SelectedComponentIDs, scaledVector))
+            //We set selection coordinates to default.
+            {model with Wire = wmodel; SelectBoxStart = origin; SelectBoxCurrent = origin}, Cmd.map WireMsg wCmd
+
+        //Otherwise for ComponentWire, we just keep the selected and set selection coordinates to default.
         | _ -> 
             {model with SelectBoxStart = origin; SelectBoxCurrent = origin}, Cmd.none           
 
@@ -556,5 +739,6 @@ let init() =
         SelectedComponentIDs = []
         SelectedWireIDs = []
         SelectedPort = None
+        AddKey = 0
         Zoom = 1.0
     }, Cmd.map WireMsg cmds
