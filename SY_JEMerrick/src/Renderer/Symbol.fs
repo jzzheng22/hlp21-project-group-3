@@ -771,6 +771,15 @@ let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int =
 let getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId =
     CommonTypes.ComponentId (getPortinfo model pId).Port.HostId
 
+type Edge = Top | Bottom | Left | Right
+let getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge =
+    let pos = getPortCoords model pId
+    let sym = List.item 0 (List.filter (fun sym -> sym.Id = getHostId model pId) model)
+    if pos.X = sym.BotR.X then Right
+    elif pos.Y = sym.TopL.Y then Top
+    elif pos.Y = sym.BotR.Y then Bottom
+    else Left
+
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
         (symModel: Model) 
