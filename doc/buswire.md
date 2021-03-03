@@ -74,7 +74,7 @@ These are called by adidesh20's BusWire and implemented in JEMerrick's Symbol:
  - Returns the ComponentID which the PortID belongs to.
 
  `Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge'
- -Returns the edge of the symbol that the port is on
+ - Returns the edge of the symbol that the port is on
 
 ## BusWire needs to be able to receive these:
  - Add connections (from Sheet and ISSIE)
