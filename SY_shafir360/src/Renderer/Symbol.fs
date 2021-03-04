@@ -331,8 +331,9 @@ let init () =
     [(createNewSymbol CommonTypes.ComponentType.Nand {X=0.;Y=0.} 2 1 );
       (createNewSymbol CommonTypes.ComponentType.And {X=100.;Y=100.} 3 4 );
       (createNewSymbol CommonTypes.ComponentType.DFFE {X=200.;Y=200.} 0 4 );
-      (createNewSymbol CommonTypes.ComponentType.MergeWires {X=300.;Y=300.} 0 4 );
-      (createNewSymbol (CommonTypes.ComponentType.SplitWire 2 )  {X=400.;Y=400.} 0 4 )]
+      (createNewSymbol CommonTypes.ComponentType.MergeWires {X=300.;Y=300.} 0 4 )
+      //(createNewSymbol (CommonTypes.ComponentType.SplitWire 2 )  {X=400.;Y=400.} 0 4 )
+      ]
 
     , Cmd.none
     
@@ -592,7 +593,7 @@ let private renderSymbol =
                 ]
 
             
-            let makeWireSymbolWires =
+            let makeWireSymbolWires() : ReactElement list =
                 let outputPoint (port:PortLocal) = {X=port.Pos.X;Y=port.Pos.Y + port.Height/2.} 
                 let inputPoint (port:PortLocal) = {X=port.Pos.X + port.Width; Y= port.Pos.Y + port.Height/2.}
                 //outputPoint
@@ -606,7 +607,8 @@ let private renderSymbol =
                                                             props.Symbol.Outputport
                                                             |> List.map (fun port->outputPoint port
                                                                                    |>makeLine fromPoint) 
-           
+                |_-> printfn "bob" 
+                     failwithf "error 321"
             let drawport (port:PortLocal)  =
                 
                 let strokecolour =if props.Symbol.HighlightAllPorts then
@@ -667,11 +669,11 @@ let private renderSymbol =
 
             let all = match props.Symbol.SymbolType with
                       |CommonTypes.ComponentType.MergeWires -> List.concat portlistDraw
-                                                               |>List.append makeWireSymbolWires
+                                                               |>List.append (makeWireSymbolWires()) 
                       |CommonTypes.ComponentType.SplitWire i -> List.concat portlistDraw
-                                                               |>List.append makeWireSymbolWires
+                                                               |>List.append (makeWireSymbolWires()) 
                       |_->List.concat portlistDraw 
-                           |> List.append makeBox
+                          |> List.append makeBox
                 
                 //|> List.append drawEnablePortCircle
             //printfn "where it thinks x:%A y:%A h:%A w:%A" props.Symbol.Pos.X props.Symbol.Pos.Y props.Symbol.H props.Symbol.W
