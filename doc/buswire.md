@@ -57,14 +57,14 @@ Note: `CommonTypes.ConnectionId` is a Wire ID
    - Highlights the source and target ports of the wire
  - Same functionality as highlighting a Symbol (need to send a Highlight message with an empty list to unhighlight everything)
 
-`Move of wireIdList *  XYPos`
+`Move of wireId * Index: index *  XYPos list`
  - XYPos is translation vector
- - Not implemented yet, will do when incorporating manual routing
+ - return wire Id, segment Index and translation vector
 
 ## Interface functions
 
-`getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list`
- - Returns all bounding boxes for all wire segments present in the wire model for Sheet to deal with.
+`getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (Index:int * CommonTypes.ConnectionId * XYPos * XYPos) list`
+ - Returns all bounding boxes for all wire segments with Wire ID and Segment Index present in the wire model for Sheet to deal with.
 
 `getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list`
  - Takes a list of PortIds as input and returns the IDs of all the wires connected to the supplied ports.
@@ -73,7 +73,7 @@ Note: `CommonTypes.ConnectionId` is a Wire ID
 ## BusWire needs to be able to receive these:
  - Add connections (from Sheet and ISSIE)
  - Delete connections (from Sheet)
- - Move connection segment (from Sheet) -> WILL HAPPEN WHEN MANUAL ROUTING IS CONFIGURED
+ - Move connection segment (from Sheet) -> need this to return the WireID aswell as Segment Index
  - Highlight connections (from Sheet and ISSIE)
  - Init canvas (from ISSIE)
 
