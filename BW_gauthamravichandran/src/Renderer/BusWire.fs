@@ -407,11 +407,11 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
 
 //---------------Other interface functions--------------------//
-let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list=
+let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): ( int * CommonTypes.ConnectionId * XYPos * XYPos) list=
     wModel.WX
     |> List.collect (fun w->
                     List.map (fun (segment:WireSegment)->
-                                (segment.wId,fst segment.BB, snd segment.BB))w.Segments)
+                                (segment.Index, segment.wId,fst segment.BB, snd segment.BB))w.Segments)
 
 
 let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =

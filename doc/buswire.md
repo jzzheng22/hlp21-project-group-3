@@ -15,23 +15,7 @@ Wires should be selectable: should do autorouting initially but be selectable an
 Might want to add in portID and symbolID and wireID as types instead of strings for type safety.
 
 
-## Interface Functions
 
-`BusWire.getBoundingBoxes (mouseCoord: XYPos) (model : Model)`
- - Returns list containing IDs, and bounding box coords of wires
- - `(id: string * topleft: XYPos * bottomright: XYPos)`
- - Initially just return all wires
-
- - Returns a flat list
-   - Each wire has one ID but multiple bounding boxes 
-   - A single WireID may appear multiple times accompanying a different bounding box of the wire
-
-    string  | XYPos  | XYPos  |   
-    |---------|--------|--------|
-    | WireID 1 | TopL 1A | BotR 1A |   
-    | WireID 1 | TopL 1B | BotR 1B |   
-    | WireID 2 | Top L2  | Bot R2  |   
-    | WireID 3 | Top L3  | Bot R3
 
 ## Messages
 
@@ -63,8 +47,8 @@ Note: `CommonTypes.ConnectionId` is a Wire ID
 
 ## Interface functions
 
-`getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (Index:int * CommonTypes.ConnectionId * XYPos * XYPos) list`
- - Returns all bounding boxes for all wire segments with Wire ID and Segment Index present in the wire model for Sheet to deal with.
+`getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (int * CommonTypes.ConnectionId * XYPos * XYPos) list`
+ - Returns all bounding boxes for all wire segments along with coressponding with Wire ID and Segment Index for Sheet to deal with.
 
 `getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list`
  - Takes a list of PortIds as input and returns the IDs of all the wires connected to the supplied ports.
