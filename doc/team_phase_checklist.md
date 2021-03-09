@@ -2,6 +2,9 @@
 
 1. [ ] Combine individual module code into single file
     - Meet with module member and submit PR for `src/MODULE.fs` file by 10 March
+    - [ ] Symbol
+    - [ ] BusWire
+    - [ ] Sheet
 
 2. Symbol
     * Move ports
