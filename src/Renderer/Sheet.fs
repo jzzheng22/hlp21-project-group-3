@@ -175,7 +175,9 @@ let backgroundGrid zoom  =
     ]
 
 let drawSelectionBox model =
-    polygon [ SVGAttr.Points(cornersToString model.DragStartPos model.DraggingPos)
+    //Necessary since DragStartPos and DraggingPos in the model are scaled down to zoom = 1.
+    let multiplyZoom pos = {pos with X = pos.X*model.Zoom; Y = pos.Y*model.Zoom}
+    polygon [ SVGAttr.Points(cornersToString (multiplyZoom model.DragStartPos) (multiplyZoom model.DraggingPos))
               SVGAttr.StrokeWidth "1px"
               SVGAttr.Stroke "lightblue"
               SVGAttr.StrokeDasharray "5,5"
@@ -183,10 +185,12 @@ let drawSelectionBox model =
               SVGAttr.Fill "grey" ] []
 
 let drawPortConnectionLine model =
-    line [ X1 model.DragStartPos.X
-           Y1 model.DragStartPos.Y
-           X2 model.DraggingPos.X
-           Y2 model.DraggingPos.Y
+    //Necessary since DragStartPos and DraggingPos in the model are scaled down to zoom = 1.
+    let multiplyZoom v = v*model.Zoom 
+    line [ X1 (multiplyZoom model.DragStartPos.X)
+           Y1 (multiplyZoom model.DragStartPos.Y)
+           X2 (multiplyZoom model.DraggingPos.X)
+           Y2 (multiplyZoom model.DraggingPos.Y)
            Style [ match validConnection model with
                    | Some _ ->
                        Stroke "darkblue"
@@ -252,15 +256,16 @@ let mouseMove model mousePos dispatch mDown =
 let mDown (ev: Types.MouseEvent) = ev.buttons <> 0.
 
 let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (dispatch: Dispatch<Msg>) =
-    let coordX = ev.clientX / model.Zoom
-    let coordY = ev.clientY / model.Zoom
+    let coordX = ev.clientX 
+    let coordY = ev.clientY 
     let offsetX, offsetY =
         match getSvgClientRect () with
         | Some a ->
             a.left, a.top
         | None ->
             0., 0.
-    let mousePos = { X = coordX - offsetX; Y = coordY - offsetY}
+    //Here the coordinates are adjusted for scrolling and scaled down to zoom = 1.0
+    let mousePos = { X = (coordX - offsetX)/model.Zoom; Y = (coordY - offsetY)/model.Zoom}
     match mouseOp with
     | MouseDown -> mouseDown model mousePos dispatch
     | MouseUp -> mouseUp model mousePos dispatch
@@ -282,19 +287,18 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                       Width sizeInPixels ] 
                       
               Ref (fun html -> 
-                        getSvgClientRect <- fun () -> (Some (html.getBoundingClientRect()))) ] [
-            g [ Style [ Transform(sprintf "scale(%f)" model.Zoom) ] ] [  // top-level transform style attribute for zoom
-              
-                g[] (backgroundGrid model.Zoom) //Background grid
-
-                svgReact // the application code
-                match model.SelectedPort with
-                | (Some _, _) -> drawPortConnectionLine model //Port selection line
-                | _ -> ()
-
-                if model.SelectingMultiple then //Drag select box
-                    drawSelectionBox model
-            ]
+                        getSvgClientRect <- fun () -> (Some (html.getBoundingClientRect()))) ] 
+            [
+                g [] (backgroundGrid model.Zoom) //Background grid
+                g [ Style [ Transform(sprintf "scale(%f)" model.Zoom) ] ] [  // top-level transform style attribute for zoom
+                    svgReact // the application code
+                    ]
+                g [] [ //Selection-related graphics
+                        match model.SelectedPort with
+                        | (Some _, _) -> drawPortConnectionLine model //Port selection line
+                        | _ -> ()
+                        if model.SelectingMultiple then //Drag select box
+                            drawSelectionBox model]
         ] 
     ] 
 
@@ -324,8 +328,8 @@ let deleteSymbols model wModel =
 ///Moves symbols/wires based on what is currently selected.
 let moveElements model mousePos =
     let transVector =
-        { X = (mousePos.X - model.DraggingPos.X) / model.Zoom
-          Y = (mousePos.Y - model.DraggingPos.Y) / model.Zoom }
+        { X = (mousePos.X - model.DraggingPos.X)
+          Y = (mousePos.Y - model.DraggingPos.Y) }
     let newModel = {model with DraggingPos = mousePos}
     if not (List.isEmpty model.SelectedComponents) then
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) newModel.Wire
@@ -352,10 +356,10 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress AltShiftZ ->
         printStats () // print and reset the performance statistics in dev tools window
         model, Cmd.none // do nothing else and return model unchanged
-    //Zooming in
+    //Zooming canvas in
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
-    //Zooming out
+    //Zooming canvas out
     | KeyPress ZoomCanvasOut -> 
         ({model with Zoom = model.Zoom/1.25}, Cmd.none)
     | KeyPress Del ->
