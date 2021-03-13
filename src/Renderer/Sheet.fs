@@ -47,18 +47,11 @@ type MouseOps =
     | MouseMove
 
 
-//IMPORTANT CONSTANTS-------------------------------------------------------------------
-
-///The origin (0,0) as an XYPos
 let origin = { X = 0.; Y = 0. }
 
-///The length of one side of the square canvas in pixels without zoom.
-let UNZOOMEDCANVAS = 1000.0
-
-///Side-length of a grid square (1/100 of canvas).
-let UNZOOMEDGRID = UNZOOMEDCANVAS/100.0
-
-//HELPER FUNCTIONS-------------------------------------------------------------------------
+/// The length of one side of the square canvas in pixels without zoom.
+let unzoomedCanvas = 1000.0
+let unzoomedGrid = unzoomedCanvas / 100.0
 
 /// Tests if a point is inside a bounding box
 let inBoundingBox point box =
@@ -72,24 +65,13 @@ let boxInSelectedArea outerBox innerBox =
     let outerBox = outerTopL, outerBotR
     inBoundingBox (fst innerBox) outerBox && inBoundingBox (snd innerBox) outerBox
 
-///Snap-to-grid. Takes in a point (top-left coord of bounding box) and returns a 
-///translation vector indicating where the point should move to be on a grid intersection point.
-let snapgrid (point: XYPos) = 
-    let newXSquare = round (point.X/UNZOOMEDGRID)
-    let newYSquare = round (point.Y/UNZOOMEDGRID)
-    //return translation vector
-    {X = (UNZOOMEDGRID*newXSquare - point.X); Y = (UNZOOMEDGRID*newYSquare - point.Y)}
+/// Takes in a point and returns translation vector 
+/// required to move to nearest square
+let snapGridVector (point: XYPos) = 
+    let newXSquare = round (point.X / unzoomedGrid)
+    let newYSquare = round (point.Y / unzoomedGrid)
+    {X = (unzoomedGrid * newXSquare - point.X); Y = (unzoomedGrid * newYSquare - point.Y)}
 
-///Finds the top left corner point of the bounding box for a symbol, given the id. Currently searches through all the
-///bounding boxes for the symbol ID. Return as option.
-let findTopLeft (model: Model) (point: XYPos) (symId: CommonTypes.ComponentId) = 
-    Symbol.getBoundingBoxes (model.Wire.Symbol) point 
-    //We try to find a box with the symbol id.
-    |> List.tryFind (fun (id, tl, br) -> id = symId)
-    //Return the XYPos top-left corner as an option
-    |> Option.map (fun (id,tl,br) -> tl)
-
-///Obtain first element (will be ID) from a 3-tuple (representation of bounding box).
 let getID (id, _, _) = id
 
 let getIDList filter lst =
@@ -106,21 +88,24 @@ let dispatchSelection symbolIDList wireIDList dispatch =
 /// Removes ID from tuple. Used for testing where IDs are not necessary 
 let removeID predicate coords (_, a, b) = predicate coords (a, b)
 
+let filterBySelectingMultiple predicate lst =
+    if not predicate then
+        List.chunkBySize 1 lst
+        |> List.last
+    else
+        id lst
+
 /// Selects elements inside the outer box
 let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>) =
     let symbolIDList =
         Symbol.getBoundingBoxes model.Wire.Symbol model.DraggingPos
         |> getIDList (List.filter (removeID predicate coords)) 
-        //If we are not doing a drag-select then a list with > 1 element implies overlap - we only select last element in the list 
-        //as this renders on top of the others.   
-        |> if (not model.SelectingMultiple) then List.chunkBySize 1 >> List.last else id 
+        |> filterBySelectingMultiple model.SelectingMultiple
 
     let wireIDList =
         BusWire.getBoundingBoxes model.Wire model.DraggingPos
         |> getIDList (List.filter (removeID predicate coords))
-        //If we are not doing a drag-select then a list with > 1 element implies overlap - we only select last element in the list 
-        //as this renders on top of the others.   
-        |> if (not model.SelectingMultiple) then List.chunkBySize 1 >> List.last else id 
+        |> filterBySelectingMultiple model.SelectingMultiple
 
     dispatchSelection symbolIDList wireIDList dispatch
 
@@ -144,8 +129,8 @@ let cornersToString startCoord endCoord =
 
 /// This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
-    let canvasSize = UNZOOMEDCANVAS*zoom
-    let step = UNZOOMEDGRID*zoom
+    let canvasSize = unzoomedCanvas * zoom
+    let step = unzoomedGrid * zoom
 
     let vertLineMap n = 
         line [
@@ -153,7 +138,7 @@ let backgroundGrid zoom  =
             SVGAttr.X2 (string n) 
             SVGAttr.Y1 "0"
             SVGAttr.Y2 (string canvasSize)
-            SVGAttr.StrokeWidth "1px"
+            SVGAttr.StrokeWidth "0.75px"
             SVGAttr.Stroke "gainsboro"
             SVGAttr.FillOpacity 0.1
         ] []
@@ -164,19 +149,18 @@ let backgroundGrid zoom  =
             SVGAttr.X2 (string canvasSize) 
             SVGAttr.Y1 (string n)
             SVGAttr.Y2 (string n)
-            SVGAttr.StrokeWidth "1px"
+            SVGAttr.StrokeWidth "0.75px"
             SVGAttr.Stroke "gainsboro"
             SVGAttr.FillOpacity 0.1
         ] []
 
     [
-        g[] (List.map vertLineMap [0.0..step..canvasSize])
-        g[] (List.map horizontalLineMap [0.0..step..canvasSize])
+        g[] (List.map vertLineMap [0. .. step .. canvasSize])
+        g[] (List.map horizontalLineMap [0. .. step .. canvasSize])
     ]
 
 let drawSelectionBox model =
-    //Necessary since DragStartPos and DraggingPos in the model are scaled down to zoom = 1.
-    let multiplyZoom pos = {pos with X = pos.X*model.Zoom; Y = pos.Y*model.Zoom}
+    let multiplyZoom pos = {pos with X = pos.X * model.Zoom; Y = pos.Y * model.Zoom}
     polygon [ SVGAttr.Points(cornersToString (multiplyZoom model.DragStartPos) (multiplyZoom model.DraggingPos))
               SVGAttr.StrokeWidth "1px"
               SVGAttr.Stroke "lightblue"
@@ -185,8 +169,7 @@ let drawSelectionBox model =
               SVGAttr.Fill "grey" ] []
 
 let drawPortConnectionLine model =
-    //Necessary since DragStartPos and DraggingPos in the model are scaled down to zoom = 1.
-    let multiplyZoom v = v*model.Zoom 
+    let multiplyZoom v = v * model.Zoom 
     line [ X1 (multiplyZoom model.DragStartPos.X)
            Y1 (multiplyZoom model.DragStartPos.Y)
            X2 (multiplyZoom model.DraggingPos.X)
@@ -209,13 +192,11 @@ let mouseDown model mousePos dispatch =
     match Symbol.isPort model.Wire.Symbol mousePos with
     | Some (_, portId) -> dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
     | None ->
-        let componentList = 
-            //Check whether we have clicked on an element already selected
+        let overlappingComponentList = 
             model.SelectedComponents
             |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
             |> List.filter (inBoundingBox mousePos) 
-        //If not, select new elements based on the mouse position
-        if List.isEmpty componentList then
+        if List.isEmpty overlappingComponentList then
             selectElements model mousePos dispatch
     dispatch <| SelectDragStart mousePos
     
@@ -264,16 +245,14 @@ let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (di
             a.left, a.top
         | None ->
             0., 0.
-    //Here the coordinates are adjusted for scrolling and scaled down to zoom = 1.0
-    let mousePos = { X = (coordX - offsetX)/model.Zoom; Y = (coordY - offsetY)/model.Zoom}
+    let mousePos = { X = (coordX - offsetX) / model.Zoom; Y = (coordY - offsetY) / model.Zoom }
     match mouseOp with
     | MouseDown -> mouseDown model mousePos dispatch
     | MouseUp -> mouseUp model mousePos dispatch
     | MouseMove -> mouseMove model mousePos dispatch (mDown ev)
 
-/// Generates the SVG canvas, adjusted for zoom and scrolling.
 let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispatch<Msg>) =
-    let sizeInPixels = sprintf "%.2fpx" ((UNZOOMEDCANVAS * model.Zoom))
+    let sizeInPixels = sprintf "%.2fpx" ((unzoomedCanvas * model.Zoom))
     div [ Style [ Height "100vh"
                   MaxWidth "100vw"
                   CSSProp.OverflowX OverflowOptions.Auto
@@ -291,13 +270,13 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
             [
                 g [] (backgroundGrid model.Zoom) //Background grid
                 g [ Style [ Transform(sprintf "scale(%f)" model.Zoom) ] ] [  // top-level transform style attribute for zoom
-                    svgReact // the application code
-                    ]
-                g [] [ //Selection-related graphics
+                    svgReact
+                  ]
+                g [] [
                         match model.SelectedPort with
-                        | (Some _, _) -> drawPortConnectionLine model //Port selection line
+                        | (Some _, _) -> drawPortConnectionLine model
                         | _ -> ()
-                        if model.SelectingMultiple then //Drag select box
+                        if model.SelectingMultiple then
                             drawSelectionBox model]
         ] 
     ] 
@@ -325,7 +304,6 @@ let deleteWires model =
 let deleteSymbols model wModel =
     BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
 
-///Moves symbols/wires based on what is currently selected.
 let moveElements model mousePos =
     let transVector =
         { X = (mousePos.X - model.DraggingPos.X)
@@ -345,6 +323,18 @@ let moveElements model mousePos =
     else
         { model with SelectingMultiple = true}, Cmd.none
 
+let snapToGrid model =
+    let transVector =
+        Symbol.getBoundingBox model.Wire.Symbol (List.head model.SelectedComponents)
+        |> function
+        | (topLeft, _) ->
+            snapGridVector topLeft
+    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire 
+    { model with 
+        Wire = sModel;
+        SelectedPort = None, CommonTypes.PortType.Input;
+        SelectingMultiple = false }, Cmd.map Wire sCmd
+
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
     | Wire wMsg ->
@@ -356,10 +346,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress AltShiftZ ->
         printStats () // print and reset the performance statistics in dev tools window
         model, Cmd.none // do nothing else and return model unchanged
-    //Zooming canvas in
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
-    //Zooming canvas out
     | KeyPress ZoomCanvasOut -> 
         ({model with Zoom = model.Zoom/1.25}, Cmd.none)
     | KeyPress Del ->
@@ -399,30 +387,12 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               DraggingPos = dragMsg },
         Cmd.none
     | SelectDragEnd ->
-        //Find translation vector for snap-to-grid on selected components if any.
-        let transVector = 
-            //origin implies no translation necessary
-            if List.isEmpty model.SelectedComponents then origin
-            else  
-                let pointToShift = 
-                        //Find the top-left corner of bounding box of first symbol in the model list.
-                        let pointOption = findTopLeft model origin (List.head (model.SelectedComponents))
-                        match pointOption with
-                        | Some a -> a 
-                        | None -> failwithf "ERROR: Symbol ID is not logged in the model and cannot be searched."
-                
-                snapgrid pointToShift
-
-        let interimModel = { model with
-                                SelectedPort = None, CommonTypes.PortType.Input;
-                                SelectingMultiple = false }
-        //Move symbols if movement is required
-        if transVector <> origin then 
-           let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire 
-           {interimModel with Wire = sModel}, Cmd.map Wire sCmd
-        //else reset model
-        else 
-            interimModel, Cmd.none
+        if List.isEmpty model.SelectedComponents then
+            { model with 
+                SelectedPort = None, CommonTypes.PortType.Input;
+                SelectingMultiple = false }, Cmd.none
+        else
+            snapToGrid model
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
     | DispatchMove mousePos ->
