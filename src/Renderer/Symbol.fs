@@ -42,6 +42,8 @@ type GenericPort =
     | Clk
     | Addr
 
+type Edge = Top | Bottom | Left | Right
+
 type Symbol =
     {
         TopL: XYPos
@@ -344,13 +346,13 @@ let swapMap (sym : Symbol) (coord : XYPos) port =
     |> function
     | (k, x) -> swapPort sym.PortMap k (fst port) x (snd port)  
                 
-let drawText (x : float) (y : float) (size : string) =
+let drawText (x : float) (y : float) (size : string) (anchor : string, baseline : string) =
     text[
         X x
         Y y
         Style[
-            TextAnchor "middle"
-            DominantBaseline "middle"
+            TextAnchor anchor
+            DominantBaseline baseline
             FontSize size
             FontWeight "bold"
             Fill "Black"
@@ -377,6 +379,19 @@ let drawCircle (sym : Symbol) (i : XYPos) (fill : string) (stroke : string) (opa
 
 ///Returns the portmap as a list with only the ports in use: i.e. (key ,value) where v != None
 let mapSetup (sym : Symbol) = genMapList sym.PortMap (List.filter (fun (_, k) -> k <> None))
+
+let getPosEdge (sym : Symbol) (pos : XYPos) =
+    if pos.X = sym.BotR.X then Right
+    elif pos.Y = sym.TopL.Y then Top
+    elif pos.Y = sym.BotR.Y then Bottom
+    else Left
+
+let getTextAttr (sym : Symbol) (pos : XYPos) : (string * string) =
+    match getPosEdge sym pos with
+    | Left -> ("start", "middle")
+    | Right -> ("end", "middle")
+    | Top -> ("middle", "hanging")
+    | Bottom -> ("middle", "auto")
 
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
@@ -650,7 +665,7 @@ let private renderObj =
                 props.Obj
                 |> mapSetup
                 |> List.map(fun (i, k) ->
-                    (drawText (displace -10. i props.Obj).X (displace -10. i props.Obj).Y "6px")[str <| sprintf "%s" (getPortName k)])
+                    (drawText (displace -2. i props.Obj).X (displace -2. i props.Obj).Y "6px" (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)])
 
             let wires : ReactElement list =
             //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
@@ -680,7 +695,7 @@ let private renderObj =
                     SVGAttr.Stroke "black"
                     SVGAttr.StrokeWidth 0.5][]
 
-            let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px"[str <| sprintf "%A" props.Obj.Name]
+            let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Name]
             
             let drawInvert =
                 genMapList props.Obj.PortMap (List.filter(fun (_, k) -> isPortInverse k))
@@ -777,14 +792,10 @@ let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int =
 let getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId =
     CommonTypes.ComponentId ((getPortinfo model pId).Port.HostId)
 
-type Edge = Top | Bottom | Left | Right
 let getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge =
     let pos = getPortCoords model pId
     let sym = List.item 0 (List.filter (fun sym -> sym.Id = getHostId model pId) model)
-    if pos.X = sym.BotR.X then Right
-    elif pos.Y = sym.TopL.Y then Top
-    elif pos.Y = sym.BotR.Y then Bottom
-    else Left
+    getPosEdge sym pos
 
 
 let getBoundingBox symModel symID =
