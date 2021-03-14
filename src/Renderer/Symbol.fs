@@ -15,13 +15,6 @@ let STD_HEIGHT = 35.
 let HW_RATIO = 0.9
 let RAD = 3.
 
-/// PortInfo extends the CommonTypes.Port
-///
-/// Pos: XYPos of the port on the canvas
-///
-/// Port: The original Port type from CommonTypes.Port
-///
-/// Placement: Int indicating the position on that side the port is placed in going in ascending order where horizontals would be left->right, and verticals top->bottom
 type Portinfo = 
     {
         Port: CommonTypes.Port
@@ -114,16 +107,15 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * int * int * Sy
     | CommonTypes.ComponentType.AsyncROM x -> ("AROM", x.AddressWidth, x.WordWidth, LogMem)
     | CommonTypes.ComponentType.ROM x -> ("ROM", x.AddressWidth, x.WordWidth, FF)
     | CommonTypes.ComponentType.RAM x -> ("RAM", x.AddressWidth, x.WordWidth, RAM)
-    | CommonTypes.ComponentType.Input x -> ((sprintf "In<%d:0>" x), x, x, IO) 
-    | CommonTypes.ComponentType.Output x -> ((sprintf "Out<%d:0>" x), x, x, IO) 
+    | CommonTypes.ComponentType.Input x -> ((sprintf "In<%d:0>" (x - 1)), x, x, IO) 
+    | CommonTypes.ComponentType.Output x -> ((sprintf "Out<%d:0>" (x - 1)), x, x, IO) 
     | CommonTypes.ComponentType.IOLabel -> ("", 0, 0, IO) //Check generic type WHAT IS THIS?? 
     | CommonTypes.ComponentType.BusSelection (x, y) -> ("", x, y, Wires)
     | CommonTypes.ComponentType.MergeWires -> ("", 0, 0, Wires)
-    | CommonTypes.ComponentType.SplitWire x -> ("", x, x, Wires)
+    | CommonTypes.ComponentType.SplitWire x -> ("", x, 1, Wires)
 
 ///Returns a tuple of float = (Height, Width) from two coordinates
 let getHW (botR : XYPos) (topL : XYPos) = (botR.Y - topL.Y, botR.X - topL.X)
-
 let getHWObj (sym : Symbol) = getHW sym.BotR sym.TopL
 
 ///Finds the midpoint of two coordinates
@@ -133,29 +125,25 @@ let midXY (botR : XYPos) (topL : XYPos) : XYPos =
     {X = midX; Y = midY}
 
 let midSym (sym : Symbol) : XYPos = midXY sym.BotR sym.TopL
-
 let midSymX (sym : Symbol) : float = (midSym sym).X 
-
 let midSymY (sym : Symbol) : float = (midSym sym).Y
 
 ///Adds a float value onto an XYPos
 let addXYVal (xy : XYPos) (n : float) : XYPos = {X = xy.X + n; Y = xy.Y + n}
 
 let posDiff a b = {X=a.X-b.X; Y=a.Y-b.Y}
-
 let posAdd a b = {X=a.X+b.X; Y=a.Y+b.Y}
-
 let posOf x y = {X=x;Y=y}
 
 let absDiff a b = 
     let diff = (posDiff a b)
     diff.X + diff.Y
 
-///Displace will move a port position _away_ from the box by n pixels.
+///displace will move a port position _away_ from the box by n pixels.
 ///
 ///For inverters call with positive n.
 ///For labels call with negative n.
-let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
+let displace (n : float) (pos : XYPos) (sym : Symbol) : XYPos =
     let x = 
         if pos.X = sym.TopL.X then (pos.X - n)
         elif pos.X = sym.BotR.X then (pos.X + n)
@@ -164,7 +152,7 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : (float * float) =
         if pos.Y = sym.TopL.Y then (pos.Y - n)
         elif pos.Y = sym.BotR.Y then (pos.Y + n)
         else pos.Y
-    (x, y)
+    {X = x; Y = y}
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
@@ -269,11 +257,6 @@ let trans func sym trans =
 ///Finds the log base 2 of an int and rounds up to the nearest int
 let log2 (n : int) : int = (log(float n) / log(2.)) |> ceil |> int
 
-///Displace an object by a float
-let displaceN (sym : Symbol) (i : XYPos) (n : float) : (float * float) = displace n i sym
-let displaceNX (sym : Symbol) (i : XYPos) (n : float) : float = displaceN sym i n |> fst
-let displaceNY (sym : Symbol) (i : XYPos) (n : float) : float = displaceN sym i n |> snd
-
 //Helpers for makePosList
 let makeLR (len : int) x func = List.map (fun i -> {X = x.X; Y = (func i).Y}) [0..len - 1]
 let makeTB (len : int) y func = List.map (fun i -> {X = (func i).X; Y = y.Y}) [0..len - 1]
@@ -312,7 +295,7 @@ let tagCoords (sym : Symbol) : string =
         (sym.TopL.X + (i + (a * 5.))) (midY - 10.) 
         (sym.TopL.X + (i + (a * 5.))) (midY + 10.) 
         (midX - ((i/7.) + (a * 5.))) (midY + 10.) 
-        (sym.BotR.X - (i + (a * 15.))) midY 
+        (sym.BotR.X - ((i * 1.2) + (a * 5.))) midY 
         (midX - ((i/7.) + (a * 5.))) (midY - 10.))
 
 ///Returns the coordinates of a triangle where midpoint of the flat side = input position i
@@ -359,7 +342,7 @@ let swapMap (sym : Symbol) (coord : XYPos) port =
     |> List.minBy fst
     |> snd
     |> function
-    | (k, x) -> swapPort sym.PortMap k (port |> fst) x (port |> snd)  
+    | (k, x) -> swapPort sym.PortMap k (fst port) x (snd port)  
                 
 let drawText (x : float) (y : float) (size : string) =
     text[
@@ -384,8 +367,8 @@ let drawPolygon (points : string) (stroke : string) (fill : string) (width : flo
 
 let drawCircle (sym : Symbol) (i : XYPos) (fill : string) (stroke : string) (opac : float) (width : float) =
     circle[
-        Cx (displaceNX sym i 3.)
-        Cy (displaceNY sym i 3.)
+        Cx (displace 3. i sym).X
+        Cy (displace 3. i sym).Y
         R RAD
         SVGAttr.Fill fill
         SVGAttr.Stroke stroke
@@ -399,15 +382,10 @@ let mapSetup (sym : Symbol) = genMapList sym.PortMap (List.filter (fun (_, k) ->
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
 
-
-
 /// Creates Symbol.PortInfo object. 
 ///
 /// i : Index of the port (e.g. IN0 : i = 0).
-/// portType : the portType of the port (Input/Output).
 /// genPort :  the generic porttype used to create any extra ports/labels
-/// compId : the Id of the component associated with the port
-/// compType : the type of component associated with the port - used to determine inverters
 /// w : the port width
 let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (genPort : GenericPort) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) (w : int) : Portinfo = 
     //Object creation
@@ -486,7 +464,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let n = max (numIn + left) (numOut + right) |> float //The max number of ports initially will always be on the left or right of the box
     let nBot = if bot > 0 then bot else (int (HW_RATIO * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
     let h = if numIn = 1 && numOut = 1 then STD_HEIGHT * 2. else STD_HEIGHT * n //ensures minimum height for 1 in 1 out components
-    let w =  if bot <= 0 then (HW_RATIO * h) else ((float nBot) * STD_HEIGHT * 1.5) //Width is either standard, or based on number of ports on the bottom
+    let w =  if bot <= 0 then (HW_RATIO * h) else ((float nBot) * STD_HEIGHT * 1.7) //Width is either standard, or based on number of ports on the bottom
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
     //Symbol's Component id creation
@@ -534,6 +512,12 @@ let init () =
         CommonTypes.Memory.WordWidth = 10
         CommonTypes.Memory.Data = [(1L, 0L); (2L, 0L); (3L, 0L)] |> Map.ofList
     }
+    let custom = {
+        CommonTypes.CustomComponentType.Name = "myComponent"
+        // Tuples with (label * connection width).
+        CommonTypes.CustomComponentType.InputLabels = [("myIn1", 0); ("myIn2", 1)] // (string * int) list
+        CommonTypes.CustomComponentType.OutputLabels = [("myOut1", 0); ("myOut2", 1)]  //(string * int) list 
+    }
     [
         (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 {X = 100.; Y = 0.})
         (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 {X = 200.; Y = 50.})
@@ -544,6 +528,7 @@ let init () =
         (CreateNewSymbol (CommonTypes.ComponentType.Register 1) 1 1 {X = 500.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.DFFE) 1 1 {X = 600.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 700.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Custom custom) 1 1 {X = 700.; Y = 300.})
     ]
     , Cmd.none
 
@@ -665,7 +650,7 @@ let private renderObj =
                 props.Obj
                 |> mapSetup
                 |> List.map(fun (i, k) ->
-                    (drawText (displaceNX props.Obj i -10.) (displaceNY props.Obj i -10.) "6px")[str <| sprintf "%s" (getPortName k)])
+                    (drawText (displace -10. i props.Obj).X (displace -10. i props.Obj).Y "6px")[str <| sprintf "%s" (getPortName k)])
 
             let wires : ReactElement list =
             //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
@@ -735,10 +720,11 @@ let view (model : Model) (dispatch : Msg -> unit) =
 
 //---------------Helpers for interface functions--------------------//
 
-///An exhaustive search through the model, which returns the Portinfo object corresponding to an input string port ID
+///Initialises the model for a port search by converting every symbol to a list portmap
 let initPortSearch (symModel: Model) : (XYPos * Portinfo Option) list = 
     symModel |> List.collect ((fun x -> x.PortMap) >> (Map.toList))
 
+///Gets a portinfo object from the model where PortId = pId
 let getPortinfo (symModel: Model) (pId : CommonTypes.PortId) =
     initPortSearch symModel
     |> List.map (fun (_, k) -> (k, getPortId k))
@@ -759,12 +745,7 @@ let getPortCoords (symModel: Model) (pId : CommonTypes.PortId) : XYPos =
     | Some x -> fst x
     | None -> failwithf "Error in getPortCoords: couldn't find portID"
 
-let getBoundingBox symModel symID =
-    List.tryFind (fun x -> x.Id = symID) symModel
-    |> function 
-    | Some x -> (x.TopL, x.BotR)
-    | None -> failwithf "Could not get bounding box"
-
+        
 ///Returns all symbols in the model in the form (ID, bounding box topLeft, bounding box botRight)
 let getBoundingBoxes (symModel : Model) (startCoord : XYPos) : (CommonTypes.ComponentId * XYPos * XYPos) list =
     List.map (fun sym -> (sym.Id, sym.TopL, sym.BotR)) symModel
@@ -794,7 +775,23 @@ let getPortWidth (model : Model) (pId : CommonTypes.PortId) : int =
     (getPortinfo model pId).Width
 
 let getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId =
-    CommonTypes.ComponentId (getPortinfo model pId).Port.HostId
+    CommonTypes.ComponentId ((getPortinfo model pId).Port.HostId)
+
+type Edge = Top | Bottom | Left | Right
+let getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge =
+    let pos = getPortCoords model pId
+    let sym = List.item 0 (List.filter (fun sym -> sym.Id = getHostId model pId) model)
+    if pos.X = sym.BotR.X then Right
+    elif pos.Y = sym.TopL.Y then Top
+    elif pos.Y = sym.BotR.Y then Bottom
+    else Left
+
+
+let getBoundingBox symModel symID =
+    List.tryFind (fun x -> x.Id = symID) symModel
+    |> function 
+    | Some x -> (x.TopL, x.BotR)
+    | None -> failwithf "Could not get bounding box"
 
 //----------------------interface to Issie-----------------------------//
 let extractComponent 
@@ -804,3 +801,5 @@ let extractComponent
 
 let extractComponents (symModel: Model) : CommonTypes.Component list = 
     failwithf "Not implemented"
+
+
