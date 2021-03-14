@@ -437,6 +437,10 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (genPort : Generi
                         | CommonTypes.PortType.Input -> sprintf "D"
                         | CommonTypes.PortType.Output -> sprintf "Q"
                     | CommonTypes.ComponentType.Input _ | CommonTypes.ComponentType.Output _ -> ""
+                    | CommonTypes.ComponentType.Custom y -> 
+                        match portType with 
+                        | CommonTypes.PortType.Input -> sprintf "%s" (fst(List.item i y.InputLabels))
+                        | CommonTypes.PortType.Output -> sprintf "%s" (fst(List.item i y.OutputLabels))
                     | _ ->
                         match portType with 
                         | CommonTypes.PortType.Input -> sprintf "IN%d" i
@@ -471,15 +475,17 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     
     //Getting type info for symbol/port construction
     let (name, wIn, wOut, symType) = typeToInfo compType
+    let len = String.length(name) |> float
 
     //Finding the component specific extra ports required
     let (left, right, bot) = numExPorts symType (max numIn numOut)
 
     //Intermediate calculations
     let n = max (numIn + left) (numOut + right) |> float //The max number of ports initially will always be on the left or right of the box
+    let scale = if float(numIn + left + numOut + right) < len - 6. then 1.03 ** len else 1.0
     let nBot = if bot > 0 then bot else (int (HW_RATIO * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
-    let h = if numIn = 1 && numOut = 1 then STD_HEIGHT * 2. else STD_HEIGHT * n //ensures minimum height for 1 in 1 out components
-    let w =  if bot <= 0 then (HW_RATIO * h) else ((float nBot) * STD_HEIGHT * 1.7) //Width is either standard, or based on number of ports on the bottom
+    let h = (if numIn = 1 && numOut = 1 then STD_HEIGHT * 2. else STD_HEIGHT * n) |> (*) scale //ensures minimum height for 1 in 1 out components
+    let w =  (if bot <= 0 then (HW_RATIO * h) else ((float nBot) * STD_HEIGHT * 1.7)) |> (*) scale //Width is either standard, or based on number of ports on the bottom
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
     //Symbol's Component id creation
@@ -510,7 +516,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         Highlight = "gainsboro"
         PortHighlight = false
         Rotation = 0
-        Scale = {X = 0.;Y = 0.}
+        Scale = {X = 0.; Y = 0.}
         GenericType = symType
         PortMap = portMap
     }
@@ -534,7 +540,7 @@ let init () =
         CommonTypes.CustomComponentType.OutputLabels = [("myOut1", 0); ("myOut2", 1)]  //(string * int) list 
     }
     [
-        (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 {X = 100.; Y = 0.})
+        (CreateNewSymbol (CommonTypes.ComponentType.MergeWires) 1 4 {X = 50.; Y = 100.})
         (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 {X = 200.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 {X = 300.; Y = 50.})
         (CreateNewSymbol (CommonTypes.ComponentType.Demux2) 1 2 {X = 400.; Y = 50.})
@@ -543,7 +549,7 @@ let init () =
         (CreateNewSymbol (CommonTypes.ComponentType.Register 1) 1 1 {X = 500.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.DFFE) 1 1 {X = 600.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 700.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Custom custom) 1 1 {X = 700.; Y = 300.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Custom custom) 1 1 {X = 100.; Y = 300.})
     ]
     , Cmd.none
 
