@@ -160,7 +160,7 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : XYPos =
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
-    let box = (addXYVal portPos -7., addXYVal portPos 7.);
+    let box = (addXYVal portPos -4., addXYVal portPos 4.);
     let topL = fst box
     let botR = snd box
     topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
