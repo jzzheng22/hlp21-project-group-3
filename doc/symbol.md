@@ -51,9 +51,11 @@ These are called by BusWire and implemented in JEMerrick's Symbol:
  - Returns the bounding box for a given Symbol ID
  - Called in jzzheng22's Sheet
 
-
  `Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge'
  - Returns the edge of the symbol that the port is on
+
+ `isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
+ - Returns an option if the user clicked on a port label or not
 
 ## Messages
 **Received from Sheet via BusWire**
@@ -103,7 +105,8 @@ The below messages can also be sent to JEMerrick's version of Symbol:
  - Moves the selected port to the port position closest to the mouse.
  - Ports have pre-specified locations where they can be moved to.
 
-
+ `DisplaySlots of sId : CommonTypes.ComponentId`
+ - Highlights all possible positions a port may be moved to on the symbol
 
 ## State Outputs
  - SymbolBBs (to Sheet and BusWire)

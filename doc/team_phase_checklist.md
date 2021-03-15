@@ -2,18 +2,18 @@
 
 1. [ ] Combine individual module code into single file
     - Meet with module member and submit PR for `src/MODULE.fs` file by 10 March
-    - [ ] Symbol
+    - [x] Symbol
     - [ ] BusWire
     - [ ] Sheet
 
 2. Symbol
     * Move ports
-        - [ ] Add interface for Sheet: `isLabel (model: Model) (pos: XYPos) : bool`
+        - [x] Add interface for Sheet: `isLabel (model: Model) (pos: XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
     * Symbol appearances
         - Wire merge/split suck when rotated
         - [ ] Check all symbols done - Wire label etc
     * Symbol creation needs to be more versatile
-        - [ ] Change add symbol message to be just symbol type and position (no longer include inputs/outputs)
+        - [x] Change symbol creation to complete custom components etc
     * ISSIE interface
 4. BusWire
     * [ ] Integrate collision avoidance
