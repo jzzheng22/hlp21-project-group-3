@@ -57,6 +57,7 @@ type Symbol =
         Rotation : int
         Scale : XYPos
         GenericType : SymbolType
+        ShowSlots : bool
     }
 
 type Model = Symbol list
@@ -77,6 +78,7 @@ type Msg =
     | DragPort of sId : CommonTypes.ComponentId * pId : CommonTypes.PortId * pagePos: XYPos
     | Rotate of sId : CommonTypes.ComponentId * rot : int
     | Scale of sId : CommonTypes.ComponentId * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
+    | DisplaySlots of sId : CommonTypes.ComponentId
     | UpdateSymbolModelWithComponent of CommonTypes.Component // Issie interface
 
 
@@ -519,6 +521,7 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
         Scale = {X = 0.; Y = 0.}
         GenericType = symType
         PortMap = portMap
+        ShowSlots = false
     }
 
 
@@ -549,7 +552,7 @@ let init () =
         (CreateNewSymbol (CommonTypes.ComponentType.Register 1) 1 1 {X = 500.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.DFFE) 1 1 {X = 600.; Y = 200.})
         (CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 700.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Custom custom) 1 1 {X = 100.; Y = 300.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Custom custom) (List.length custom.InputLabels) (List.length custom.OutputLabels) {X = 100.; Y = 300.})
     ]
     , Cmd.none
 
@@ -636,6 +639,15 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         )
         , Cmd.none
 
+        | DisplaySlots (sId) ->
+            model
+            |> List.map (fun sym ->
+                { sym with
+                    ShowSlots = List.contains sym.Id [sId]
+                }
+        )
+        , Cmd.none
+
     | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
     | _ -> failwithf "Not implemented"
 
@@ -713,6 +725,12 @@ let private renderObj =
                     |> mapSetup
                     |> List.map(fun (i, _) -> drawCircle props.Obj i "deepskyblue" "deepskyblue" 0.4 1.[])
                 else []
+
+            let labelPos : ReactElement list = 
+                if props.Obj.ShowSlots then
+                    genMapList props.Obj.PortMap id
+                    |> List.map(fun (i, _) -> drawCircle props.Obj (displace -5. i props.Obj) "purple" "purple" 0.4 1.[])
+                else []
             
             let symDraw = 
                 match props.Obj.GenericType with
@@ -720,7 +738,7 @@ let private renderObj =
                 | IO -> [io]
                 | _ -> [displayBox]
             
-            g[](List.concat [symDraw; labels; drawInvert; ports; [title]])
+            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; labelPos])
             
     , "Circle"
     , equalsButFunctions
@@ -784,6 +802,17 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * CommonTypes.PortId) Optio
     | Some(v, Some k) -> Some(v, (CommonTypes.PortId (k.Port.Id)))
     | _ -> None
 
+let isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option =
+    model
+    |> List.tryFind (fun sym -> sym.Id = sId)
+    |> function
+    | Some sym -> Some (genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -4. x sym) pos))) 
+                        |> List.filter (fun (x, y, z) -> z)
+                        |> List.map (fun (x, y, z) -> (x, getPortId y))
+                        |> List.item 0)
+    | None -> None
+    
+
 //Returns a list of Port Ids for a given symbol
 let getPortIds (model : Model) (sId : CommonTypes.ComponentId) : CommonTypes.PortId list = 
     model
@@ -802,7 +831,6 @@ let getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge =
     let pos = getPortCoords model pId
     let sym = List.item 0 (List.filter (fun sym -> sym.Id = getHostId model pId) model)
     getPosEdge sym pos
-
 
 let getBoundingBox symModel symID =
     List.tryFind (fun x -> x.Id = symID) symModel
