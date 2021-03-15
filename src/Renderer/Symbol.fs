@@ -486,13 +486,15 @@ let CreateNewSymbol (compType : CommonTypes.ComponentType) (numIn : int) (numOut
     let n = max (numIn + left) (numOut + right) |> float //The max number of ports initially will always be on the left or right of the box
     let scale = if float(numIn + left + numOut + right) < len - 6. then 1.03 ** len else 1.0
     let nBot = if bot > 0 then bot else (int (HW_RATIO * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
-    let h = (if numIn = 1 && numOut = 1 
-             then STD_HEIGHT * 2.  //ensures minimum height for 1 in 1 out components
-             else STD_HEIGHT * n) 
+    let h = if numIn = 1 && numOut = 1 then 
+                STD_HEIGHT * 2.  //ensures minimum height for 1 in 1 out components
+            else 
+                STD_HEIGHT * n 
             |> (*) scale
-    let w = (if bot <= 0 
-             then (HW_RATIO * h)  //Width is standard
-             else ((float nBot) * STD_HEIGHT * 1.7)) //Or width based on number of ports on the bottom
+    let w = if bot <= 0 then 
+                HW_RATIO * h  //Width is standard
+            else 
+                (float nBot) * STD_HEIGHT * 1.7 //Or width based on number of ports on the bottom
              |> (*) scale 
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
