@@ -24,7 +24,7 @@ type Model = {
     SelectBoxCurrent: XYPos
     SelectionType: Selection
     SelectedComponentIDs: CommonTypes.ComponentId list
-    SelectedWireIDs: CommonTypes.ConnectionId list
+    SelectedWireIDs: (int * CommonTypes.ConnectionId) list
     SelectedPort: CommonTypes.PortId option
     AddKey: int
     Zoom: float
@@ -51,7 +51,7 @@ type Msg =
     | WireMsg of BusWire.Msg
     | KeyPress of KeyboardMsg
     | SelectSymbols of (XYPos * CommonTypes.ComponentId list)
-    | SelectWires of (XYPos * CommonTypes.ConnectionId list) 
+    | SelectWires of (XYPos * (int * CommonTypes.ConnectionId) list) 
     | SelectPort of (XYPos * CommonTypes.PortId)
     | SelectMulti of XYPos 
     | SelectGrow of XYPos
@@ -121,6 +121,21 @@ let filterBoxes (point: XYPos) (boxList: (string * XYPos * XYPos) list)  =
     |> List.filter (pointInBoundingBox point)
     |> List.map obtainID
 
+let obtainID2 (data: (int * string * XYPos * XYPos)) = 
+    let index,id, topLeft, bottomRight = data 
+    (index,id)    
+let obtainCorners2 (data: (int * string * XYPos * XYPos)) =
+    let index,id, topLeft, bottomRight = data 
+    (topLeft, bottomRight)
+
+let pointInBoundingBox2 (point: XYPos) (box: (int * string * XYPos * XYPos)) = 
+    let corners = obtainCorners2 box 
+    inBox point corners
+
+let filterBoxes2 (point: XYPos) (boxList: (int * string * XYPos * XYPos) list)  =
+    boxList
+    |> List.filter (pointInBoundingBox2 point)
+    |> List.map obtainID2
 
 //Bool function to check if one box (id: string * top-left corner: XYPos * bottom-right corner: XYPos) is fully inside another box
 //(corner: XYPos * corner: XYPos). We assume that we don't know which of the corners are top-left and bottom-right for the encloser box.
@@ -348,10 +363,10 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
                                     //Filter wire bounding boxes on whether they contain the click point
                                     let filteredWireList = BusWire.getBoundingBoxes (model.Wire) scaledMousePos 
                                                            //Convert IDs to strings to use in generic helper functions
-                                                           |> List.map (fun (a,b,c) -> (string a, b, c))
-                                                           |> filterBoxes scaledMousePos
+                                                           |> List.map (fun (index, id ,b,c) -> (index,string id, b, c))
+                                                           |> filterBoxes2 scaledMousePos
                                                            //Convert back to component IDs when done. 
-                                                           |> List.map CommonTypes.ConnectionId
+                                                           |> List.map (fun (a,b)->(a, CommonTypes.ConnectionId b))
                                     //Check if we have something.
                                     if not (List.isEmpty filteredWireList) then
                                         //If we select a wire ID that is already highlighted we don't change anything
@@ -429,7 +444,7 @@ let displaySvgWithZoom (model:Model) (svgReact: ReactElement) (selectGraphic: Re
 let view (model:Model) (dispatch : Msg -> unit) =
 
     WireMsg (BusWire.Symbol (Symbol.Highlight model.SelectedComponentIDs)) |> dispatch
-    WireMsg (BusWire.HighlightWires model.SelectedWireIDs) |> dispatch           
+    WireMsg (BusWire.HighlightWires (List.map snd model.SelectedWireIDs)) |> dispatch           
      
     let wDispatch wMsg = dispatch (WireMsg wMsg)
     //Get components from wire and symbol
@@ -520,7 +535,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             {model with Wire = wModel2}, Cmd.batch [Cmd.map WireMsg wCmd2; Cmd.map WireMsg wCmd1]
         //delete wire(s)
         | ComponentWire -> 
-            updateBusWireModel model (BusWire.DeleteWires model.SelectedWireIDs)
+            updateBusWireModel model (BusWire.DeleteWires (List.map snd model.SelectedWireIDs))
         | _ -> 
             model, Cmd.none
 
@@ -585,7 +600,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             SelectBoxCurrent = startPoint;
             SelectionType = ComponentWire;
             SelectedComponentIDs = [];
-            SelectedWireIDs = wires;
+            SelectedWireIDs = wires ;
             SelectedPort = None}, Cmd.none
 
 
@@ -617,7 +632,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             {model with Wire = wmodel; SelectBoxCurrent = point}, Cmd.map WireMsg wCmd
         //This corresponds to a wire being moved
         | ComponentWire ->
-            let wModel, wCmd = sendBusWireMsg model (BusWire.MoveWires (model.SelectedWireIDs, scaledVector))
+            let wModel, wCmd = sendBusWireMsg model (BusWire.MoveWires ((List.map snd model.SelectedWireIDs), scaledVector))
             {model with Wire = wModel; SelectBoxCurrent = point}, Cmd.map WireMsg wCmd
         //Otherwise we don't need to dispatch any messages to Symbol/BusWire components
         | _ ->
@@ -688,7 +703,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     //Filter out wireIDs that only appear once 
                     |> List.filter (fun (id, count) -> count > 1)
                     //Only interested in the first elements of tuples i.e. ids
-                    |> List.map fst
+                    |> List.map (fun a-> (int 1, fst a))
                     
                 {model with
                     SelectBoxStart = origin;
