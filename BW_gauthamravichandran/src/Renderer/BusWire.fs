@@ -38,6 +38,7 @@ type Wire = {
     Segments: WireSegment list
     WireHighlight: bool
     Width: int
+    Manual:bool
     
     }
 
@@ -198,6 +199,7 @@ let makeWire (srcId:CommonTypes.PortId) (tarId:CommonTypes.PortId) (symbols: Sym
     Segments= setIndex segments
     WireHighlight=false
     Width=width
+    Manual= false
     }
 
 //----------------------------Message Type-----------------------------------//
@@ -373,15 +375,35 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     | Symbol sMsg -> 
         let sm,sCmd = Symbol.update sMsg model.Symbol
-        (*let wires = 
+        let manualRoute wire =
+            let last = (List.length wire.Segments) - 1
+            let src= Symbol.getPortCoords sm wire.SrcPort
+            let tar= Symbol.getPortCoords sm wire.TargetPort
+            wire.Segments
+            |> List.mapi (fun i seg -> 
+                match i with 
+                |0->makeWireSegment wire.Id src {X=seg.TargetPos.X;Y=src.Y} wire.Width
+                |1->makeWireSegment wire.Id {X=seg.SrcPos.X;Y=src.Y} seg.TargetPos wire.Width
+                |x when x= last - 1 -> makeWireSegment wire.Id seg.SrcPos {X=seg.SrcPos.X;Y=tar.Y}  wire.Width
+                |x when x=last-> makeWireSegment wire.Id {X=seg.SrcPos.X;Y=tar.Y} tar wire.Width
+
+                |_ -> seg    
+                )
+            |> setIndex
+        let wires = 
             model.WX
             |> List.map (fun w ->
                 let srcSym= Symbol.getHostId sm w.SrcPort
                 let tarSym= Symbol.getHostId sm w.TargetPort 
                 let segments=routing srcSym tarSym w.Id sm (Symbol.getPortCoords sm w.SrcPort) (Symbol.getPortCoords sm w.TargetPort) (Symbol.getPortWidth model.Symbol w.SrcPort)
-                {w with Segments= setIndex segments})
-        *)
-        {model with Symbol=sm;(* WX=wires*)}, Cmd.map Symbol sCmd
+                
+                if w.Manual=false then 
+                    {w with Segments= setIndex segments}
+                else 
+                    {w with Segments= manualRoute w}
+            )
+        
+        {model with Symbol=sm; WX=wires}, Cmd.map Symbol sCmd
     | AddWire (srcPort, tarPort) ->
         let w= makeWire srcPort tarPort model.Symbol (Symbol.getPortWidth model.Symbol srcPort)
         {model with WX=w::model.WX}, Cmd.none
@@ -403,6 +425,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         
         {model with WX = wList}, Cmd.none
     | MoveWires (idx,wId,vec) ->
+
         let a = idx - 1
         let b = idx + 1
         let move (w:Wire) (seg:WireSegment) idx wId =
@@ -459,7 +482,12 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wires= 
             model.WX
             |> List.mapi (fun i w-> {w with Segments = setIndex segLstLst.[i]})
-           
+            |> List.map (fun w ->
+                if  w.Id=wId  then
+                    {w with Manual = true}
+                else 
+                    {w with Manual = false}
+            )
         {model with WX = wires}, Cmd.none        
 
     | SetColor c -> {model with Color = c}, Cmd.none
