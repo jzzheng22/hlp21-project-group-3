@@ -513,16 +513,18 @@ let init () =
         CommonTypes.Memory.Data = [(1L, 0L); (2L, 0L); (3L, 0L)] |> Map.ofList
     }
     [
-        (CreateNewSymbol (CommonTypes.ComponentType.SplitWire 4) 1 4 {X = 10.; Y = 0.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Nand) 2 1 {X = 200.; Y = 50.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 {X = 300.; Y = 50.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Demux2) 1 2 {X = 400.; Y = 50.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Input 1) 0 1 {X = 200.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Decode4) 2 4 {X = 10.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Register 1) 1 1 {X = 500.; Y = 200.})
-        (CreateNewSymbol (CommonTypes.ComponentType.Register 2) 1 1 {X = 600.; Y = 200.}) //To show getbuswidth interface func
-        (CreateNewSymbol (CommonTypes.ComponentType.DFFE) 1 1 {X = 200.; Y = 300.})
-        (CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 400.; Y = 300.})
+        //(CreateNewSymbol (CommonTypes.ComponentType.SplitWire 4) 1 4 {X = 10.; Y = 0.})
+        (CreateNewSymbol (CommonTypes.ComponentType.And) 2 1 {X = 100.; Y = 20.})
+        (CreateNewSymbol (CommonTypes.ComponentType.And) 2 1 {X = 100.; Y = 100.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Mux2) 2 1 {X = 300.; Y = 100.})
+        //(CreateNewSymbol (CommonTypes.ComponentType.Demux2) 1 2 {X = 400.; Y = 200.})
+        (CreateNewSymbol (CommonTypes.ComponentType.Input 3) 0 1 {X = 200.; Y = 400.})
+        (CreateNewSymbol(CommonTypes.ComponentType.Output 3) 1 0 {X = 300.; Y = 400.})
+        //(CreateNewSymbol (CommonTypes.ComponentType.Decode4) 2 4 {X = 10.; Y = 200.})
+        //(CreateNewSymbol (CommonTypes.ComponentType.Register 1) 1 1 {X = 500.; Y = 200.})
+        //(CreateNewSymbol (CommonTypes.ComponentType.Register 2) 1 1 {X = 600.; Y = 200.}) //To show getbuswidth interface func
+        //(CreateNewSymbol (CommonTypes.ComponentType.DFFE) 1 1 {X = 200.; Y = 300.})
+        //(CreateNewSymbol (CommonTypes.ComponentType.RAM memory) 1 1 {X = 400.; Y = 300.})
     ]
     , Cmd.none
 

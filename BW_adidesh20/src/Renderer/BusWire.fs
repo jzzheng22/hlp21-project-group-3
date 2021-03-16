@@ -90,29 +90,6 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
             let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y)}
             
             [sourcePos;endPosSeg0;endPosSeg1;targetPos]
-
-    | Symbol.Left,Symbol.Right ->
-        if diff.X > 0. then 
-            let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
-            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
-            let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X + (2.*xOffset)}
-            let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
-            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
-        else 
-            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X + xOffset)}
-            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
-            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
-        
-    | Symbol.Left,Symbol.Left ->
-        if diff.X >= 0. then 
-            let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
-            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
-            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
-        
-        else 
-            let endPosSeg0 = {sourcePos with X = sourcePos.X + diff.X - xOffset}
-            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
-            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
             
     | Symbol.Right,Symbol.Bottom ->
         if diff.X > 0. && diff.Y > 0. then // Two Segment Case
@@ -155,19 +132,171 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
 
-    | _,_ -> // Symbol is probably rotated, so reusing the basic algorithm. Will sort in Group Stage
+    | Symbol.Left,Symbol.Right ->
+        if diff.X > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+            let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X + (2.*xOffset)}
+            let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X + xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        
+    | Symbol.Left,Symbol.Left ->
         if diff.X >= 0. then 
-            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
             let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
             [sourcePos;endPosSeg0;endPosSeg1;targetPos]
         
         else 
-            let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
-            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
-            let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X - (2.*xOffset)}
-            let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
-            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + diff.X - xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
 
+    | Symbol.Left,Symbol.Top ->
+        if diff.X > 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - (xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X > 0. && diff.Y < 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - (xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y - yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = targetPos.X}
+            [sourcePos;endPosSeg0;targetPos]
+        else //if diff.X < 0 && diff.Y < 0 then
+           let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
+           let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y - yOffset}
+           let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+           [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+
+    | Symbol.Left,Symbol.Bottom ->
+        if diff.X > 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - (xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X > 0. && diff.Y < 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - (xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else //if diff.X < 0 && diff.Y < 0 then
+           let endPosSeg0 = {sourcePos with X = targetPos.X}
+           [sourcePos;endPosSeg0;targetPos]
+
+    | Symbol.Top, Symbol.Left ->
+        if diff.X >= 0. && diff.Y > 0. then  
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = endPosSeg0.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X >= 0. && diff.Y <= 0. then
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X - xOffset}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        
+    | Symbol.Top, Symbol.Right ->
+        if diff.X >= 0. then  
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X + xOffset}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = endPosSeg0.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;targetPos]
+
+    | Symbol.Top, Symbol.Top ->
+        if diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        else
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+
+    | Symbol.Top, Symbol.Bottom ->
+        if diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y + yOffset}
+            let endPosSeg3 = {endPosSeg2 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + (diff.Y/2.)}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+
+    | Symbol.Bottom, Symbol.Left ->
+        if diff.X >= 0. && diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;targetPos]
+        else if diff.X >= 0. && diff.Y < 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = endPosSeg0.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X - xOffset}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+    | Symbol.Bottom, Symbol.Right ->
+        if diff.X >= 0. then  
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X + xOffset}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = endPosSeg0.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+
+    | Symbol.Bottom, Symbol.Bottom ->
+        if diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        else
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+
+    | Symbol.Bottom, Symbol.Top ->
+        if diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + (diff.Y/2.)}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y - yOffset}
+            let endPosSeg3 = {endPosSeg2 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
 
 
 let posLeftMost (posList: XYPos list) : XYPos list =
@@ -262,14 +391,14 @@ let singleWireView =
                     SVGAttr.StrokeWidth props.StrokeWidthP
                     SVGAttr.StrokeLinecap "round"] []
             let widthAnnotation = 
-                let textPos = Symbol.posAdd props.Vertices.Head {X = 5. ; Y = 5.}
+                let textPos = Symbol.posAdd props.Vertices.Head {X = 8. ; Y = 5.}
                 text [
                     X textPos.X
                     Y textPos.Y
                     Style [
                         TextAnchor "middle"
                         DominantBaseline "hanging"
-                        FontSize "10px"
+                        FontSize "7px"
                         FontWeight "Bold"
                         Fill "Black"
                     ]
