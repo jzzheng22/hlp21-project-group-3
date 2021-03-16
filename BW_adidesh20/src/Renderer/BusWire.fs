@@ -13,6 +13,16 @@ open Helpers
 //------------------------------------------------------------------------//
 
 
+type WireSegment = {
+    wId: CommonTypes.ConnectionId
+    Index: int 
+    SourcePos: XYPos
+    TargetPos: XYPos
+    BB: XYPos * XYPos
+    Highlight: bool
+    Width:int
+    }
+
 /// type for buswires
 /// for demo only. The real wires will
 /// connect to Ports - not symbols, where each symbol has
@@ -27,10 +37,12 @@ type Wire = {
     SourcePortEdge: Symbol.Edge
     TargetPortId: CommonTypes.PortId
     TargetPortEdge: Symbol.Edge
-    Vertices: XYPos list
-    BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
+    Segments: WireSegment list
+    //Vertices: XYPos list
+    //BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
     Width: int
     Highlight: bool
+    Manual: bool
     }
 
 type Model = {
@@ -315,7 +327,7 @@ let posLowest (posList: XYPos list) : XYPos list =
     let posY pos = pos.Y
     posList
     |> List.sortByDescending posY
-
+(*
 /// Calculates and returns a list of bounding boxes for all the segments of a wire
 let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionId): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     let bbDist = 10. // Distance of Bounding Box Outline from wire
@@ -333,21 +345,50 @@ let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionI
     |> List.pairwise
     |> List.map (fun (p1,p2) -> lineToBox p1 p2)
     |> List.map (fun (topL,botR) ->  (wID,topL,botR))
+*)
 
+/// Returns the Top Left and Bottom Right Corner for a wire segment bounding box
+let makeWireBB (sPos:XYPos) (tPos:XYPos): XYPos * XYPos=
+    match sPos.X,sPos.Y, tPos.X, tPos.Y with
+    | (sx,sy,tx,ty) when tx>sx -> ({X=sx;Y=sy-5.},{X=tx;Y=ty+5.})
+    | (sx,sy,tx,ty) when tx<sx -> ({X=tx;Y=ty-5.},{X=sx;Y=sy+5.})
+    | (sx,sy,tx,ty) when ty>sy -> ({X=sx-5.;Y=sy},{X=tx+5.;Y=ty})
+    | (sx,sy,tx,ty) when ty<sy -> ({X=tx-5.;Y=ty},{X=tx+5.;Y=sy})
+    | (sx,sy,tx,ty) when (tx=sx && ty=sy) -> ({X=tx;Y=ty},{X=sx;Y=sy})
+    | _ -> failwithf "diagonal line error"
 
 /// look up wire in WireModel
 let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
     wModel.WX
     |> List.tryFind (fun wire -> wire.Id = wId)
 
+/// Creates a single wire segment
+let makeWireSegment (wId:CommonTypes.ConnectionId) (width:int) (srcPos) (tgtPos)  = 
+    {
+        wId= wId
+        Index = 0
+        SourcePos=srcPos
+        TargetPos=tgtPos
+        BB= makeWireBB srcPos tgtPos
+        Highlight=false
+        Width=width
+    }
+
+/// Calculates and creates all wire segments
+let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) (width: int) 
+    (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : WireSegment list =
+
+    (routeWire model sourcePortId targetPortId)
+    |> List.pairwise
+    |> List.map (fun (src,tgt) -> makeWireSegment wId width src tgt)
+
+
 /// Creates a new wire 
 let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: CommonTypes.PortId) (width: int): Wire = 
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
     let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
     let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
-    let newVertices = routeWire model srcPortId tgtPortId
-    let newBB = singleWireBoundingBoxes newVertices wId
-    
+    let newSegments = makeWireSegments model wId width srcPortId tgtPortId
   
     {
         Id = wId
@@ -355,10 +396,10 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
         SourcePortEdge = srcEdge
         TargetPortId = tgtPortId
         TargetPortEdge = tgtEdge
-        Vertices = newVertices
-        BoundingBoxes = newBB
+        Segments = newSegments
         Width = width
         Highlight = false
+        Manual = false
     }
 
 //----------------Render/View Functions----------------//
@@ -366,7 +407,7 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
 type WireRenderProps = {
     key : CommonTypes.ConnectionId
     WireP: Wire
-    Vertices: XYPos list
+    Segments: WireSegment list
     Width: int
     Highlight: bool
     ColorP: string
@@ -378,9 +419,9 @@ type WireRenderProps = {
 let singleWireView =        
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
-            let singleSegmentView (segPos: XYPos*XYPos) =
-                let SrcP = fst segPos
-                let TgtP = snd segPos
+            let singleSegmentView (seg: WireSegment) =
+                let SrcP = seg.SourcePos
+                let TgtP = seg.TargetPos
                 line [
                     X1 SrcP.X
                     Y1 SrcP.Y
@@ -391,7 +432,7 @@ let singleWireView =
                     SVGAttr.StrokeWidth props.StrokeWidthP
                     SVGAttr.StrokeLinecap "round"] []
             let widthAnnotation = 
-                let textPos = Symbol.posAdd props.Vertices.Head {X = 8. ; Y = 5.}
+                let textPos = Symbol.posAdd props.Segments.Head.SourcePos {X = 8. ; Y = 5.}
                 text [
                     X textPos.X
                     Y textPos.Y
@@ -408,13 +449,13 @@ let singleWireView =
                     if props.Highlight = false then
                         []
                     else
-                        let srcHighlightPos = Symbol.posAdd (List.head props.Vertices) {X=3.;Y=0.}
+                        let srcHighlightPos = Symbol.posAdd props.Segments.Head.SourcePos {X=3.;Y=0.}
                         let tgtHighlightPos = 
                             match props.WireP.TargetPortEdge with
-                            | Symbol.Left -> Symbol.posAdd (List.last props.Vertices) {X= -3.;Y=0.}
-                            | Symbol.Right -> Symbol.posAdd (List.last props.Vertices) {X= 3.;Y=0.}
-                            | Symbol.Bottom -> Symbol.posAdd (List.last props.Vertices) {X=0.;Y=3.}
-                            | Symbol.Top -> Symbol.posAdd (List.last props.Vertices) {X=0.;Y= -3.}
+                            | Symbol.Left -> Symbol.posAdd (List.last props.Segments).TargetPos {X= -3.;Y=0.}
+                            | Symbol.Right -> Symbol.posAdd (List.last props.Segments).TargetPos {X= 3.;Y=0.}
+                            | Symbol.Bottom -> Symbol.posAdd (List.last props.Segments).TargetPos {X=0.;Y=3.}
+                            | Symbol.Top -> Symbol.posAdd (List.last props.Segments).TargetPos {X=0.;Y= -3.}
                             
                         [
                         circle [
@@ -438,10 +479,10 @@ let singleWireView =
                             SVGAttr.StrokeWidth 1][]
                         ]
             
-            let segments =
-                List.pairwise props.Vertices
+            let segmentEls =
+                props.Segments
                 |> List.map singleSegmentView
-            (widthAnnotation::segments)@highlightCircles
+            (widthAnnotation::segmentEls)@highlightCircles
             |> ofList)
 
 
@@ -453,11 +494,11 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
             let props = {
                 key = w.Id
                 WireP = w
-                Vertices = w.Vertices
+                Segments = w.Segments
                 Width = w.Width
                 Highlight = w.Highlight
                 ColorP = model.Color.Text()
-                StrokeWidthP = "2px" }
+                StrokeWidthP = "1px" }
             singleWireView props)
     let symbols = Symbol.view model.Symbol (fun sMsg -> dispatch (Symbol sMsg))
     g [] [(g [] wires); symbols]
@@ -532,11 +573,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wList = 
             model.WX
             |> List.map (fun w -> 
-                let newVertices = routeWire model w.SourcePortId  w.TargetPortId
-                let newBB = singleWireBoundingBoxes newVertices w.Id
-                {w with 
-                    Vertices = newVertices
-                    BoundingBoxes = newBB })
+                let newSegments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId
+                {w with Segments = newSegments })
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
     | AddWire (portId1,portId2) ->
@@ -582,7 +620,9 @@ let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId opti
 /// Returns all bounding boxes for all wire segments in the wire model
 let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list =
     wModel.WX
-    |> List.collect (fun w -> w.BoundingBoxes)
+    |> List.collect (fun w -> 
+                        List.map (fun seg -> 
+                            (seg.wId,fst seg.BB, snd seg.BB)) w.Segments)
 
 /// Returns a list of wire IDs connected to the supplied ports
 let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =
