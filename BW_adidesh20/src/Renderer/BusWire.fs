@@ -563,9 +563,17 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             )
             |> setIndex
 
+        let checkRouteCaseChange (wire: Wire) : Wire =
+            let newDiff = Symbol.posDiff (Symbol.getPortCoords sm wire.TargetPortId) (Symbol.getPortCoords sm wire.SourcePortId) 
+            let oldDiff = Symbol.posDiff ((List.last wire.Segments).TargetPos) ((List.head wire.Segments).SourcePos)
+            if (sign(newDiff.X) <> sign(oldDiff.X) || sign(newDiff.Y) <> sign(oldDiff.Y)) then
+                {wire with Manual = false}
+            else
+                wire
 
         let wList = 
             model.WX
+            |> List.map checkRouteCaseChange
             |> List.map (fun w -> match w.Manual with
                                     | false -> {w with Segments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId }
                                     | true -> {w with Segments = manualRoute w}
@@ -626,7 +634,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             model.WX
                 |> List.map (fun w ->
                     List.map (fun (seg:WireSegment)-> move w seg idx wId) w.Segments)
-        let wires= 
+        let wList= 
             model.WX
             |> List.mapi (fun i w-> {w with Segments = setIndex segLstLst.[i]})
             |> List.map (fun w ->
@@ -635,7 +643,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 else 
                     {w with Manual = false}
             )
-        {model with WX = wires}, Cmd.none
+        {model with WX = wList}, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
