@@ -632,7 +632,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             {model with Wire = wmodel; SelectBoxCurrent = point}, Cmd.map WireMsg wCmd
         //This corresponds to a wire being moved
         | ComponentWire ->
-            let wModel, wCmd = sendBusWireMsg model (BusWire.MoveWires ((List.map snd model.SelectedWireIDs), scaledVector))
+            let wModel, wCmd = sendBusWireMsg model (BusWire.MoveWires ( fst model.SelectedWireIDs.[0], snd model.SelectedWireIDs.[0], scaledVector))
             {model with Wire = wModel; SelectBoxCurrent = point}, Cmd.map WireMsg wCmd
         //Otherwise we don't need to dispatch any messages to Symbol/BusWire components
         | _ ->
