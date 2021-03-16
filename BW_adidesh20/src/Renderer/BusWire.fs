@@ -337,6 +337,11 @@ let makeWireSegment (wId:CommonTypes.ConnectionId) (width:int) (srcPos) (tgtPos)
         Width=width
     }
 
+/// Sets the indexes for each segment in a wire
+let setIndex (lst: WireSegment list) =
+    lst 
+    |> List.mapi (fun i seg-> {seg with Index= i})
+
 /// Calculates and creates all wire segments
 let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) (width: int) 
     (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : WireSegment list =
@@ -344,6 +349,7 @@ let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) (width: int)
     (routeWire model sourcePortId targetPortId)
     |> List.pairwise
     |> List.map (fun (src,tgt) -> makeWireSegment wId width src tgt)
+    |> setIndex
 
 
 /// Creates a new wire 
@@ -538,11 +544,32 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     | Symbol sMsg -> 
         let sm,sCmd = Symbol.update sMsg model.Symbol
+        let manualRoute (wire: Wire) =
+            let noOfSegments= List.length wire.Segments
+            let last = noOfSegments - 1
+            let src= Symbol.getPortCoords sm wire.SourcePortId
+            let tgt= Symbol.getPortCoords sm wire.TargetPortId
+            
+            wire.Segments
+            |> List.mapi (fun i seg -> 
+                match i with 
+                |0 ->makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
+                |1 when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
+                |x when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
+                |1->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} {X=seg.SourcePos.X;Y=tgt.Y} 
+                |x when x=last-> makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=tgt.Y} tgt 
+
+                |_ -> seg    
+            )
+            |> setIndex
+
+
         let wList = 
             model.WX
-            |> List.map (fun w -> 
-                let newSegments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId
-                {w with Segments = newSegments })
+            |> List.map (fun w -> match w.Manual with
+                                    | false -> {w with Segments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId }
+                                    | true -> {w with Segments = manualRoute w}
+            )
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
     | AddWire (portId1,portId2) ->
@@ -572,7 +599,43 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     {w with Highlight = false}
             )
         {model with WX = wList}, Cmd.none
-    | MoveWires (_,_,_) -> model, Cmd.none // Not implemented yet
+    | MoveWires (idx,wId,vector) ->
+        let a = idx - 1
+        let b = idx + 1
+        let move (w:Wire) (seg:WireSegment) idx wId =
+            let last = (List.length w.Segments) - 1
+            match idx with
+            | 0  -> seg
+            | x when (x=last && seg.Index=last ) -> seg
+            | _ when w.Id <> wId -> seg
+            | _ when idx%2=0 -> 
+                match seg.Index with 
+                | x when x=a -> makeWireSegment wId w.Width seg.SourcePos  {X=seg.TargetPos.X;Y=seg.TargetPos.Y+vector.Y} 
+                | x when x=idx-> makeWireSegment wId w.Width {X=seg.SourcePos.X;Y=seg.SourcePos.Y+vector.Y} {X=seg.TargetPos.X;Y=seg.TargetPos.Y+vector.Y} 
+                | x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X;Y=seg.SourcePos.Y+vector.Y} seg.TargetPos 
+                | _ -> seg
+            | _ when idx%2=1 ->
+                match seg.Index with 
+                |x when x=a -> makeWireSegment wId w.Width seg.SourcePos {X=seg.TargetPos.X+vector.X;Y=seg.TargetPos.Y} 
+                |x when x=idx-> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} {X=seg.TargetPos.X+vector.X;Y=seg.TargetPos.Y} 
+                |x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} seg.TargetPos 
+                |_ -> seg
+            |_ -> failwithf "Negative Index"
+        
+        let segLstLst =
+            model.WX
+                |> List.map (fun w ->
+                    List.map (fun (seg:WireSegment)-> move w seg idx wId) w.Segments)
+        let wires= 
+            model.WX
+            |> List.mapi (fun i w-> {w with Segments = setIndex segLstLst.[i]})
+            |> List.map (fun w ->
+                if  w.Id=wId  then
+                    {w with Manual = true}
+                else 
+                    {w with Manual = false}
+            )
+        {model with WX = wires}, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
