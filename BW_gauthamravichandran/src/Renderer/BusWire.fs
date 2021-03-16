@@ -376,15 +376,18 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     | Symbol sMsg -> 
         let sm,sCmd = Symbol.update sMsg model.Symbol
         let manualRoute wire =
-            let last = (List.length wire.Segments) - 1
+            let noOfSegments= List.length wire.Segments
+            let last = noOfSegments - 1
             let src= Symbol.getPortCoords sm wire.SrcPort
             let tar= Symbol.getPortCoords sm wire.TargetPort
+            
             wire.Segments
             |> List.mapi (fun i seg -> 
                 match i with 
-                |0->makeWireSegment wire.Id src {X=seg.TargetPos.X;Y=src.Y} wire.Width
-                |1->makeWireSegment wire.Id {X=seg.SrcPos.X;Y=src.Y} seg.TargetPos wire.Width
-                |x when x= last - 1 -> makeWireSegment wire.Id seg.SrcPos {X=seg.SrcPos.X;Y=tar.Y}  wire.Width
+                |0 ->makeWireSegment wire.Id src {X=seg.TargetPos.X;Y=src.Y} wire.Width
+                |1 when noOfSegments>3 ->makeWireSegment wire.Id {X=seg.SrcPos.X;Y=src.Y} seg.TargetPos wire.Width
+                |x when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id seg.SrcPos {X=seg.SrcPos.X;Y=tar.Y}  wire.Width
+                |1->makeWireSegment wire.Id {X=seg.SrcPos.X;Y=src.Y} {X=seg.SrcPos.X;Y=tar.Y} wire.Width
                 |x when x=last-> makeWireSegment wire.Id {X=seg.SrcPos.X;Y=tar.Y} tar wire.Width
 
                 |_ -> seg    
@@ -432,8 +435,21 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             let last = (List.length w.Segments) - 1
 
             match idx with
-            |0 -> failwithf "do nothing"
-            |x when x=last -> failwithf "do nothing"
+            |0  -> failwithf "do nothing"
+                (*let pos1= {X=seg.SrcPos.X ;Y=seg.SrcPos.Y}
+                let pos2= {X=seg.SrcPos.X ;Y=seg.SrcPos.Y+vec.Y}
+                let pos3= {X=seg.TargetPos.X  ;Y=seg.SrcPos.Y+vec.Y}
+
+                match seg.Index with 
+                |x when x=idx-> 
+                    [ 
+                     //makeWireSegment wId seg.SrcPos pos1 w.Width   
+                     //makeWireSegment wId pos1 pos2 w.Width 
+                     makeWireSegment wId pos2 pos3 w.Width
+                    ]
+                |x when x=b -> [makeWireSegment wId {X=seg.SrcPos.X;Y=seg.SrcPos.Y+vec.Y} seg.TargetPos w.Width]
+                | _ -> [seg] *)
+            |x when (x=last && seg.Index=last ) -> failwithf "do nothing"
             |_ when w.Id <> wId -> seg
             |_ when idx%2=0 -> 
                 match seg.Index with 
