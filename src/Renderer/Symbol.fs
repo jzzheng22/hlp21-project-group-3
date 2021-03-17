@@ -155,7 +155,7 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : XYPos =
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
-    let box = (addXYVal portPos -4., addXYVal portPos 4.);
+    let box = (addXYVal portPos -6., addXYVal portPos 6.);
     let topL = fst box
     let botR = snd box
     topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
@@ -803,7 +803,7 @@ let isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYP
     model
     |> List.tryFind (fun sym -> sym.Id = sId)
     |> function
-    | Some sym -> Some (genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -4. x sym) pos))) 
+    | Some sym -> Some (genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -9. x sym) pos))) 
                         |> List.filter (fun (x, y, z) -> z)
                         |> List.map (fun (x, y, z) -> (x, getPortId y))
                         |> List.item 0)
