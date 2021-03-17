@@ -583,16 +583,30 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let checkRouteCaseChange (wire: Wire) : Wire =
             let newDiff = Symbol.posDiff (Symbol.getPortCoords sm wire.TargetPortId) (Symbol.getPortCoords sm wire.SourcePortId) 
             let oldDiff = Symbol.posDiff ((List.last wire.Segments).TargetPos) ((List.head wire.Segments).SourcePos)
-            if (sign(newDiff.X) <> sign(oldDiff.X) || sign(newDiff.Y) <> sign(oldDiff.Y)) then
+            if (sign(newDiff.X) <> sign(oldDiff.X) || sign(newDiff.Y) <> sign(oldDiff.Y) 
+            || (wire.SourcePortEdge,wire.TargetPortEdge) <> (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId)) then
                 {wire with Manual = false}
             else
                 wire
+           
 
         let wList = 
             model.WX
             |> List.map checkRouteCaseChange
-            |> List.map (fun w -> match w.Manual with
-                                    | false -> {w with Segments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId }
+            |> List.map (fun w -> 
+                                    let srcEdge = Symbol.getPortEdge sm w.SourcePortId
+                                    let tgtEdge = Symbol.getPortEdge sm w.TargetPortId
+                                    let startHoriz = 
+                                        if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
+                                    let endHoriz = 
+                                        if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
+                                    match w.Manual with
+                                    | false -> {w with 
+                                                    Segments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId 
+                                                    SourcePortEdge = srcEdge
+                                                    TargetPortEdge = tgtEdge
+                                                    StartHoriz = startHoriz
+                                                    EndHoriz = endHoriz}
                                     | true -> {w with Segments = manualRoute w}
             )
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
