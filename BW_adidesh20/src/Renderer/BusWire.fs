@@ -77,7 +77,7 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
     let sourcePos = Symbol.getPortCoords model.Symbol sourcePortId
     let targetPos = Symbol.getPortCoords model.Symbol targetPortId
     let diff = Symbol.posDiff targetPos sourcePos
-    let xOffset = 15. // Length of Horizontal line coming out of/going into port
+    let xOffset = 10. // Length of Horizontal line coming out of/going into port
     let yOffset = 10. // Length of Vertical line coming out of/going into port
     match Symbol.getPortEdge model.Symbol sourcePortId, Symbol.getPortEdge model.Symbol targetPortId with 
     | Symbol.Right,Symbol.Left -> 
@@ -547,6 +547,12 @@ let verifyWire (model: Model) (wire: Wire): Wire option =
     |> List.contains false
     |> function true -> None | false -> Some wire
 
+/// Returns the absolute length of a wire segment
+let segLength (seg: WireSegment): float =
+    (seg.TargetPos,seg.SourcePos)
+    ||> Symbol.posDiff
+    |> (fun diff -> (sqrt diff.X**2. + diff.Y**2.))
+
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     | Symbol sMsg -> 
@@ -579,7 +585,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             )
             |> setIndex
 
-        let checkRouteCaseChange (wire: Wire) : Wire =
+        let checkRouteCaseChange (wire: Wire) : Wire = // Very ugly function, turn it into a rule function list which is mapped
 
             let newDiff = Symbol.posDiff (Symbol.getPortCoords sm wire.TargetPortId) (Symbol.getPortCoords sm wire.SourcePortId) 
             let oldDiff = Symbol.posDiff ((List.last wire.Segments).TargetPos) ((List.head wire.Segments).SourcePos)
@@ -593,20 +599,20 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             model.WX
             |> List.map checkRouteCaseChange
             |> List.map (fun w -> 
-                                    let srcEdge = Symbol.getPortEdge sm w.SourcePortId
-                                    let tgtEdge = Symbol.getPortEdge sm w.TargetPortId
-                                    let startHoriz = 
-                                        if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
-                                    let endHoriz = 
-                                        if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
-                                    match w.Manual with
-                                    | false -> {w with 
-                                                    Segments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId 
-                                                    SourcePortEdge = srcEdge
-                                                    TargetPortEdge = tgtEdge
-                                                    StartHoriz = startHoriz
-                                                    EndHoriz = endHoriz}
-                                    | true -> {w with Segments = manualRoute w}
+                let srcEdge = Symbol.getPortEdge sm w.SourcePortId
+                let tgtEdge = Symbol.getPortEdge sm w.TargetPortId
+                let startHoriz = 
+                    if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
+                let endHoriz = 
+                    if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
+                match w.Manual with
+                | false -> {w with 
+                                Segments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId 
+                                SourcePortEdge = srcEdge
+                                TargetPortEdge = tgtEdge
+                                StartHoriz = startHoriz
+                                EndHoriz = endHoriz}
+                | true -> {w with Segments = manualRoute w}
             )
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
@@ -637,10 +643,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     {w with Highlight = false}
             )
         {model with WX = wList}, Cmd.none
-    | MoveWires (idx,wId,vector) ->
+    | MoveWires (idx,wId,vec) ->
         let a = idx - 1
         let b = idx + 1
-        let move (w:Wire) (seg:WireSegment) idx wId =
+        let move (w:Wire) (seg:WireSegment) idx wId vector=
             let last = (List.length w.Segments) - 1
             match idx with
             | 0  -> seg
@@ -659,11 +665,28 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} seg.TargetPos 
                 |_ -> seg
             |_ -> failwithf "Negative Index"
-        
+
+        let validateSegments (segLstLst: WireSegment list list): bool =
+            segLstLst
+            |> List.map (fun segLst ->
+                if segLength (List.head segLst) < 10. || segLength (List.last segLst) < 10. then false else true)
+            |> List.contains false
+            |> not
+            
+
         let segLstLst =
-            model.WX
+            let preMove =
+                model.WX 
+                |> List.map (fun w-> List.map id w.Segments)
+            let postMove =
+                model.WX
                 |> List.map (fun w ->
-                    List.map (fun (seg:WireSegment)-> move w seg idx wId) w.Segments)
+                    List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
+
+            match validateSegments postMove with 
+            | true -> postMove
+            | false -> preMove
+
         let wList= 
             model.WX
             |> List.mapi (fun i w-> {w with Segments = setIndex segLstLst.[i]})
