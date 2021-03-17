@@ -561,12 +561,23 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let manualRoute (wire: Wire) =
             let noOfSegments= List.length wire.Segments
             let last = noOfSegments - 1
+            let prevSrc= wire.Segments.[0].SourcePos
+            let prevTgt= wire.Segments.[0].TargetPos
             let src= Symbol.getPortCoords sm wire.SourcePortId
             let tgt= Symbol.getPortCoords sm wire.TargetPortId
-            
+
+            let vec = {X=src.X-prevSrc.X;Y=tgt.Y-prevTgt.Y}
+
+            let fstLength = segLength (makeWireSegment wire.Id wire.Width src {X=wire.Segments.[0].TargetPos.X;Y=src.Y} ) <9.
+            let LstLength = segLength wire.Segments.[last] <15.
             wire.Segments
             |> List.mapi (fun i seg -> 
-                match i ,wire.StartHoriz ,wire.EndHoriz with 
+                match i ,wire.StartHoriz ,wire.EndHoriz with
+                |0,true,_ when fstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vec) 
+                |1,true,_ when fstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vec) {X=seg.TargetPos.X + vec.X; Y=seg.TargetPos.Y}
+                |2,true,_ when fstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X + vec.X; Y=seg.SourcePos.Y} seg.TargetPos
+
+
                 |0,true,_ ->makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
                 |1,true,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
                 |x,true,true when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
@@ -694,7 +705,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 if  w.Id=wId  then
                     {w with Manual = true}
                 else 
-                    {w with Manual = false}
+                    w 
             )
         {model with WX = wList}, Cmd.none
 
