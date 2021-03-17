@@ -14,6 +14,7 @@ open Helpers
 let STD_HEIGHT = 35.
 let HW_RATIO = 0.9
 let RAD = 3.
+let LABELSIZE = 6
 
 type Portinfo = 
     {
@@ -491,7 +492,7 @@ let createSymbol (compType : CommonTypes.ComponentType) (ports : (string * Commo
     //2. The max length of the label on the left/right * 2 , plus the name of the component is larger than the width
     let labelLens = List.map (List.map (fun (n, _, _) -> float (String.length n)) >> (List.sum)) ports
     let maxlens = List.map (List.map (fun (n, _, _) -> float (String.length n)) >> (fun x -> if List.isEmpty x then 0. else List.max x)) ports 
-    let test = max (max labelLens.[2] labelLens.[3]) ((max maxlens.[0] maxlens.[1])*2. + len) |> (*) 6.
+    let test = max (max labelLens.[2] labelLens.[3]) ((max maxlens.[0] maxlens.[1])*2. + len) |> (*) (float LABELSIZE)
 
     let n = max left right |> float //The max number of ports initially will always be on the left or right of the box
     let nBot = if bot > 0 || top > 0 then max bot top else (int (HW_RATIO * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
@@ -679,7 +680,7 @@ let private renderObj =
                 props.Obj
                 |> mapSetup
                 |> List.map(fun (i, k) ->
-                    (drawText (displace -2. i props.Obj).X (displace -2. i props.Obj).Y "6px" (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)])
+                    (drawText (displace -2. i props.Obj).X (displace -2. i props.Obj).Y (sprintf "%dpx" LABELSIZE) (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)])
 
             let wires : ReactElement list =
             //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
