@@ -13,7 +13,7 @@ type Model =
       Zoom: float
       SelectedPort: CommonTypes.PortId option * CommonTypes.PortType
       SelectedComponents: CommonTypes.ComponentId list
-      SelectedWireSegments: (int * CommonTypes.ConnectionId) list
+      SelectedWireSegments: (CommonTypes.ConnectionId * int) list
       SelectingMultiple: bool
       DragStartPos: XYPos
       DraggingPos: XYPos }
@@ -39,7 +39,7 @@ type Msg =
     | KeyPress of KeyboardMsg
     | SelectPort of CommonTypes.PortId * CommonTypes.PortType
     | SelectComponents of CommonTypes.ComponentId list
-    | SelectWireSegments of (int * CommonTypes.ConnectionId) list
+    | SelectWireSegments of (CommonTypes.ConnectionId * int) list
     | SelectDragStart of XYPos
     | SelectDragging of XYPos
     | SelectDragEnd
@@ -78,7 +78,7 @@ let snapGridVector (point: XYPos) =
 
 let getSymbolID (id, _, _) = id
 
-let getWireSegmentID (index, id, _, _) = (index, id)
+let getWireSegmentID (id, index, _, _) = (id, index)
 
 let getSymbolIDList filter lst =
     lst
@@ -94,7 +94,7 @@ let dispatchSelection symbolIDList wireSegmentIDList dispatch =
     dispatch <| SelectComponents symbolIDList
     dispatch <| Symbol(Symbol.Highlight symbolIDList)
     dispatch <| SelectWireSegments wireSegmentIDList
-    dispatch <| Wire(BusWire.HighlightWires (List.map snd wireSegmentIDList))
+    dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
 
 /// Removes ID from Symbol tuple. Used for testing where IDs are not necessary 
 let removeSymbolID predicate coords (_, a, b) = predicate coords (a, b)
@@ -309,7 +309,7 @@ let deleteWires model =
 
     let wiresToDelete =
         connectedWires
-        |> List.append (List.map snd model.SelectedWireSegments)
+        |> List.append (List.map fst model.SelectedWireSegments)
         |> List.distinct
 
     BusWire.update (BusWire.DeleteWires wiresToDelete) model.Wire
