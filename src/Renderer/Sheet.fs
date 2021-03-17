@@ -13,7 +13,7 @@ type Model =
       Zoom: float
       SelectedPort: CommonTypes.PortId option * CommonTypes.PortType
       SelectedComponents: CommonTypes.ComponentId list
-      SelectedWires: CommonTypes.ConnectionId list
+      SelectedWireSegments: (CommonTypes.ConnectionId * int) list
       SelectingMultiple: bool
       DragStartPos: XYPos
       DraggingPos: XYPos }
@@ -27,7 +27,11 @@ type KeyboardMsg =
     | Del
     | AltA
     | ZoomCanvasIn 
-    | ZoomCanvasOut 
+    | ZoomCanvasOut
+    | SymbolClockwise
+    | SymbolAntiClock
+    | SymbolMagnify
+    | SymbolShrink 
 
 type Msg =
     | Wire of BusWire.Msg
@@ -35,7 +39,7 @@ type Msg =
     | KeyPress of KeyboardMsg
     | SelectPort of CommonTypes.PortId * CommonTypes.PortType
     | SelectComponents of CommonTypes.ComponentId list
-    | SelectWires of CommonTypes.ConnectionId list
+    | SelectWireSegments of (CommonTypes.ConnectionId * int) list
     | SelectDragStart of XYPos
     | SelectDragging of XYPos
     | SelectDragEnd
@@ -72,21 +76,30 @@ let snapGridVector (point: XYPos) =
     let newYSquare = round (point.Y / unzoomedGrid)
     {X = (unzoomedGrid * newXSquare - point.X); Y = (unzoomedGrid * newYSquare - point.Y)}
 
-let getID (id, _, _) = id
+let getSymbolID (id, _, _) = id
 
-let getIDList filter lst =
+let getWireSegmentID (id, index, _, _) = (id, index)
+
+let getSymbolIDList filter lst =
     lst
     |> filter
-    |> List.map getID
+    |> List.map getSymbolID
 
-let dispatchSelection symbolIDList wireIDList dispatch = 
+let getWireSegmentIDList filter lst =
+    lst
+    |> filter
+    |> List.map getWireSegmentID
+
+let dispatchSelection symbolIDList wireSegmentIDList dispatch = 
     dispatch <| SelectComponents symbolIDList
     dispatch <| Symbol(Symbol.Highlight symbolIDList)
-    dispatch <| SelectWires wireIDList
-    dispatch <| Wire(BusWire.HighlightWires wireIDList)
+    dispatch <| SelectWireSegments wireSegmentIDList
+    dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
 
-/// Removes ID from tuple. Used for testing where IDs are not necessary 
-let removeID predicate coords (_, a, b) = predicate coords (a, b)
+/// Removes ID from Symbol tuple. Used for testing where IDs are not necessary 
+let removeSymbolID predicate coords (_, a, b) = predicate coords (a, b)
+/// Remove wire ID from tuple.
+let removeWireSegmentID predicate coords (_, _, a, b) = predicate coords (a, b)
 
 let filterBySelectingMultiple predicate lst =
     if not predicate then
@@ -99,15 +112,15 @@ let filterBySelectingMultiple predicate lst =
 let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>) =
     let symbolIDList =
         Symbol.getBoundingBoxes model.Wire.Symbol model.DraggingPos
-        |> getIDList (List.filter (removeID predicate coords)) 
+        |> getSymbolIDList (List.filter (removeSymbolID predicate coords)) 
         |> filterBySelectingMultiple model.SelectingMultiple
 
-    let wireIDList =
+    let wireSegmentIDList =
         BusWire.getBoundingBoxes model.Wire model.DraggingPos
-        |> getIDList (List.filter (removeID predicate coords))
+        |> getWireSegmentIDList (List.filter (removeWireSegmentID predicate coords))
         |> filterBySelectingMultiple model.SelectingMultiple
 
-    dispatchSelection symbolIDList wireIDList dispatch
+    dispatchSelection symbolIDList wireSegmentIDList dispatch
 
 /// Selects elements where mousePos is inside bounding box
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
@@ -221,7 +234,7 @@ let mouseMove model mousePos dispatch mDown =
     let symbolIDList =
         Symbol.getBoundingBoxes model.Wire.Symbol mousePos
         |> List.map increaseBoundingBox
-        |> getIDList (List.filter (removeID inBoundingBox mousePos))
+        |> getSymbolIDList (List.filter (removeSymbolID inBoundingBox mousePos))
 
     dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
 
@@ -296,7 +309,7 @@ let deleteWires model =
 
     let wiresToDelete =
         connectedWires
-        |> List.append model.SelectedWires
+        |> List.append (List.map fst model.SelectedWireSegments)
         |> List.distinct
 
     BusWire.update (BusWire.DeleteWires wiresToDelete) model.Wire
@@ -313,17 +326,15 @@ let moveElements model mousePos =
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) newModel.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
-    else if not (List.isEmpty model.SelectedWires) then
-        printf "Demo: Send BusWire.MoveWires"
-        printf "%A" model.SelectedWires
-        printf "%A" transVector
-        let wModel, wCmd = BusWire.update (BusWire.MoveWires(model.SelectedWires, transVector)) newModel.Wire
+    else if not (List.isEmpty model.SelectedWireSegments) then
+        let wireSegment = List.head model.SelectedWireSegments
+        let wModel, wCmd = BusWire.update (BusWire.MoveWires(fst wireSegment, snd wireSegment, transVector)) newModel.Wire
         {model with Wire = wModel}, Cmd.map Wire wCmd
 
     else
         { model with SelectingMultiple = true}, Cmd.none
 
-let snapToGrid model =
+let snapSymbolToGrid model =
     let transVector =
         Symbol.getBoundingBox model.Wire.Symbol (List.head model.SelectedComponents)
         |> function
@@ -346,6 +357,24 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress AltShiftZ ->
         printStats () // print and reset the performance statistics in dev tools window
         model, Cmd.none // do nothing else and return model unchanged
+    | KeyPress SymbolClockwise | KeyPress SymbolAntiClock | KeyPress SymbolMagnify | KeyPress SymbolShrink -> 
+        if List.isEmpty model.SelectedComponents then 
+            model, Cmd.none
+        else 
+            let symid = List.head model.SelectedComponents
+            let sModel, sCmd = 
+                match msg with 
+                | KeyPress SymbolClockwise -> 
+                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symid, 90))) model.Wire
+                | KeyPress SymbolAntiClock ->
+                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symid, 270))) model.Wire
+                | KeyPress SymbolMagnify ->
+                    BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 1.25; Y = 1.25}))) model.Wire
+                | KeyPress SymbolShrink -> 
+                    BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 0.8; Y = 0.8}))) model.Wire
+                | _ -> 
+                    failwithf "Unexpected input in symbol transformation."
+            { model with Wire = sModel }, Cmd.map Wire sCmd
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
     | KeyPress ZoomCanvasOut -> 
@@ -358,7 +387,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               Wire = sModel
               SelectedPort = None, CommonTypes.PortType.Input
               SelectedComponents = []
-              SelectedWires = [] },
+              SelectedWireSegments = [] },
         Cmd.batch [ Cmd.map Wire wCmd;
                     Cmd.map Wire sCmd ]
     | KeyPress AltA ->
@@ -380,19 +409,19 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | SelectPort (portID, portType) -> { model with SelectedPort = Some portID, portType }, Cmd.none
     | SelectComponents scMsg ->
         { model with SelectedComponents = scMsg }, Cmd.none
-    | SelectWires swMsg -> { model with SelectedWires = swMsg }, Cmd.none
+    | SelectWireSegments swMsg -> { model with SelectedWireSegments = swMsg }, Cmd.none
     | SelectDragStart dragMsg ->
         { model with
               DragStartPos = dragMsg;
               DraggingPos = dragMsg },
         Cmd.none
     | SelectDragEnd ->
-        if List.isEmpty model.SelectedComponents then
+        if not (List.isEmpty model.SelectedComponents) then
+            snapSymbolToGrid model
+        else
             { model with 
                 SelectedPort = None, CommonTypes.PortType.Input;
                 SelectingMultiple = false }, Cmd.none
-        else
-            snapToGrid model
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
     | DispatchMove mousePos ->
@@ -405,7 +434,7 @@ let init () =
       Zoom = 1.0
       SelectedPort = None, CommonTypes.PortType.Input
       SelectedComponents = []
-      SelectedWires = []
+      SelectedWireSegments = []
       SelectingMultiple = false
       DragStartPos = origin
       DraggingPos = origin },
