@@ -395,6 +395,48 @@ let getTextAttr (sym : Symbol) (pos : XYPos) : (string * string) =
     | Top -> ("middle", "hanging")
     | Bottom -> ("middle", "auto")
 
+let isInvert (portType : CommonTypes.PortType) (compType : CommonTypes.ComponentType) : bool =
+    match portType with
+    | CommonTypes.PortType.Output when compType = CommonTypes.ComponentType.Not
+                                    || compType = CommonTypes.ComponentType.Nand
+                                    || compType = CommonTypes.ComponentType.Nor
+                                    || compType = CommonTypes.ComponentType.Xnor -> true;
+    | _ -> false;
+
+let createLabelName (genPort : GenericPort) (portType : CommonTypes.PortType) (compType : CommonTypes.ComponentType) (i : int) : string = 
+    match genPort with
+    | Select -> sprintf "S%d" i
+    | Carry -> match portType with 
+               | CommonTypes.PortType.Input -> sprintf "Cin" 
+               | CommonTypes.PortType.Output -> sprintf "Cout" 
+    | Enable -> sprintf "En"
+    | Clk -> sprintf "Clk"
+    | Addr -> if i = 0 then "addr" elif i = 1 then "write" else "Clk"
+    | _ -> match compType with 
+            | CommonTypes.ComponentType.ROM x | CommonTypes.ComponentType.AsyncROM x ->
+                match portType with 
+                | CommonTypes.PortType.Input -> sprintf "addr"
+                | CommonTypes.PortType.Output -> sprintf "data"
+            | CommonTypes.ComponentType.RAM _ | CommonTypes.ComponentType.Register _ | CommonTypes.ComponentType.RegisterE _ ->
+                match portType with 
+                | CommonTypes.PortType.Input -> sprintf "data-in"
+                | CommonTypes.PortType.Output -> sprintf "data-out"
+            | CommonTypes.ComponentType.DFF | CommonTypes.ComponentType.DFFE ->
+                match portType with 
+                | CommonTypes.PortType.Input -> sprintf "D"
+                | CommonTypes.PortType.Output -> sprintf "Q"
+            | CommonTypes.ComponentType.Input _ | CommonTypes.ComponentType.Output _ -> ""
+            | CommonTypes.ComponentType.Custom y -> 
+                match portType with 
+                | CommonTypes.PortType.Input -> sprintf "%s" (fst(List.item i y.InputLabels))
+                | CommonTypes.PortType.Output -> sprintf "%s" (fst(List.item i y.OutputLabels))
+            | _ ->
+                match portType with 
+                | CommonTypes.PortType.Input -> sprintf "IN%d" i
+                | CommonTypes.PortType.Output -> sprintf "OUT%d" i 
+
+    
+    
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -402,9 +444,8 @@ let getTextAttr (sym : Symbol) (pos : XYPos) : (string * string) =
 /// Creates Symbol.PortInfo object. 
 ///
 /// i : Index of the port (e.g. IN0 : i = 0).
-/// genPort :  the generic porttype used to create any extra ports/labels
 /// w : the port width
-let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (genPort : GenericPort) (compId : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) (w : int) : Portinfo = 
+let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (compId : CommonTypes.ComponentId) (name : string) (invert : bool) (w : int) : Portinfo = 
     //Object creation
     {      
         Port = {
@@ -413,55 +454,14 @@ let CreatePortInfo (i : int) (portType : CommonTypes.PortType) (genPort : Generi
             PortType =  portType
             HostId = string(compId)
         }
-
         NumWires = 0
-        
-        Name = 
-            match genPort with
-            | Select -> sprintf "S%d" i
-            | Carry -> match portType with 
-                       | CommonTypes.PortType.Input -> sprintf "Cin" 
-                       | CommonTypes.PortType.Output -> sprintf "Cout" 
-            | Enable -> sprintf "En"
-            | Clk -> sprintf "Clk"
-            | Addr -> if i = 0 then "addr" elif i = 1 then "write" else "Clk"
-            | _ -> match compType with 
-                    | CommonTypes.ComponentType.ROM x | CommonTypes.ComponentType.AsyncROM x ->
-                        match portType with 
-                        | CommonTypes.PortType.Input -> sprintf "addr"
-                        | CommonTypes.PortType.Output -> sprintf "data"
-                    | CommonTypes.ComponentType.RAM _ | CommonTypes.ComponentType.Register _ | CommonTypes.ComponentType.RegisterE _ ->
-                        match portType with 
-                        | CommonTypes.PortType.Input -> sprintf "data-in"
-                        | CommonTypes.PortType.Output -> sprintf "data-out"
-                    | CommonTypes.ComponentType.DFF | CommonTypes.ComponentType.DFFE ->
-                        match portType with 
-                        | CommonTypes.PortType.Input -> sprintf "D"
-                        | CommonTypes.PortType.Output -> sprintf "Q"
-                    | CommonTypes.ComponentType.Input _ | CommonTypes.ComponentType.Output _ -> ""
-                    | CommonTypes.ComponentType.Custom y -> 
-                        match portType with 
-                        | CommonTypes.PortType.Input -> sprintf "%s" (fst(List.item i y.InputLabels))
-                        | CommonTypes.PortType.Output -> sprintf "%s" (fst(List.item i y.OutputLabels))
-                    | _ ->
-                        match portType with 
-                        | CommonTypes.PortType.Input -> sprintf "IN%d" i
-                        | CommonTypes.PortType.Output -> sprintf "OUT%d" i 
-
-        Invert = 
-            match portType with
-            | CommonTypes.PortType.Output when compType = CommonTypes.ComponentType.Not
-                                            || compType = CommonTypes.ComponentType.Nand
-                                            || compType = CommonTypes.ComponentType.Nor
-                                            || compType = CommonTypes.ComponentType.Xnor -> true;
-            | _ -> false;
-        
+        Name = name
+        Invert = invert
         Width = w
     }
 
-
 let makePort (range : int) (port : CommonTypes.PortType) (_id : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) (width : int) (pType : GenericPort) = 
-    List.map(fun x -> CreatePortInfo x port pType _id compType width) [0 .. range - 1]
+    List.map(fun x -> CreatePortInfo x port _id (createLabelName pType port compType x) (isInvert port compType) width) [0 .. range - 1]
 
 let getExPorts (symType: SymbolType) (bot : int) (left : int) (right : int) (_id : CommonTypes.ComponentId) (compType : CommonTypes.ComponentType) (wIn : int) (wOut : int) = 
     match symType with
