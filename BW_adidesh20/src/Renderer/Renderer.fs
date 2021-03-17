@@ -46,13 +46,7 @@
                 [| makeKeyItem "Default" "CmdOrCtrl+S" (fun () -> dispatch KeyboardMsg.CtrlS)
                    makeKeyItem "Blue" "Alt+C" (fun () -> dispatch KeyboardMsg.AltC)
                    makeKeyItem "Green" "Alt+V" (fun () -> dispatch KeyboardMsg.AltV)
-                   makeKeyItem "Delete"  "delete" (fun () -> dispatch KeyboardMsg.DEL)
                    makeKeyItem "Red" "Alt+Z" (fun () -> dispatch KeyboardMsg.AltZ)
-                   makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.AltA)
-                   menuSeparator
-                   makeKeyItem "Rotate Symbol Clockwise" "Alt+Shift+R" (fun () -> dispatch KeyboardMsg.RotateSymbol)
-                   makeKeyItem "Enlarge Symbol" "Alt+Shift+U" (fun () -> dispatch KeyboardMsg.ScaleUpSymbol)
-                   makeKeyItem "Shrink Symbol" "Alt+Shift+D" (fun () -> dispatch KeyboardMsg.ScaleDownSymbol)
                    menuSeparator
                    makeKeyItem "Diagram Zoom In" "CmdOrCtrl+z" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
                    makeKeyItem "Diagram Zoom Out" "CmdOrCtrl+y" (fun () -> dispatch KeyboardMsg.ZoomCanvasOut)
@@ -65,10 +59,45 @@
                    makeRoleItem MenuItemRole.ZoomOut|]
                 |> U2.Case1
     
+
+    ///Menu for operations relating to symbols    
+    let symbolMenu dispatch =
+        let menuSeparator =
+           let sep = createEmpty<MenuItemOptions>
+           sep.``type`` <- MenuItemType.Separator
+           sep
+        let makeKeyItem (label:string) (accelerator : string) (action : unit -> unit) =
+            jsOptions<MenuItemOptions> <| fun item ->
+                item.label <- label
+                item.accelerator <- accelerator
+                item.click <- fun _ _ _ -> action()
+
+    
+        jsOptions<MenuItemOptions> <| fun invisibleMenu ->
+            invisibleMenu.``type`` <- MenuItemType.SubMenu
+            invisibleMenu.label <- "Symbol"
+            invisibleMenu.visible <- true // visible
+            invisibleMenu.submenu <-
+                [| makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.AltA)
+                   makeKeyItem "Delete"  "delete" (fun () -> dispatch KeyboardMsg.Del)
+                   menuSeparator
+                   makeKeyItem "Rotate Clockwise" "CmdOrCtrl+Q" (fun () -> dispatch KeyboardMsg.SymbolClockwise)
+                   makeKeyItem "Rotate Anticlockwise" "CmdOrCtrl+E" (fun () -> dispatch KeyboardMsg.SymbolAntiClock)
+                   makeKeyItem "Magnify" "Alt+M" (fun () -> dispatch KeyboardMsg.SymbolMagnify)
+                   makeKeyItem "Shrink"  "Alt+D" (fun () -> dispatch KeyboardMsg.SymbolShrink)
+                |]
+                |> U2.Case1
+    
+    
+
+
+
     let attachMenusAndKeyShortcuts dispatch =
         let sub dispatch =
             let menu = 
-                [| editMenu dispatch |]          
+                [| editMenu dispatch
+                   symbolMenu dispatch
+                |]          
                 |> Array.map U2.Case1
                 |> electron.remote.Menu.buildFromTemplate   
             menu.items.[0].visible <- Some true
@@ -79,9 +108,9 @@
     let view'  = recordExecutionTimeStats "View" Sheet.view
     let printMsg (msg:Msg) =
         match msg with
-        | WireMsg (BusWire.Msg.MouseMsg busWireMouseMsg) -> sprintf "BusWireMsg:%A" busWireMouseMsg.Op
+        | Wire (BusWire.Msg.MouseMsg busWireMouseMsg) -> sprintf "BusWireMsg:%A" busWireMouseMsg.Op
         | KeyPress key -> sprintf "%A" key
-        | WireMsg (BusWire.Msg.Symbol (Symbol.Msg.MouseMsg symMouseMsg)) -> sprintf "SymbolMsg:%A"  symMouseMsg.Op
+        | Wire (BusWire.Msg.Symbol (Symbol.Msg.MouseMsg symMouseMsg)) -> sprintf "SymbolMsg:%A"  symMouseMsg.Op
         | x -> sprintf "Other:%A" x
 
     let traceFn (msg:Msg) model = printfn "Msg=%A\n\n" (printMsg msg)
