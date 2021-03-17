@@ -561,7 +561,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             wire.Segments
             |> List.mapi (fun i seg -> 
                 match i ,wire.StartHoriz ,wire.EndHoriz with 
-                | _ when noOfSegments<3 -> seg
                 |0,true,_ ->makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
                 |1,true,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
                 |x,true,true when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
@@ -581,10 +580,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             |> setIndex
 
         let checkRouteCaseChange (wire: Wire) : Wire =
+
             let newDiff = Symbol.posDiff (Symbol.getPortCoords sm wire.TargetPortId) (Symbol.getPortCoords sm wire.SourcePortId) 
             let oldDiff = Symbol.posDiff ((List.last wire.Segments).TargetPos) ((List.head wire.Segments).SourcePos)
-            if (sign(newDiff.X) <> sign(oldDiff.X) || sign(newDiff.Y) <> sign(oldDiff.Y) 
-            || (wire.SourcePortEdge,wire.TargetPortEdge) <> (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId)) then
+            if ((sign(newDiff.X) <> sign(oldDiff.X) || sign(newDiff.Y) <> sign(oldDiff.Y)  || (wire.SourcePortEdge,wire.TargetPortEdge) <> (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId)) || List.length wire.Segments < 3) then
                 {wire with Manual = false}
             else
                 wire
