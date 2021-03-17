@@ -128,8 +128,7 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
     | Symbol.Right,Symbol.Top ->
         if diff.X > 0. && diff.Y > 0. then // Two Segment Case
             let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X)}
-            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y - yOffset}
-            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+            [sourcePos;endPosSeg0;targetPos]
         else if diff.X > 0. && diff.Y < 0. then // Four Segment Case
             let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
             let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y - yOffset}
@@ -562,6 +561,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             wire.Segments
             |> List.mapi (fun i seg -> 
                 match i ,wire.StartHoriz ,wire.EndHoriz with 
+                | _ when noOfSegments<3 -> seg
                 |0,true,_ ->makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
                 |1,true,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
                 |x,true,true when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
