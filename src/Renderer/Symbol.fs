@@ -59,6 +59,7 @@ type Symbol =
         ShowSlots : bool
         Index : int
         Label : string
+        IOList : (CommonTypes.Port list * CommonTypes.Port list)
     }
 
 type Model = Symbol list
@@ -458,6 +459,12 @@ let getSymLabel (comp : CommonTypes.ComponentType) (i : int) : string =
     match a with 
     | "" -> ""
     | _ -> sprintf "%s%i" a i
+
+let makeIssiePorts (l, r, b, t) (portType : CommonTypes.PortType) : CommonTypes.Port list =
+    List.concat [l; r; b; t] 
+    |> List.filter (fun x -> x.Port.PortType = portType) 
+    |> List.map (fun x -> x.Port)
+
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -514,6 +521,12 @@ let createSymbol (compType : CommonTypes.ComponentType) (ports : (string * Commo
     // ---- Making portMap ---- //
     let portMap = getPortMap leftPort rightPort botPort topPort (makePosList (int n) nBot pos botR)
 
+
+    
+    // ---- Making list for Issie ---//
+    let inputList = makeIssiePorts (leftPort, rightPort, topPort, botPort) CommonTypes.PortType.Input
+    let outputList = makeIssiePorts (leftPort, rightPort, topPort, botPort) CommonTypes.PortType.Output
+
     // ------- Symbol Creation ------ ///
     {
         TopL = pos
@@ -528,6 +541,7 @@ let createSymbol (compType : CommonTypes.ComponentType) (ports : (string * Commo
         ShowSlots = false
         Index = index
         Label = label
+        IOList = (inputList, outputList) //Interface with issie
     }
 
 //-----------------------Skeleton Message type for symbols---------------------//
@@ -859,12 +873,28 @@ let getBoundingBox symModel symID =
 
 
 //----------------------interface to Issie-----------------------------//
-let extractComponent 
-        (symModel: Model) 
-        (sId:CommonTypes.ComponentId) : CommonTypes.Component= 
-    failwithf "Not implemented"
+
+let symToIssie (sym : Symbol) : CommonTypes.Component = 
+    {
+        CommonTypes.Component.Id = string sym.Id
+        CommonTypes.Component.Type = sym.Type
+        CommonTypes.Component.Label = sym.Label
+        CommonTypes.Component.InputPorts = fst sym.IOList
+        CommonTypes.Component.OutputPorts = snd sym.IOList
+        CommonTypes.Component.X = int sym.TopL.X
+        CommonTypes.Component.Y = int sym.TopL.Y
+        CommonTypes.Component.H = getHWObj sym |> fst |> int
+        CommonTypes.Component.W = getHWObj sym |> snd |> int
+     }
+
+let extractComponent (symModel: Model) (sId:CommonTypes.ComponentId) : CommonTypes.Component= 
+    symModel 
+    |> List.tryFind (fun x -> x.Id = sId)
+    |> function
+    | Some x -> symToIssie x
+    | None -> failwithf "couldnt find symbol id in extract component"
 
 let extractComponents (symModel: Model) : CommonTypes.Component list = 
-    failwithf "Not implemented"
+    symModel |> List.map symToIssie
 
 
