@@ -80,6 +80,7 @@ type Msg =
     | Rotate of sId : CommonTypes.ComponentId * rot : int
     | Scale of sId : CommonTypes.ComponentId * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
     | DisplaySlots of sId : CommonTypes.ComponentId
+    | Rename of sId : CommonTypes.ComponentId * name : string
     | UpdateSymbolModelWithComponent of CommonTypes.Component // Issie interface
 
 
@@ -456,6 +457,11 @@ let getTypeName (comp : CommonTypes.ComponentType) : string =
     let (a, _, _, _, _) = typeToInfo comp
     a
 
+let getSymLabel (comp : CommonTypes.ComponentType) (i : int) : string = 
+    let a = getTypeName comp
+    match a with 
+    | "" -> ""
+    | _ -> sprintf "%s%i" a i
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -546,17 +552,17 @@ let init () =
         CommonTypes.CustomComponentType.OutputLabels = [("myOut1", 0); ("myOut2", 1)]  //(string * int) list 
     }
     [
-        (createSymbol (CommonTypes.ComponentType.And) [[("IN0", CommonTypes.PortType.Input, false); ("IN1", CommonTypes.PortType.Input, false)]; [("OUT1", CommonTypes.PortType.Output, true)]; []; [("OUT2", CommonTypes.PortType.Output, true); ("reallyreallyreallylonglabelname", CommonTypes.PortType.Output, true); ("OUT4", CommonTypes.PortType.Output, true)]] {X = 250.; Y = 150.} 0 (getTypeName CommonTypes.ComponentType.And))
-        (createSymbol (CommonTypes.ComponentType.MergeWires) (findPortList 1 4 CommonTypes.ComponentType.MergeWires) {X = 50.; Y = 100.} 0 (getTypeName CommonTypes.ComponentType.MergeWires))
-        (createSymbol (CommonTypes.ComponentType.Nand) (findPortList 2 1 CommonTypes.ComponentType.Nand) {X = 200.; Y = 50.} 0 (getTypeName CommonTypes.ComponentType.Nand))
-        (createSymbol (CommonTypes.ComponentType.Mux2) (findPortList 2 1 CommonTypes.ComponentType.Mux2) {X = 300.; Y = 50.} 0 (getTypeName CommonTypes.ComponentType.Mux2))
-        (createSymbol (CommonTypes.ComponentType.Demux2) (findPortList 1 2 CommonTypes.ComponentType.Demux2) {X = 400.; Y = 50.} 0 (getTypeName CommonTypes.ComponentType.Demux2))
-        (createSymbol (CommonTypes.ComponentType.Input 1) (findPortList 0 1 (CommonTypes.ComponentType.Input 1)) {X = 200.; Y = 200.} 0 (getTypeName (CommonTypes.ComponentType.Input 1)))
-        (createSymbol (CommonTypes.ComponentType.Decode4) (findPortList 2 4 CommonTypes.ComponentType.Decode4) {X = 250.; Y = 250.} 0 (getTypeName CommonTypes.ComponentType.Decode4))
-        (createSymbol (CommonTypes.ComponentType.Register 1) (findPortList 1 1 (CommonTypes.ComponentType.Register 1)) {X = 500.; Y = 100.} 0 (getTypeName (CommonTypes.ComponentType.Register 1)))
-        (createSymbol (CommonTypes.ComponentType.DFFE) (findPortList 1 1 CommonTypes.ComponentType.DFFE) {X = 500.; Y = 200.} 0 (getTypeName CommonTypes.ComponentType.DFFE))
-        (createSymbol (CommonTypes.ComponentType.RAM memory) (findPortList 1 1 (CommonTypes.ComponentType.RAM memory)) {X = 500.; Y = 300.} 0 (getTypeName (CommonTypes.ComponentType.RAM memory)))
-        (createSymbol (CommonTypes.ComponentType.Custom custom) (findPortList (List.length custom.InputLabels) (List.length custom.OutputLabels) (CommonTypes.ComponentType.Custom custom)) {X = 20.; Y = 300.} 0 (getTypeName (CommonTypes.ComponentType.Custom custom)))
+        (createSymbol (CommonTypes.ComponentType.And) [[("IN0", CommonTypes.PortType.Input, false); ("IN1", CommonTypes.PortType.Input, false)]; [("OUT1", CommonTypes.PortType.Output, true)]; []; [("OUT2", CommonTypes.PortType.Output, true); ("reallyreallyreallylonglabelname", CommonTypes.PortType.Output, true); ("OUT4", CommonTypes.PortType.Output, true)]] {X = 250.; Y = 150.} 0 (getSymLabel CommonTypes.ComponentType.And 0))
+        (createSymbol (CommonTypes.ComponentType.MergeWires) (findPortList 1 4 CommonTypes.ComponentType.MergeWires) {X = 50.; Y = 100.} 0 (getSymLabel CommonTypes.ComponentType.MergeWires 0))
+        (createSymbol (CommonTypes.ComponentType.Nand) (findPortList 2 1 CommonTypes.ComponentType.Nand) {X = 200.; Y = 50.} 0 (getSymLabel CommonTypes.ComponentType.Nand 0))
+        (createSymbol (CommonTypes.ComponentType.Mux2) (findPortList 2 1 CommonTypes.ComponentType.Mux2) {X = 300.; Y = 50.} 0 (getSymLabel CommonTypes.ComponentType.Mux2 0))
+        (createSymbol (CommonTypes.ComponentType.Demux2) (findPortList 1 2 CommonTypes.ComponentType.Demux2) {X = 400.; Y = 50.} 0 (getSymLabel CommonTypes.ComponentType.Demux2 0))
+        (createSymbol (CommonTypes.ComponentType.Input 1) (findPortList 0 1 (CommonTypes.ComponentType.Input 1)) {X = 200.; Y = 200.} 0 (getSymLabel (CommonTypes.ComponentType.Input 1) 0))
+        (createSymbol (CommonTypes.ComponentType.Decode4) (findPortList 2 4 CommonTypes.ComponentType.Decode4) {X = 250.; Y = 250.} 0 (getSymLabel CommonTypes.ComponentType.Decode4 0))
+        (createSymbol (CommonTypes.ComponentType.Register 1) (findPortList 1 1 (CommonTypes.ComponentType.Register 1)) {X = 500.; Y = 100.} 0 (getSymLabel (CommonTypes.ComponentType.Register 1) 0))
+        (createSymbol (CommonTypes.ComponentType.DFFE) (findPortList 1 1 CommonTypes.ComponentType.DFFE) {X = 500.; Y = 200.} 0 (getSymLabel CommonTypes.ComponentType.DFFE 0))
+        (createSymbol (CommonTypes.ComponentType.RAM memory) (findPortList 1 1 (CommonTypes.ComponentType.RAM memory)) {X = 500.; Y = 300.} 0 (getSymLabel (CommonTypes.ComponentType.RAM memory) 0))
+        (createSymbol (CommonTypes.ComponentType.Custom custom) (findPortList (List.length custom.InputLabels) (List.length custom.OutputLabels) (CommonTypes.ComponentType.Custom custom)) {X = 20.; Y = 300.} 0 (getSymLabel (CommonTypes.ComponentType.Custom custom) 0))
     ]
     , Cmd.none
 
@@ -564,7 +570,7 @@ let init () =
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     match msg with
     | Add (compType, pagePos, numIn, numOut, i) ->
-        (createSymbol compType (findPortList numIn numOut compType) pagePos i (sprintf "%s%i" (getTypeName compType) i)) :: model, Cmd.none
+        (createSymbol compType (findPortList numIn numOut compType) pagePos i (getSymLabel compType i)) :: model, Cmd.none
 
     | Delete sIdList -> 
         List.filter (fun sym -> not (List.contains sym.Id sIdList)) model, Cmd.none
@@ -651,6 +657,17 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 }
         )
         , Cmd.none
+        | Rename (sId, name) ->
+            model
+            |> List.map (fun sym ->
+                if sId <> sym.Id then
+                    sym
+                else
+                    { sym with
+                        Label = name
+                    }
+        )
+        , Cmd.none
 
     | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
     | _ -> failwithf "Not implemented"
@@ -719,7 +736,7 @@ let private renderObj =
 
             let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Name]
             
-            let symLabel = drawText (midSymX props.Obj) (props.Obj.TopL.Y) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Label]
+            let symLabel = drawText (midSymX props.Obj) (props.Obj.TopL.Y - 10.) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Label]
             
             let drawInvert =
                 genMapList props.Obj.PortMap (List.filter(fun (_, k) -> isPortInverse k))
