@@ -112,8 +112,8 @@ let typeToInfo (compType : CommonTypes.ComponentType) : (string * string * int *
     | CommonTypes.ComponentType.AsyncROM x -> ("AROM", "AROM", x.AddressWidth, x.WordWidth, LogMem)
     | CommonTypes.ComponentType.ROM x -> ("ROM", "ROM", x.AddressWidth, x.WordWidth, FF)
     | CommonTypes.ComponentType.RAM x -> ("RAM", "RAM", x.AddressWidth, x.WordWidth, RAM)
-    | CommonTypes.ComponentType.Input x -> ((sprintf "In<%d:0>" (x - 1)), "", x, x, IO) 
-    | CommonTypes.ComponentType.Output x -> ((sprintf "Out<%d:0>" (x - 1)), "", x, x, IO) 
+    | CommonTypes.ComponentType.Input x -> ("", (sprintf "In<%d:0>" (x - 1)), x, x, IO) 
+    | CommonTypes.ComponentType.Output x -> ("", (sprintf "Out<%d:0>" (x - 1)), x, x, IO) 
     | CommonTypes.ComponentType.IOLabel -> ("", "", 0, 0, IO) //Check generic type WHAT IS THIS?? 
     | CommonTypes.ComponentType.BusSelection (x, y) -> ("", "", x, y, Wires)
     | CommonTypes.ComponentType.MergeWires -> ("", "", 0, 0, Wires)
