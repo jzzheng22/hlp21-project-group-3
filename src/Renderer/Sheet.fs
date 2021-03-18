@@ -395,12 +395,15 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             let n = 
                 model.Wire.Symbol
                 |> List.filter (fun x -> x.Type = CommonTypes.ComponentType.Mux2)
-                |> List.map (fun x -> x.I)
-                |> List.max
-                |> (+) 1
+
+            let a = if List.isEmpty n then 1 
+                    else n
+                         |> List.map (fun x -> x.I)
+                         |> List.max
+                         |> (+) 1
 
             BusWire.update
-                (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, n)))
+                (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, a)))
                 model.Wire
 
         { model with Wire = sModel }, Cmd.map Wire sCmd
