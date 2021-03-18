@@ -321,6 +321,14 @@ let makeWireBB (sPos:XYPos) (tPos:XYPos): XYPos * XYPos=
     | (sx,sy,tx,ty) when (tx=sx && ty=sy) -> ({X=tx;Y=ty},{X=sx;Y=sy})
     | _ -> failwithf "diagonal line error"
 
+let bbCollision (bb1:XYPos*XYPos) (bb2:XYPos*XYPos) =
+    match fst bb1, snd bb1, fst bb2, snd bb2 with
+    | (tL1, bR1, tL2, bR2) when bR2.Y < tL1.Y -> false
+    | (tL1, bR1, tL2, bR2) when tL2.X > bR1.X -> false
+    | (tL1, bR1, tL2, bR2) when tL2.Y > bR1.Y -> false
+    | (tL1, bR1, tL2, bR2) when bR2.X < tL1.X -> false
+    |  _ ->true
+
 /// look up wire in WireModel
 let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
     wModel.WX
@@ -561,12 +569,53 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let manualRoute (wire: Wire) =
             let noOfSegments= List.length wire.Segments
             let last = noOfSegments - 1
+            let prevSrc= wire.Segments.[0].SourcePos
+            let prevTgt= wire.Segments.[last].TargetPos
             let src= Symbol.getPortCoords sm wire.SourcePortId
             let tgt= Symbol.getPortCoords sm wire.TargetPortId
+
+            let vecSrc = {X=src.X-prevSrc.X;Y=src.Y-prevSrc.Y}
+            let vecTgt = {X=tgt.X-prevTgt.X;Y=tgt.Y-prevTgt.Y}
+            let head= List.head wire.Segments
+            let tail = List.last wire.Segments
+
+            let fstLength = 
+                match wire.SourcePortEdge with 
+                |Symbol.Right when head.TargetPos.X<src.X + 9. -> true
+                |Symbol.Left when head.TargetPos.X>src.X - 9. ->true
+                |Symbol.Top when head.TargetPos.Y>src.Y - 9. ->true
+                |Symbol.Bottom when head.TargetPos.Y<src.Y + 9. ->true
+                |_ -> false
             
+            //if head.TargetPos.X<src.X + 9. then true else false
+            let LstLength = 
+                match wire.TargetPortEdge with 
+                |Symbol.Right when tail.SourcePos.X<tgt.X + 9. -> true
+                |Symbol.Left when tail.SourcePos.X>tgt.X - 9. ->true
+                |Symbol.Top when tail.SourcePos.Y>tgt.Y - 9. ->true
+                |Symbol.Bottom when tail.SourcePos.Y<tgt.Y + 9. ->true
+                |_ -> false
+
+
             wire.Segments
             |> List.mapi (fun i seg -> 
-                match i ,wire.StartHoriz ,wire.EndHoriz with 
+                match i ,wire.StartHoriz ,wire.EndHoriz with
+                |0,true,_ when fstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
+                |1,true,_ when fstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X + vecSrc.X; Y=seg.TargetPos.Y}
+                |2,true,_ when fstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X + vecSrc.X; Y=seg.SourcePos.Y} seg.TargetPos
+
+                |0,false,_ when fstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
+                |1,false,_ when fstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X ; Y=seg.TargetPos.Y+vecSrc.Y}
+                |2,false,_ when fstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X ; Y=seg.SourcePos.Y+ vecSrc.Y} seg.TargetPos
+                
+                |x,_,true when x=last && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
+                |x,_,true when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X + vecTgt.X; Y=seg.SourcePos.Y} (Symbol.posAdd seg.TargetPos vecTgt)
+                |x,_,true when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X + vecTgt.X; Y=seg.TargetPos.Y}
+
+                |x,_,false when x=last && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
+                |x,_,false when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X ; Y=seg.SourcePos.Y + vecTgt.Y} (Symbol.posAdd seg.TargetPos vecTgt)
+                |x,_,false when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X ; Y=seg.TargetPos.Y + vecTgt.Y}
+                
                 |0,true,_ ->makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
                 |1,true,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
                 |x,true,true when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
@@ -643,7 +692,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     {w with Highlight = false}
             )
         {model with WX = wList}, Cmd.none
-    | MoveWires (wId, idx,vec) ->
+
+    | MoveWires (wId,idx,vec) ->
         let a = idx - 1
         let b = idx + 1
         let move (w:Wire) (seg:WireSegment) idx wId vector=
@@ -665,27 +715,42 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} seg.TargetPos 
                 |_ -> seg
             |_ -> failwithf "Negative Index"
-
+        
+        let condition (w:Wire)=
+            let head= List.head w.Segments
+            let last = List.last w.Segments
+            match w.SourcePortEdge, w.TargetPortEdge with 
+            |Symbol.Right,_ when head.TargetPos.X<head.SourcePos.X + 9. ->false
+            |Symbol.Top,_ when head.TargetPos.Y>head.SourcePos.Y - 9. ->false
+            |Symbol.Left,_ when head.TargetPos.X>head.SourcePos.X - 9. ->false
+            |Symbol.Bottom, _ when head.TargetPos.Y<head.SourcePos.Y + 9. ->false
+            |_,Symbol.Right when last.SourcePos.X<last.TargetPos.X + 9. ->false
+            |_,Symbol.Top when last.SourcePos.Y>last.TargetPos.Y - 9. ->false
+            |_,Symbol.Left when last.SourcePos.X>last.TargetPos.X - 9. ->false
+            |_,Symbol.Bottom when last.SourcePos.Y<last.TargetPos.Y + 9. ->false
+            |_ -> true
+        (*
         let validateSegments (segLstLst: WireSegment list list): bool =
             segLstLst
             |> List.map (fun segLst ->
-                if segLength (List.head segLst) < 10. || segLength (List.last segLst) < 10. then false else true)
+                if (*segLength (List.head segLst) < 10. || segLength (List.last segLst) < 10.*) condition (List.head segLst) then false else true)
             |> List.contains false
             |> not
-            
+        *)
+
+        let validateWires (wLst: Wire list): bool =
+            wLst
+            |> List.map (fun w ->
+                condition w)
+            |> List.contains false
+            |> not
+
 
         let segLstLst =
-            let preMove =
-                model.WX 
-                |> List.map (fun w-> List.map id w.Segments)
-            let postMove =
-                model.WX
-                |> List.map (fun w ->
-                    List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
 
-            match validateSegments postMove with 
-            | true -> postMove
-            | false -> preMove
+            model.WX
+            |> List.map (fun w ->
+                List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
 
         let wList= 
             model.WX
@@ -694,9 +759,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 if  w.Id=wId  then
                     {w with Manual = true}
                 else 
-                    {w with Manual = false}
+                    w 
             )
-        {model with WX = wList}, Cmd.none
+        if validateWires wList then {model with WX = wList}, Cmd.none else model, Cmd.none
+        //{model with WX = wList}, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
@@ -710,11 +776,11 @@ let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId opti
     failwith "Not implemented"
 
 /// Returns all bounding boxes for all wire segments in the wire model
-let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * int * XYPos * XYPos) list =
+let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): ( CommonTypes.ConnectionId * int *XYPos * XYPos) list =
     wModel.WX
     |> List.collect (fun w->
                     List.map (fun (segment:WireSegment)->
-                                (segment.wId, segment.Index, fst segment.BB, snd segment.BB))w.Segments)
+                                ( segment.wId,segment.Index,fst segment.BB, snd segment.BB))w.Segments)
 
 /// Returns a list of wire IDs connected to the supplied ports
 let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =
