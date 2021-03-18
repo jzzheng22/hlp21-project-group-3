@@ -781,7 +781,13 @@ let getPortCoords (symModel: Model) (pId : CommonTypes.PortId) : XYPos =
     | Some x -> fst x
     | None -> failwithf "Error in getPortCoords: couldn't find portID"
 
-        
+///Get bounding box of a single symbol based on the ID.      
+let getBoundingBox symModel symID =
+    List.tryFind (fun x -> x.Id = symID) symModel
+    |> function 
+    | Some x -> (x.TopL, x.BotR)
+    | None -> failwithf "Could not get bounding box"
+
 ///Returns all symbols in the model in the form (ID, bounding box topLeft, bounding box botRight)
 let getBoundingBoxes (symModel : Model) (startCoord : XYPos) : (CommonTypes.ComponentId * XYPos * XYPos) list =
     List.map (fun sym -> (sym.Id, sym.TopL, sym.BotR)) symModel
@@ -843,3 +849,4 @@ let extractComponent
 
 let extractComponents (symModel: Model) : CommonTypes.Component list = 
     failwithf "Not implemented"
+

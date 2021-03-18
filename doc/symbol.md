@@ -64,7 +64,7 @@ These are called by BusWire and implemented in JEMerrick's Symbol:
  - XYPos is a translation vector.
  - Move symbols in list by given translation vector.
 
-`Add of compType: CommonTypes.ComponentType * pagePos: XYPos * numIn: int * numOut: int`
+`Add of compType: CommonTypes.ComponentType * pagePos: XYPos * numIn: int * numOut: int * i : int`
  - Adds a new symbol based on the provided information.
  - compType: type of component.
  - pagePos: location on canvas.
@@ -75,6 +75,7 @@ These are called by BusWire and implemented in JEMerrick's Symbol:
  - Initial position of symbol:
     - ISSIE chooses an arbitrary random position to put the symbol. From here we can drag. 
     - This arbitrary initial position changes each time.
+- i : the number indicating how many of that symbol are currently on the sheet
 
 `Delete of CommonTypes.ComponentId list`
  - Deletes symbols from model based on IDs in list.
@@ -107,6 +108,9 @@ The below messages can also be sent to JEMerrick's version of Symbol:
 
  `DisplaySlots of sId : CommonTypes.ComponentId`
  - Highlights all possible positions a port may be moved to on the symbol
+
+`Rename of sId : CommonTypes.ComponentId * name : string`
+- Changes the label of the component to a given string
 
 ## State Outputs
  - SymbolBBs (to Sheet and BusWire)

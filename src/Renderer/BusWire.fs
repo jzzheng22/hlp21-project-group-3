@@ -65,7 +65,7 @@ type Msg =
     | AddWire of (CommonTypes.PortId * CommonTypes.PortId)
     | DeleteWires of CommonTypes.ConnectionId list
     | HighlightWires of CommonTypes.ConnectionId list
-    | MoveWires of  CommonTypes.ConnectionId * int  * XYPos
+    | MoveWires of CommonTypes.ConnectionId * int * XYPos
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
 
@@ -328,6 +328,7 @@ let bbCollision (bb1:XYPos*XYPos) (bb2:XYPos*XYPos) =
     | (tL1, bR1, tL2, bR2) when tL2.Y > bR1.Y -> false
     | (tL1, bR1, tL2, bR2) when bR2.X < tL1.X -> false
     |  _ ->true
+
 /// look up wire in WireModel
 let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
     wModel.WX
@@ -615,7 +616,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |x,_,false when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X ; Y=seg.SourcePos.Y + vecTgt.Y} (Symbol.posAdd seg.TargetPos vecTgt)
                 |x,_,false when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X ; Y=seg.TargetPos.Y + vecTgt.Y}
                 
-
                 |0,true,_ ->makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
                 |1,true,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
                 |x,true,true when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
@@ -692,6 +692,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     {w with Highlight = false}
             )
         {model with WX = wList}, Cmd.none
+
     | MoveWires (wId,idx,vec) ->
         let a = idx - 1
         let b = idx + 1
@@ -750,8 +751,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             model.WX
             |> List.map (fun w ->
                 List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
-
-
 
         let wList= 
             model.WX
