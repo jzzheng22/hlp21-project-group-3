@@ -569,11 +569,12 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             let noOfSegments= List.length wire.Segments
             let last = noOfSegments - 1
             let prevSrc= wire.Segments.[0].SourcePos
-            let prevTgt= wire.Segments.[0].TargetPos
+            let prevTgt= wire.Segments.[last].TargetPos
             let src= Symbol.getPortCoords sm wire.SourcePortId
             let tgt= Symbol.getPortCoords sm wire.TargetPortId
 
             let vecSrc = {X=src.X-prevSrc.X;Y=src.Y-prevSrc.Y}
+            let vecTgt = {X=tgt.X-prevTgt.X;Y=tgt.Y-prevTgt.Y}
             let head= List.head wire.Segments
             let tail = List.last wire.Segments
 
@@ -605,15 +606,15 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |0,false,_ when fstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
                 |1,false,_ when fstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X ; Y=seg.TargetPos.Y+vecSrc.Y}
                 |2,false,_ when fstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X ; Y=seg.SourcePos.Y+ vecSrc.Y} seg.TargetPos
-                (*
-                |x,true,_ when x=last && LstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vec) 
-                |x,true,_ when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vec) {X=seg.TargetPos.X + vec.X; Y=seg.TargetPos.Y}
-                |x,true,_ when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X + vec.X; Y=seg.SourcePos.Y} seg.TargetPos
+                
+                |x,_,true when x=last && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
+                |x,_,true when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X + vecTgt.X; Y=seg.SourcePos.Y} (Symbol.posAdd seg.TargetPos vecTgt)
+                |x,_,true when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X + vecTgt.X; Y=seg.TargetPos.Y}
 
-                |x,false,_ when x=last && LstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vec) 
-                |x,false,_ when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vec) {X=seg.TargetPos.X ; Y=seg.TargetPos.Y+vec.Y}
-                |x,false,_ when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X ; Y=seg.SourcePos.Y+ vec.Y} seg.TargetPos
-                *)
+                |x,_,false when x=last && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
+                |x,_,false when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X ; Y=seg.SourcePos.Y + vecTgt.Y} (Symbol.posAdd seg.TargetPos vecTgt)
+                |x,_,false when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X ; Y=seg.TargetPos.Y + vecTgt.Y}
+                
 
                 |0,true,_ ->makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
                 |1,true,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
