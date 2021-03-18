@@ -321,6 +321,13 @@ let makeWireBB (sPos:XYPos) (tPos:XYPos): XYPos * XYPos=
     | (sx,sy,tx,ty) when (tx=sx && ty=sy) -> ({X=tx;Y=ty},{X=sx;Y=sy})
     | _ -> failwithf "diagonal line error"
 
+let bbCollision (bb1:XYPos*XYPos) (bb2:XYPos*XYPos) =
+    match fst bb1, snd bb1, fst bb2, snd bb2 with
+    | (tL1, bR1, tL2, bR2) when bR2.Y < tL1.Y -> false
+    | (tL1, bR1, tL2, bR2) when tL2.X > bR1.X -> false
+    | (tL1, bR1, tL2, bR2) when tL2.Y > bR1.Y -> false
+    | (tL1, bR1, tL2, bR2) when bR2.X < tL1.X -> false
+    |  _ ->true
 /// look up wire in WireModel
 let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
     wModel.WX
@@ -676,27 +683,44 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} seg.TargetPos 
                 |_ -> seg
             |_ -> failwithf "Negative Index"
-
+        
+        let condition (w:Wire)=
+            let head= List.head w.Segments
+            let last = List.last w.Segments
+            match w.SourcePortEdge, w.TargetPortEdge with 
+            |Symbol.Right,_ when head.TargetPos.X<head.SourcePos.X + 9. ->false
+            |Symbol.Top,_ when head.TargetPos.Y>head.SourcePos.Y - 9. ->false
+            |Symbol.Left,_ when head.TargetPos.X>head.SourcePos.X - 9. ->false
+            |Symbol.Bottom, _ when head.TargetPos.Y<head.SourcePos.Y + 9. ->false
+            |_,Symbol.Right when last.SourcePos.X<last.TargetPos.X + 9. ->false
+            |_,Symbol.Top when last.SourcePos.Y>last.TargetPos.Y - 9. ->false
+            |_,Symbol.Left when last.SourcePos.X>last.TargetPos.X - 9. ->false
+            |_,Symbol.Bottom when last.SourcePos.Y<last.TargetPos.Y + 9. ->false
+            |_ -> true
+        (*
         let validateSegments (segLstLst: WireSegment list list): bool =
             segLstLst
             |> List.map (fun segLst ->
-                if segLength (List.head segLst) < 10. || segLength (List.last segLst) < 10. then false else true)
+                if (*segLength (List.head segLst) < 10. || segLength (List.last segLst) < 10.*) condition (List.head segLst) then false else true)
             |> List.contains false
             |> not
-            
+        *)
+
+        let validateWires (wLst: Wire list): bool =
+            wLst
+            |> List.map (fun w ->
+                condition w)
+            |> List.contains false
+            |> not
+
 
         let segLstLst =
-            let preMove =
-                model.WX 
-                |> List.map (fun w-> List.map id w.Segments)
-            let postMove =
-                model.WX
-                |> List.map (fun w ->
-                    List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
 
-            match validateSegments postMove with 
-            | true -> postMove
-            | false -> preMove
+            model.WX
+            |> List.map (fun w ->
+                List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
+
+
 
         let wList= 
             model.WX
@@ -707,7 +731,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 else 
                     w 
             )
-        {model with WX = wList}, Cmd.none
+        if validateWires wList then {model with WX = wList}, Cmd.none else model, Cmd.none
+        //{model with WX = wList}, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
