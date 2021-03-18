@@ -347,8 +347,8 @@ let snapSymbolToGrid model =
         SelectingMultiple = false }, Cmd.map Wire sCmd
 
 ///Finds the int representing the max number of that type of symbol + 1
-let findN (model : Model) : int = 
-    let n = model.Wire.Symbol |> List.filter (fun x -> x.Type = CommonTypes.ComponentType.Mux2)
+let findN (model : Model) (compType : CommonTypes.ComponentType) : int = 
+    let n = model.Wire.Symbol |> List.filter (fun x -> x.Type = compType)
 
     if List.isEmpty n then 1 
     else n
@@ -403,7 +403,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress AltA ->
         let sModel, sCmd =
             BusWire.update
-                (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, (findN model))))
+                (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, (findN model CommonTypes.ComponentType.Mux2))))
                 model.Wire
 
         { model with Wire = sModel }, Cmd.map Wire sCmd
