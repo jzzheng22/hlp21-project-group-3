@@ -12,6 +12,17 @@ open Helpers
 //------------------------------BusWire Types-----------------------------//
 //------------------------------------------------------------------------//
 
+
+type WireSegment = {
+    wId: CommonTypes.ConnectionId
+    Index: int 
+    SourcePos: XYPos
+    TargetPos: XYPos
+    BB: XYPos * XYPos
+    Highlight: bool
+    Width:int
+    }
+
 /// type for buswires
 /// for demo only. The real wires will
 /// connect to Ports - not symbols, where each symbol has
@@ -23,11 +34,17 @@ open Helpers
 type Wire = {
     Id: CommonTypes.ConnectionId 
     SourcePortId: CommonTypes.PortId
+    SourcePortEdge: Symbol.Edge
     TargetPortId: CommonTypes.PortId
-    Vertices: XYPos list
-    BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
+    TargetPortEdge: Symbol.Edge
+    Segments: WireSegment list
+    //Vertices: XYPos list
+    //BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
     Width: int
     Highlight: bool
+    Manual: bool
+    StartHoriz: bool
+    EndHoriz: bool
     }
 
 type Model = {
@@ -48,87 +65,324 @@ type Msg =
     | AddWire of (CommonTypes.PortId * CommonTypes.PortId)
     | DeleteWires of CommonTypes.ConnectionId list
     | HighlightWires of CommonTypes.ConnectionId list
-    | MoveWires of CommonTypes.ConnectionId list * XYPos
+    | MoveWires of  CommonTypes.ConnectionId * int  * XYPos
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
 
 //-------------------Helpers for functions------------------------//
 
-/// Takes Source and Target positions of a wire and returns the 
+/// Takes Source and Target ports of a wire and returns the 
 /// vertices of the path it should follow
-///
-/// NOTE: Currently only supports inputs on left, outputs on right
-let routeWire (sourcePos: XYPos) (targetPos: XYPos) : XYPos list =
+let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : XYPos list =
+    let sourcePos = Symbol.getPortCoords model.Symbol sourcePortId
+    let targetPos = Symbol.getPortCoords model.Symbol targetPortId
     let diff = Symbol.posDiff targetPos sourcePos
+    let xOffset = 10. // Length of Horizontal line coming out of/going into port
+    let yOffset = 10. // Length of Vertical line coming out of/going into port
+    match Symbol.getPortEdge model.Symbol sourcePortId, Symbol.getPortEdge model.Symbol targetPortId with 
+    | Symbol.Right,Symbol.Left -> 
+        if diff.X >= 0. then // Three Segement Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        
+        else // Five Segment Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+            let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X - (2.*xOffset)}
+            let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
 
-    if diff.X >= 0. then // Three Segement Case
-        let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
-        let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
-        [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+    | Symbol.Right,Symbol.Right ->
+        if diff.X >= 0. then // Three Segement Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X + xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        
+        else 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y)}
+            
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+            
+    | Symbol.Right,Symbol.Bottom ->
+        if diff.X > 0. && diff.Y > 0. then // Two Segment Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X > 0. && diff.Y < 0. then // Four Segment Case
+            let endPosSeg0 = {sourcePos with X = targetPos.X}
+            [sourcePos;endPosSeg0;targetPos]
+        else if diff.X < 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y) + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else //if diff.X < 0 && diff.Y < 0 then
+           let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+           let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+           let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+           [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
 
-    else // Five Segment Case
-        let xOffset = 15. // Length of Horizontal line coming out of/going into port
-        let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
-        let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
-        let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X - (2.*xOffset)}
-        let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
-        [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
+    | Symbol.Right,Symbol.Top ->
+        if diff.X > 0. && diff.Y > 0. then // Two Segment Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X)}
+            [sourcePos;endPosSeg0;targetPos]
+        else if diff.X > 0. && diff.Y < 0. then // Four Segment Case
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y - yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y) - yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else //if diff.X < 0 && diff.Y < 0 then
+           let endPosSeg0 = {sourcePos with X = sourcePos.X + xOffset}
+           let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + diff.Y - yOffset}
+           let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+           [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
 
-let posLeftMost (posList: XYPos list) : XYPos list =
-    let posX pos = pos.X
-    posList
-    |> List.sortBy posX 
-let posRightMost (posList: XYPos list) : XYPos list =
-    let posX pos = pos.X
-    posList
-    |> List.sortByDescending posX
-let posHighest (posList: XYPos list) : XYPos list =
-    let posY pos = pos.Y
-    posList
-    |> List.sortBy posY
-let posLowest (posList: XYPos list) : XYPos list =
-    let posY pos = pos.Y
-    posList
-    |> List.sortByDescending posY
+    | Symbol.Left,Symbol.Right ->
+        if diff.X > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+            let endPosSeg2 = {endPosSeg1 with X = endPosSeg1.X + diff.X + (2.*xOffset)}
+            let endPosSeg3 = {endPosSeg2 with Y = endPosSeg2.Y + (diff.Y/2.)}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X + xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        
+    | Symbol.Left,Symbol.Left ->
+        if diff.X >= 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        
+        else 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + diff.X - xOffset}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
 
-/// Calculates and returns a list of bounding boxes for all the segments of a wire
-let singleWireBoundingBoxes (vertices: XYPos list) (wID: CommonTypes.ConnectionId): (CommonTypes.ConnectionId * XYPos * XYPos) list =
-    let bbDist = 10. // Distance of Bounding Box Outline from wire
-    let lineToBox (startPos: XYPos) (endPos: XYPos):  XYPos * XYPos =
-        if startPos.Y = endPos.Y then // Horizontal Segment
-            let leftmost = (posLeftMost [startPos;endPos]).Head
-            let rightmost = (posRightMost [startPos;endPos]).Head
-            {leftmost with Y = leftmost.Y - bbDist},{rightmost with Y = rightmost.Y + bbDist}
-        else // Vertical Segment
-            let highest = (posHighest [startPos;endPos]).Head
-            let lowest = (posLowest [startPos;endPos]).Head
-            {highest with X = highest.X - bbDist},{lowest with X = highest.X + bbDist}
+    | Symbol.Left,Symbol.Top ->
+        if diff.X > 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - (xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = endPosSeg0.Y + (diff.Y/2.)}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X > 0. && diff.Y < 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - (xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y - yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = targetPos.X}
+            [sourcePos;endPosSeg0;targetPos]
+        else //if diff.X < 0 && diff.Y < 0 then
+           let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
+           let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y - yOffset}
+           let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+           [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
 
-    vertices
-    |> List.pairwise
-    |> List.map (fun x -> lineToBox (fst x) (snd x))
-    |> List.map (fun (topL,botR) ->  (wID,topL,botR))
+    | Symbol.Left,Symbol.Bottom ->
+        if diff.X > 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - (xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X > 0. && diff.Y < 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X - (xOffset)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y > 0. then 
+            let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y + yOffset}
+            let endPosSeg2 = {endPosSeg1 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else //if diff.X < 0 && diff.Y < 0 then
+           let endPosSeg0 = {sourcePos with X = targetPos.X}
+           [sourcePos;endPosSeg0;targetPos]
 
+    | Symbol.Top, Symbol.Left ->
+        if diff.X >= 0. && diff.Y > 0. then  
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = endPosSeg0.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X >= 0. && diff.Y <= 0. then
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X - xOffset}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        
+    | Symbol.Top, Symbol.Right ->
+        if diff.X >= 0. then  
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X + xOffset}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = endPosSeg0.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;targetPos]
 
+    | Symbol.Top, Symbol.Top ->
+        if diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        else
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+
+    | Symbol.Top, Symbol.Bottom ->
+        if diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y - yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y + yOffset}
+            let endPosSeg3 = {endPosSeg2 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + (diff.Y/2.)}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+
+    | Symbol.Bottom, Symbol.Left ->
+        if diff.X >= 0. && diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;targetPos]
+        else if diff.X >= 0. && diff.Y < 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = endPosSeg0.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X - xOffset}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+    | Symbol.Bottom, Symbol.Right ->
+        if diff.X >= 0. then  
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X + xOffset}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+        else if diff.X < 0. && diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y}
+            [sourcePos;endPosSeg0;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = endPosSeg0.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y }
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;targetPos]
+
+    | Symbol.Bottom, Symbol.Bottom ->
+        if diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = targetPos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        else
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+
+    | Symbol.Bottom, Symbol.Top ->
+        if diff.Y >= 0. then
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + (diff.Y/2.)}
+            let endPosSeg1 = {endPosSeg0 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;targetPos]
+        else 
+            let endPosSeg0 = {sourcePos with Y = sourcePos.Y + yOffset}
+            let endPosSeg1 = {endPosSeg0 with X = sourcePos.X + (diff.X/2.)}
+            let endPosSeg2 = {endPosSeg1 with Y = targetPos.Y - yOffset}
+            let endPosSeg3 = {endPosSeg2 with X = targetPos.X}
+            [sourcePos;endPosSeg0;endPosSeg1;endPosSeg2;endPosSeg3;targetPos]
+
+/// Returns the Top Left and Bottom Right Corner for a wire segment bounding box
+let makeWireBB (sPos:XYPos) (tPos:XYPos): XYPos * XYPos=
+    match sPos.X,sPos.Y, tPos.X, tPos.Y with
+    | (sx,sy,tx,ty) when tx>sx -> ({X=sx;Y=sy-5.},{X=tx;Y=ty+5.})
+    | (sx,sy,tx,ty) when tx<sx -> ({X=tx;Y=ty-5.},{X=sx;Y=sy+5.})
+    | (sx,sy,tx,ty) when ty>sy -> ({X=sx-5.;Y=sy},{X=tx+5.;Y=ty})
+    | (sx,sy,tx,ty) when ty<sy -> ({X=tx-5.;Y=ty},{X=tx+5.;Y=sy})
+    | (sx,sy,tx,ty) when (tx=sx && ty=sy) -> ({X=tx;Y=ty},{X=sx;Y=sy})
+    | _ -> failwithf "diagonal line error"
+
+let bbCollision (bb1:XYPos*XYPos) (bb2:XYPos*XYPos) =
+    match fst bb1, snd bb1, fst bb2, snd bb2 with
+    | (tL1, bR1, tL2, bR2) when bR2.Y < tL1.Y -> false
+    | (tL1, bR1, tL2, bR2) when tL2.X > bR1.X -> false
+    | (tL1, bR1, tL2, bR2) when tL2.Y > bR1.Y -> false
+    | (tL1, bR1, tL2, bR2) when bR2.X < tL1.X -> false
+    |  _ ->true
 /// look up wire in WireModel
 let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
     wModel.WX
     |> List.tryFind (fun wire -> wire.Id = wId)
 
+/// Creates a single wire segment
+let makeWireSegment (wId:CommonTypes.ConnectionId) (width:int) (srcPos) (tgtPos)  = 
+    {
+        wId= wId
+        Index = 0
+        SourcePos=srcPos
+        TargetPos=tgtPos
+        BB= makeWireBB srcPos tgtPos
+        Highlight=false
+        Width=width
+    }
+
+/// Sets the indexes for each segment in a wire
+let setIndex (lst: WireSegment list) =
+    lst 
+    |> List.mapi (fun i seg-> {seg with Index= i})
+
+/// Calculates and creates all wire segments
+let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) (width: int) 
+    (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : WireSegment list =
+
+    (routeWire model sourcePortId targetPortId)
+    |> List.pairwise
+    |> List.map (fun (src,tgt) -> makeWireSegment wId width src tgt)
+    |> setIndex
+
+
 /// Creates a new wire 
 let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: CommonTypes.PortId) (width: int): Wire = 
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
-    let newVertices = routeWire (Symbol.getPortCoords model.Symbol srcPortId) (Symbol.getPortCoords model.Symbol tgtPortId)
-    let newBB = singleWireBoundingBoxes newVertices wId
-  
+    let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
+    let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
+    let newSegments = makeWireSegments model wId width srcPortId tgtPortId
+    let startHoriz = 
+        if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
+    let endHoriz = 
+        if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
+            
     {
         Id = wId
         SourcePortId = srcPortId
+        SourcePortEdge = srcEdge
         TargetPortId = tgtPortId
-        Vertices = newVertices
-        BoundingBoxes = newBB
+        TargetPortEdge = tgtEdge
+        Segments = newSegments
         Width = width
         Highlight = false
+        Manual = false
+        StartHoriz=startHoriz
+        EndHoriz=endHoriz
     }
 
 //----------------Render/View Functions----------------//
@@ -136,7 +390,7 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
 type WireRenderProps = {
     key : CommonTypes.ConnectionId
     WireP: Wire
-    Vertices: XYPos list
+    Segments: WireSegment list
     Width: int
     Highlight: bool
     ColorP: string
@@ -148,9 +402,9 @@ type WireRenderProps = {
 let singleWireView =        
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
-            let singleSegmentView (segPos: XYPos*XYPos) =
-                let SrcP = fst segPos
-                let TgtP = snd segPos
+            let singleSegmentView (seg: WireSegment) =
+                let SrcP = seg.SourcePos
+                let TgtP = seg.TargetPos
                 line [
                     X1 SrcP.X
                     Y1 SrcP.Y
@@ -161,50 +415,62 @@ let singleWireView =
                     SVGAttr.StrokeWidth props.StrokeWidthP
                     SVGAttr.StrokeLinecap "round"] []
             let widthAnnotation = 
-                let textPos = Symbol.posAdd props.Vertices.Head {X = 5. ; Y = 5.}
+                let textPos = Symbol.posAdd props.Segments.Head.SourcePos {X = 8. ; Y = 5.}
                 text [
                     X textPos.X
                     Y textPos.Y
                     Style [
                         TextAnchor "middle"
                         DominantBaseline "hanging"
-                        FontSize "10px"
+                        FontSize "7px"
                         FontWeight "Bold"
                         Fill "Black"
                     ]
                 ] [str <| sprintf "%i" props.Width]   
             let highlightCircles =
-                    let srcPortPos = List.head props.Vertices
-                    let tgtPortPos = List.last props.Vertices
+                    
                     if props.Highlight = false then
                         []
                     else
+                        let srcHighlightPos = 
+                            match props.WireP.SourcePortEdge with
+                            | Symbol.Left -> Symbol.posAdd (List.head props.Segments).SourcePos {X= -3.;Y=0.}
+                            | Symbol.Right -> Symbol.posAdd (List.head props.Segments).SourcePos {X= 3.;Y=0.}
+                            | Symbol.Bottom -> Symbol.posAdd (List.head props.Segments).SourcePos {X=0.;Y=3.}
+                            | Symbol.Top -> Symbol.posAdd (List.head props.Segments).SourcePos {X=0.;Y= -3.}
+                        let tgtHighlightPos = 
+                            match props.WireP.TargetPortEdge with
+                            | Symbol.Left -> Symbol.posAdd (List.last props.Segments).TargetPos {X= -3.;Y=0.}
+                            | Symbol.Right -> Symbol.posAdd (List.last props.Segments).TargetPos {X= 3.;Y=0.}
+                            | Symbol.Bottom -> Symbol.posAdd (List.last props.Segments).TargetPos {X=0.;Y=3.}
+                            | Symbol.Top -> Symbol.posAdd (List.last props.Segments).TargetPos {X=0.;Y= -3.}
+                            
                         [
                         circle [
-                           Cx (srcPortPos.X + 3.)
-                           Cy srcPortPos.Y
+                           Cx srcHighlightPos.X
+                           Cy srcHighlightPos.Y
                            R 3.
 
                            SVGAttr.Fill "deepskyblue"
                            SVGAttr.Stroke "deepskyblue"
-                           SVGAttr.Opacity 0.4
+                           //SVGAttr.Opacity 0.4
                            SVGAttr.StrokeWidth 1][]
                            ;
                         circle [
-                            Cx (tgtPortPos.X - 3.)
-                            Cy tgtPortPos.Y
+                            Cx tgtHighlightPos.X
+                            Cy tgtHighlightPos.Y
                             R 3.
 
                             SVGAttr.Fill "deepskyblue"
                             SVGAttr.Stroke "deepskyblue"
-                            SVGAttr.Opacity 0.4
+                            //SVGAttr.Opacity 0.4
                             SVGAttr.StrokeWidth 1][]
                         ]
             
-            let segments =
-                List.pairwise props.Vertices
+            let segmentEls =
+                props.Segments
                 |> List.map singleSegmentView
-            (widthAnnotation::segments)@highlightCircles
+            (widthAnnotation::segmentEls)@highlightCircles
             |> ofList)
 
 
@@ -216,11 +482,11 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
             let props = {
                 key = w.Id
                 WireP = w
-                Vertices = w.Vertices
+                Segments = w.Segments
                 Width = w.Width
                 Highlight = w.Highlight
                 ColorP = model.Color.Text()
-                StrokeWidthP = "2px" }
+                StrokeWidthP = "1px" }
             singleWireView props)
     let symbols = Symbol.view model.Symbol (fun sMsg -> dispatch (Symbol sMsg))
     g [] [(g [] wires); symbols]
@@ -230,28 +496,26 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
 /// this initialisation depends on details of Symbol.Model type.
 let init n () =
     let symbols, cmd = Symbol.init()
-    // let symIds = List.map (fun (sym:Symbol.Symbol) -> sym.Id) symbols
-    // let rng = System.Random 0
-    // let ports = Symbol.initPortSearch symbols 
-    // let outPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Output) ports).Value
-    // let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
-    // let id = CommonTypes.ConnectionId (Helpers.uuid())
-    // let vert = routeWire (Symbol.getPortCoords symbols (CommonTypes.PortId outPort.Port.Id)) (Symbol.getPortCoords symbols (CommonTypes.PortId inPort.Port.Id))
-    // let bb = singleWireBoundingBoxes vert id
-    // let testWire: Wire = 
-    //     {
-    //         Id = id
-    //         SourcePortId = CommonTypes.PortId outPort.Port.Id
-    //         TargetPortId = CommonTypes.PortId inPort.Port.Id
-    //         Vertices = vert
-    //         BoundingBoxes = bb
-    //         Width = Symbol.getPortWidth symbols (CommonTypes.PortId outPort.Port.Id)
-    //         Highlight = false
-    //     }
-    // [testWire]
-    // |> (fun wires -> 
-    {WX=[];Symbol=symbols; Color=CommonTypes.Red},Cmd.none
-    //)
+    let symIds = List.map (fun (sym:Symbol.Symbol) -> sym.Id) symbols
+    (*let rng = System.Random 0
+    let ports = Symbol.initPortSearch symbols 
+    let outPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Output) ports).Value
+    let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
+    let id = CommonTypes.ConnectionId (Helpers.uuid())
+    let vert = routeWire (Symbol.getPortCoords symbols (CommonTypes.PortId outPort.Port.Id)) (Symbol.getPortCoords symbols (CommonTypes.PortId inPort.Port.Id))
+    let bb = singleWireBoundingBoxes vert id
+    let testWire: Wire = 
+        {
+            Id = id
+            SourcePortId = CommonTypes.PortId outPort.Port.Id
+            TargetPortId = CommonTypes.PortId inPort.Port.Id
+            Vertices = vert
+            BoundingBoxes = bb
+            Width = Symbol.getPortWidth symbols (CommonTypes.PortId outPort.Port.Id)
+            Highlight = false
+        }*)
+    []
+    |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
 
 //-------------------Helpers for Update Function-------------------//
 // WIRE RULES: Must have signature Model->Wire->bool
@@ -262,10 +526,10 @@ let ruleOutToIn (model: Model) (wire: Wire) : bool =
     | CommonTypes.Output , CommonTypes.Input -> true
     | _ , _ -> false
 
-/// Checks if a new wire does not already exist in the model
+/// Checks if the wire's target port already has a wire driving it. By-product of this is that it disallows duplicate wire creation.
 let ruleUnique (model: Model) (wire: Wire) : bool =
     model.WX
-    |> List.filter (fun w -> w.SourcePortId = wire.SourcePortId && w.TargetPortId = wire.TargetPortId)
+    |> List.filter (fun w -> w.TargetPortId = wire.TargetPortId)
     |> List.isEmpty
 
 /// Checks if the Width of the Source Port is equal to that of the Target Port
@@ -290,18 +554,115 @@ let verifyWire (model: Model) (wire: Wire): Wire option =
     |> List.contains false
     |> function true -> None | false -> Some wire
 
+/// Returns the absolute length of a wire segment
+let segLength (seg: WireSegment): float =
+    (seg.TargetPos,seg.SourcePos)
+    ||> Symbol.posDiff
+    |> (fun diff -> (sqrt diff.X**2. + diff.Y**2.))
+
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     | Symbol sMsg -> 
         let sm,sCmd = Symbol.update sMsg model.Symbol
+
+        let manualRoute (wire: Wire) =
+            let noOfSegments= List.length wire.Segments
+            let last = noOfSegments - 1
+            let prevSrc= wire.Segments.[0].SourcePos
+            let prevTgt= wire.Segments.[last].TargetPos
+            let src= Symbol.getPortCoords sm wire.SourcePortId
+            let tgt= Symbol.getPortCoords sm wire.TargetPortId
+
+            let vecSrc = {X=src.X-prevSrc.X;Y=src.Y-prevSrc.Y}
+            let vecTgt = {X=tgt.X-prevTgt.X;Y=tgt.Y-prevTgt.Y}
+            let head= List.head wire.Segments
+            let tail = List.last wire.Segments
+
+            let fstLength = 
+                match wire.SourcePortEdge with 
+                |Symbol.Right when head.TargetPos.X<src.X + 9. -> true
+                |Symbol.Left when head.TargetPos.X>src.X - 9. ->true
+                |Symbol.Top when head.TargetPos.Y>src.Y - 9. ->true
+                |Symbol.Bottom when head.TargetPos.Y<src.Y + 9. ->true
+                |_ -> false
+            
+            //if head.TargetPos.X<src.X + 9. then true else false
+            let LstLength = 
+                match wire.TargetPortEdge with 
+                |Symbol.Right when tail.SourcePos.X<tgt.X + 9. -> true
+                |Symbol.Left when tail.SourcePos.X>tgt.X - 9. ->true
+                |Symbol.Top when tail.SourcePos.Y>tgt.Y - 9. ->true
+                |Symbol.Bottom when tail.SourcePos.Y<tgt.Y + 9. ->true
+                |_ -> false
+
+
+            wire.Segments
+            |> List.mapi (fun i seg -> 
+                match i ,wire.StartHoriz ,wire.EndHoriz with
+                |0,true,_ when fstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
+                |1,true,_ when fstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X + vecSrc.X; Y=seg.TargetPos.Y}
+                |2,true,_ when fstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X + vecSrc.X; Y=seg.SourcePos.Y} seg.TargetPos
+
+                |0,false,_ when fstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
+                |1,false,_ when fstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X ; Y=seg.TargetPos.Y+vecSrc.Y}
+                |2,false,_ when fstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X ; Y=seg.SourcePos.Y+ vecSrc.Y} seg.TargetPos
+                
+                |x,_,true when x=last && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
+                |x,_,true when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X + vecTgt.X; Y=seg.SourcePos.Y} (Symbol.posAdd seg.TargetPos vecTgt)
+                |x,_,true when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X + vecTgt.X; Y=seg.TargetPos.Y}
+
+                |x,_,false when x=last && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
+                |x,_,false when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X ; Y=seg.SourcePos.Y + vecTgt.Y} (Symbol.posAdd seg.TargetPos vecTgt)
+                |x,_,false when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X ; Y=seg.TargetPos.Y + vecTgt.Y}
+                
+
+                |0,true,_ ->makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
+                |1,true,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
+                |x,true,true when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
+                |1,true,true ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} {X=seg.SourcePos.X;Y=tgt.Y} 
+                |x,true,true when x=last-> makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=tgt.Y} tgt 
+                |x,true,false when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=tgt.X;Y=seg.SourcePos.Y}
+                |x,true,false when x=last-> makeWireSegment wire.Id wire.Width {X=tgt.X;Y=seg.SourcePos.Y} tgt
+                |0,false,_ ->makeWireSegment wire.Id wire.Width src {X=src.X;Y=seg.TargetPos.Y} 
+                |1,false,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=src.X;Y=seg.SourcePos.Y} seg.TargetPos
+                |x,false,false when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=tgt.X;Y=seg.SourcePos.Y}
+                |1,false,false ->makeWireSegment wire.Id wire.Width {X=src.X;Y=seg.SourcePos.Y} {X=tgt.X;Y=seg.SourcePos.Y} 
+                |x,false,false when x=last-> makeWireSegment wire.Id wire.Width {X=tgt.X;Y=seg.SourcePos.Y} tgt 
+                |x,false,true when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}
+                |x,false,true when x=last-> makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=tgt.Y} tgt
+                |_ -> seg    
+            )
+            |> setIndex
+
+        let checkRouteCaseChange (wire: Wire) : Wire = // Very ugly function, turn it into a rule function list which is mapped
+
+            let newDiff = Symbol.posDiff (Symbol.getPortCoords sm wire.TargetPortId) (Symbol.getPortCoords sm wire.SourcePortId) 
+            let oldDiff = Symbol.posDiff ((List.last wire.Segments).TargetPos) ((List.head wire.Segments).SourcePos)
+            if ((sign(newDiff.X) <> sign(oldDiff.X) || sign(newDiff.Y) <> sign(oldDiff.Y)  || (wire.SourcePortEdge,wire.TargetPortEdge) <> (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId)) || List.length wire.Segments < 3) then
+                {wire with Manual = false}
+            else
+                wire
+           
+
         let wList = 
             model.WX
+            |> List.map checkRouteCaseChange
             |> List.map (fun w -> 
-                let newVertices = routeWire (Symbol.getPortCoords sm w.SourcePortId) (Symbol.getPortCoords sm w.TargetPortId)
-                let newBB = singleWireBoundingBoxes newVertices w.Id
-                {w with 
-                    Vertices = newVertices
-                    BoundingBoxes = newBB })
+                let srcEdge = Symbol.getPortEdge sm w.SourcePortId
+                let tgtEdge = Symbol.getPortEdge sm w.TargetPortId
+                let startHoriz = 
+                    if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
+                let endHoriz = 
+                    if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
+                match w.Manual with
+                | false -> {w with 
+                                Segments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId 
+                                SourcePortEdge = srcEdge
+                                TargetPortEdge = tgtEdge
+                                StartHoriz = startHoriz
+                                EndHoriz = endHoriz}
+                | true -> {w with Segments = manualRoute w}
+            )
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
     | AddWire (portId1,portId2) ->
@@ -331,11 +692,78 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     {w with Highlight = false}
             )
         {model with WX = wList}, Cmd.none
-    | MoveWires (wireIDList, transVector) -> 
-        printf "Demo: Receive BusWire.MoveWires"
-        printf "%A" wireIDList
-        printf "%A" transVector
-        model, Cmd.none // Not implemented yet
+    | MoveWires (wId,idx,vec) ->
+        let a = idx - 1
+        let b = idx + 1
+        let move (w:Wire) (seg:WireSegment) idx wId vector=
+            let last = (List.length w.Segments) - 1
+            match idx with
+            | 0  -> seg
+            | x when (x=last && seg.Index=last ) -> seg
+            | _ when w.Id <> wId -> seg
+            | _ when (idx%2=0 && w.StartHoriz) || (idx%2=1 && not w.StartHoriz)  -> 
+                match seg.Index with 
+                | x when x=a -> makeWireSegment wId w.Width seg.SourcePos  {X=seg.TargetPos.X;Y=seg.TargetPos.Y+vector.Y} 
+                | x when x=idx-> makeWireSegment wId w.Width {X=seg.SourcePos.X;Y=seg.SourcePos.Y+vector.Y} {X=seg.TargetPos.X;Y=seg.TargetPos.Y+vector.Y} 
+                | x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X;Y=seg.SourcePos.Y+vector.Y} seg.TargetPos 
+                | _ -> seg
+            | _ when (idx%2=1 && w.StartHoriz) || (idx%2=0 && not w.StartHoriz) ->
+                match seg.Index with 
+                |x when x=a -> makeWireSegment wId w.Width seg.SourcePos {X=seg.TargetPos.X+vector.X;Y=seg.TargetPos.Y} 
+                |x when x=idx-> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} {X=seg.TargetPos.X+vector.X;Y=seg.TargetPos.Y} 
+                |x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} seg.TargetPos 
+                |_ -> seg
+            |_ -> failwithf "Negative Index"
+        
+        let condition (w:Wire)=
+            let head= List.head w.Segments
+            let last = List.last w.Segments
+            match w.SourcePortEdge, w.TargetPortEdge with 
+            |Symbol.Right,_ when head.TargetPos.X<head.SourcePos.X + 9. ->false
+            |Symbol.Top,_ when head.TargetPos.Y>head.SourcePos.Y - 9. ->false
+            |Symbol.Left,_ when head.TargetPos.X>head.SourcePos.X - 9. ->false
+            |Symbol.Bottom, _ when head.TargetPos.Y<head.SourcePos.Y + 9. ->false
+            |_,Symbol.Right when last.SourcePos.X<last.TargetPos.X + 9. ->false
+            |_,Symbol.Top when last.SourcePos.Y>last.TargetPos.Y - 9. ->false
+            |_,Symbol.Left when last.SourcePos.X>last.TargetPos.X - 9. ->false
+            |_,Symbol.Bottom when last.SourcePos.Y<last.TargetPos.Y + 9. ->false
+            |_ -> true
+        (*
+        let validateSegments (segLstLst: WireSegment list list): bool =
+            segLstLst
+            |> List.map (fun segLst ->
+                if (*segLength (List.head segLst) < 10. || segLength (List.last segLst) < 10.*) condition (List.head segLst) then false else true)
+            |> List.contains false
+            |> not
+        *)
+
+        let validateWires (wLst: Wire list): bool =
+            wLst
+            |> List.map (fun w ->
+                condition w)
+            |> List.contains false
+            |> not
+
+
+        let segLstLst =
+
+            model.WX
+            |> List.map (fun w ->
+                List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
+
+
+
+        let wList= 
+            model.WX
+            |> List.mapi (fun i w-> {w with Segments = setIndex segLstLst.[i]})
+            |> List.map (fun w ->
+                if  w.Id=wId  then
+                    {w with Manual = true}
+                else 
+                    w 
+            )
+        if validateWires wList then {model with WX = wList}, Cmd.none else model, Cmd.none
+        //{model with WX = wList}, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
@@ -349,9 +777,11 @@ let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId opti
     failwith "Not implemented"
 
 /// Returns all bounding boxes for all wire segments in the wire model
-let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (CommonTypes.ConnectionId * XYPos * XYPos) list =
+let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): ( CommonTypes.ConnectionId * int *XYPos * XYPos) list =
     wModel.WX
-    |> List.collect (fun w -> w.BoundingBoxes)
+    |> List.collect (fun w->
+                    List.map (fun (segment:WireSegment)->
+                                ( segment.wId,segment.Index,fst segment.BB, snd segment.BB))w.Segments)
 
 /// Returns a list of wire IDs connected to the supplied ports
 let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =

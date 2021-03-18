@@ -65,7 +65,7 @@ type Msg =
     | AddWire of (CommonTypes.PortId * CommonTypes.PortId)
     | DeleteWires of CommonTypes.ConnectionId list
     | HighlightWires of CommonTypes.ConnectionId list
-    | MoveWires of int * CommonTypes.ConnectionId * XYPos
+    | MoveWires of  CommonTypes.ConnectionId * int  * XYPos
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
 
@@ -692,7 +692,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                     {w with Highlight = false}
             )
         {model with WX = wList}, Cmd.none
-    | MoveWires (idx,wId,vec) ->
+    | MoveWires (wId,idx,vec) ->
         let a = idx - 1
         let b = idx + 1
         let move (w:Wire) (seg:WireSegment) idx wId vector=
@@ -777,11 +777,11 @@ let wireToSelectOpt (wModel: Model) (pos: XYPos) : CommonTypes.ConnectionId opti
     failwith "Not implemented"
 
 /// Returns all bounding boxes for all wire segments in the wire model
-let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): (int * CommonTypes.ConnectionId * XYPos * XYPos) list =
+let getBoundingBoxes (wModel: Model) (mouseCoord: XYPos): ( CommonTypes.ConnectionId * int *XYPos * XYPos) list =
     wModel.WX
     |> List.collect (fun w->
                     List.map (fun (segment:WireSegment)->
-                                (segment.Index, segment.wId,fst segment.BB, snd segment.BB))w.Segments)
+                                ( segment.wId,segment.Index,fst segment.BB, snd segment.BB))w.Segments)
 
 /// Returns a list of wire IDs connected to the supplied ports
 let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list =
