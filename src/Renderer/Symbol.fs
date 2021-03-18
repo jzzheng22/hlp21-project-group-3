@@ -453,12 +453,8 @@ let findPortList (numIn : int) (numOut : int) (compType : CommonTypes.ComponentT
     let (l, r, b) = exPorts symType bot left right compType
     [List.concat[ins; l]; List.concat[outs; r]; b; []]
 
-let getTypeName (comp : CommonTypes.ComponentType) : string = 
-    let (a, _, _, _, _) = typeToInfo comp
-    a
-
 let getSymLabel (comp : CommonTypes.ComponentType) (i : int) : string = 
-    let a = getTypeName comp
+    let (a, _, _, _, _) = typeToInfo comp
     match a with 
     | "" -> ""
     | _ -> sprintf "%s%i" a i
