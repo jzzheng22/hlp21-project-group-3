@@ -396,7 +396,42 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                 (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1)))
                 model.Wire
 
-        { model with Wire = sModel }, Cmd.map Wire sCmd
+        { model with Wire = sModel }, Cmd.map Wire sCmd 
+    
+    | KeyPress AltC | KeyPress AltV -> //Alignment of multiple selected symbols
+        if (List.length model.SelectedComponents) > 1 then
+            let topleftCorners =
+                model.SelectedComponents
+                |> List.map (Symbol.getBoundingBox model.Wire.Symbol >> fst)
+            let vectors = 
+                match msg with 
+                | KeyPress AltC -> //Horizontal alignment
+                    let leftMost =  List.minBy (fun a -> a.X) topleftCorners
+                    List.map (fun a ->
+                        if a.X <> leftMost.X then 
+                            {X = 0.0; Y = leftMost.Y - a.Y}
+                        else 
+                            {X = 0.0; Y = 0.0}) topleftCorners
+                | KeyPress AltV -> //Vertical alignment
+                    let downMost = List.maxBy (fun a -> a.Y) topleftCorners
+                    List.map (fun a ->
+                        if a.Y <> downMost.Y then 
+                            {X = downMost.X - a.X; Y = 0.0}
+                        else 
+                            {X = 0.0; Y = 0.0}) topleftCorners
+                | _ -> 
+                    failwithf "ERROR: Unexpected input for Symbol alignment."
+
+            let foldfunction (model: Model, cmd: Cmd<Msg>) (id: CommonTypes.ComponentId, vector: XYPos) = 
+                let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Move ([id], vector))) model.Wire
+                {model with Wire = sModel}, 
+                Cmd.batch [ Cmd.map Wire sCmd; cmd ]
+
+            List.zip model.SelectedComponents vectors
+            |> List.fold foldfunction (model, Cmd.none)
+        else 
+            model, Cmd.none
+            
     | KeyPress s -> // all other keys are turned into SetColor commands
         let c =
             match s with
