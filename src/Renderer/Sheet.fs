@@ -140,6 +140,12 @@ let cornersToString startCoord endCoord =
         endCoord.X endCoord.Y
         startCoord.X endCoord.Y
 
+///NOTWORKINGYET
+let inferWidth (model : Model) = 
+    let comps = Symbol.extractComponents model.Wire.Symbol
+    //let conns = Wire.wireToIssie model.Wire 
+    0
+
 /// This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
     let canvasSize = unzoomedCanvas * zoom
@@ -219,6 +225,7 @@ let mouseUp model mousePos dispatch =
     | Some endPort ->
         match model.SelectedPort with
         | (Some startPort, _) when Symbol.getPortType model.Wire.Symbol endPort <> snd model.SelectedPort 
+        ///Here buswidth inferer should be called?
             -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
         | _ -> ()
     | None -> ()

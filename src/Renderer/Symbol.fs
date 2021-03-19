@@ -817,7 +817,6 @@ let getPortCoords (symModel: Model) (pId : CommonTypes.PortId) : XYPos =
     | Some x -> fst x
     | None -> failwithf "Error in getPortCoords: couldn't find portID"
 
-        
 ///Returns all symbols in the model in the form (ID, bounding box topLeft, bounding box botRight)
 let getBoundingBoxes (symModel : Model) (startCoord : XYPos) : (CommonTypes.ComponentId * XYPos * XYPos) list =
     List.map (fun sym -> (sym.Id, sym.TopL, sym.BotR)) symModel
@@ -871,6 +870,15 @@ let getBoundingBox symModel symID =
     | Some x -> (x.TopL, x.BotR)
     | None -> failwithf "Could not get bounding box"
 
+let getPort (model : Model) (pId : CommonTypes.PortId) : CommonTypes.Port = 
+    model
+    |> initPortSearch
+    |> List.map (fun (_, x) -> x)
+    |> List.filter (fun x -> getPortId x = pId)
+    |> List.item 0
+    |> function
+    | Some x -> x.Port
+    | None -> failwithf "Unexpected error in getPort"
 
 //----------------------interface to Issie-----------------------------//
 

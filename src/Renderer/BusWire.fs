@@ -723,12 +723,29 @@ let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : C
     |> List.map (fun w -> w.Id)
     
 
-
 //----------------------interface to Issie-----------------------//
-let extractWire (wModel: Model) (sId:CommonTypes.ComponentId) : CommonTypes.Component= 
-    failwithf "Not implemented"
 
-let extractWires (wModel: Model) : CommonTypes.Component list = 
+let segToVert (wSegs : WireSegment list) : (float * float) list = 
+    wSegs 
+    |> List.collect (fun x -> [(x.SourcePos.X, x.SourcePos.Y); (x.TargetPos.X, x.TargetPos.Y)])
+    |> List.distinct
+    
+
+let wireToIssie (wire : Wire) (wModel : Model) : CommonTypes.Connection = 
+    {
+        CommonTypes.Connection.Id = string wire.Id
+        CommonTypes.Connection.Source = Symbol.getPort wModel.Symbol wire.SourcePortId
+        CommonTypes.Connection.Target = Symbol.getPort wModel.Symbol wire.TargetPortId
+        CommonTypes.Connection.Vertices = segToVert wire.Segments
+    }
+
+let extractWires (wModel: Model) : CommonTypes.Connection list = 
+    wModel
+    |> List.map (fun x -> wireToIssie x wModel)
+    
+    
+
+let extractWiress (wModel: Model) : CommonTypes.Component list = 
     failwithf "Not implemented"
 
 /// Update the symbol with matching componentId to comp, or add a new symbol based on comp.
