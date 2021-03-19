@@ -42,6 +42,7 @@ type Wire = {
     //BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
     Width: int
     Highlight: bool
+    HighlightError : bool
     Manual: bool
     StartHoriz: bool
     EndHoriz: bool
@@ -69,6 +70,7 @@ type Msg =
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
     | UpdateWidth of cId : CommonTypes.ConnectionId * w : int
+    | HighlightError of CommonTypes.ConnectionId list
 
 //-------------------Helpers for functions------------------------//
 
@@ -374,6 +376,7 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
         Segments = newSegments
         Width = width
         Highlight = false
+        HighlightError = false
         Manual = false
         StartHoriz=startHoriz
         EndHoriz=endHoriz
@@ -387,6 +390,7 @@ type WireRenderProps = {
     Segments: WireSegment list
     Width: int
     Highlight: bool
+    HighlightError : bool
     ColorP: string
     StrokeWidthP: string }
 
@@ -396,6 +400,9 @@ type WireRenderProps = {
 let singleWireView =        
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
+            
+            let colour = if props.HighlightError then "red" elif props.Width = 1 then props.ColorP else "purple"
+            
             let singleSegmentView (seg: WireSegment) =
                 let SrcP = seg.SourcePos
                 let TgtP = seg.TargetPos
@@ -405,7 +412,7 @@ let singleWireView =
                     X2 TgtP.X
                     Y2 TgtP.Y
                     // Qualify these props to avoid name collision with CSSProp
-                    SVGAttr.Stroke (if props.Width = 1 then props.ColorP else "purple")
+                    SVGAttr.Stroke colour
                     SVGAttr.StrokeWidth props.StrokeWidthP
                     SVGAttr.StrokeLinecap "round"] []
             let widthAnnotation = 
@@ -479,6 +486,7 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
                 Segments = w.Segments
                 Width = w.Width
                 Highlight = w.Highlight
+                HighlightError = w.HighlightError
                 ColorP = model.Color.Text()
                 StrokeWidthP = "1px" }
             singleWireView props)
