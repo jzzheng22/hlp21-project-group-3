@@ -262,8 +262,8 @@ let trans func sym trans =
 let log2 (n : int) : int = (log(float n) / log(2.)) |> ceil |> int
 
 //Helpers for makePosList
-let makeLR (len : int) (x : XYPos) (func : 'a -> XYPos) = List.map (fun i -> {X = x.X; Y = (func i).Y}) [0..len - 1]
-let makeTB (len : int) (y : XYPos) (func : 'a -> XYPos) = List.map (fun i -> {X = (func i).X; Y = y.Y}) [0..len - 1]
+let makeLR (len : int) (x : XYPos) (func : int -> XYPos) = List.map (fun i -> {X = x.X; Y = (func i).Y}) [0..len - 1]
+let makeTB (len : int) (y : XYPos) (func : int -> XYPos) = List.map (fun i -> {X = (func i).X; Y = y.Y}) [0..len - 1]
 let makeGen func len pos topL botR = func len pos (portPos len topL botR)
 
 ///Creates the list of positions for ports to slot in to on each side, returns in tupled list form
