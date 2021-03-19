@@ -36,6 +36,9 @@ Wires should be selectable: should do autorouting initially but be selectable an
  - XYPos is translation vector.
  - Not implemented yet, will do when incorporating manual routing.
 
+`UpdateWidth of cId : CommonTypes.ConnectionId * w : int`
+- Updates the with of a connection to value found from width inferer
+
 ## Interface Functions (called by Sheet)
 
 `BusWire.getBoundingBoxes (mouseCoord: XYPos) (model : Model)`
