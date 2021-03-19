@@ -83,7 +83,6 @@ type Msg =
     | Scale of sId : ComponentId * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
     | DisplaySlots of sId : ComponentId
     | Rename of sId : ComponentId * name : string
-    | UpdateSymWidth of sIdList : ComponentId list * w : int
     | UpdateSymbolModelWithComponent of Component // Issie interface
 
 
@@ -680,22 +679,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                     }
         )
         , Cmd.none
-
-        | UpdateSymWidth (sIds, w) ->
-            model
-            |> List.map (fun sym ->
-                if List.contains sym.Id sIds then
-                    { sym with
-                        PortMap = genMap sym.PortMap (List.map (fun (x, y) -> 
-                            match y with 
-                            | Some z -> (x, Some {z with Width = w})
-                            | None -> (x, None)))
-                    }
-                else
-                    sym
-            )
-            
-            , Cmd.none
 
     | MouseMsg _ -> model, Cmd.none // allow unused mouse messags
     | _ -> failwithf "Not implemented"

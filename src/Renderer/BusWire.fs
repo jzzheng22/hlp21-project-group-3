@@ -68,7 +68,7 @@ type Msg =
     | MoveWires of CommonTypes.ConnectionId * int * XYPos
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
-    | UpdateWidth of cIds : CommonTypes.ConnectionId list * w : int
+    | UpdateWidth of cId : CommonTypes.ConnectionId * w : int
 
 //-------------------Helpers for functions------------------------//
 
@@ -704,7 +704,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         {model with
             WX = model.WX
                 |> List.map (fun wire ->
-                    if List.contains wire.Id cId then
+                    if wire.Id = cId then
                         { wire with
                             Width = w
                             Segments = List.map (fun x -> {x with Width = w}) wire.Segments
