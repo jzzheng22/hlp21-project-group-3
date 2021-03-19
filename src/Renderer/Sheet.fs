@@ -161,7 +161,7 @@ let updateWidth (model : Model) =
                 e.Connections 
                 |> List.iter (
                     fun x -> dispatch Wire.highlighterror x, dispatch Symbol.highlighterror x) //need to find the symbol for the connections for symbol highlight error
-                dispatch Sheet.displayErrorMessage Message
+                dispatch Sheet.displayErrorMessage e.Message
 *)
 
 /// This function generates the background grid for the canvas by drawing spaced out lines
