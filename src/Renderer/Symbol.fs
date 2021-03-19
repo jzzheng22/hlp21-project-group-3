@@ -191,17 +191,24 @@ let getRot (oldrot : int) : int =
     else 0
 
 //updates rotation state
-(*
-let updaterot (rot : int) (prevRot : Rotation) : Rotation =
-    let incrementRot = 
+let updaterot (rot : int) (oldRot : Rotation) : Rotation =
+    let incrementRot (prevRot:Rotation) :Rotation = 
         match prevRot with
         |R0 -> R90
         |R90 -> R180
         |R180 -> R270
-        |R270 -> R90
-*)
-    
+        |R270 -> R0
 
+    let snaprot = getRot rot
+
+    match snaprot with  
+    |0 -> oldRot
+    |90 -> incrementRot oldRot
+    |180-> incrementRot oldRot |> incrementRot
+    |270-> incrementRot oldRot |> incrementRot |> incrementRot
+    |_-> oldRot
+
+  
     
 
 ///Creates the rotation matrix for a given rotation, snapped to a multiple of 90
@@ -651,10 +658,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         | Rotate (sId, rot) ->
             model
             |> List.map (fun sym ->
-                if sId <> sym.Id then
-                    sym
-                else
-                    trans rotateCoords sym rot
+                let newsym = 
+                    if sId <> sym.Id then
+                        sym
+                    else
+                        trans rotateCoords sym rot
+                {
+                    newsym with
+                        Rotation = updaterot rot sym.Rotation
+                        
+                }
         )
         , Cmd.none
 
