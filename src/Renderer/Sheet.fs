@@ -192,9 +192,12 @@ let backgroundGrid zoom  =
         g[] (List.map horizontalLineMap [0. .. step .. canvasSize])
     ]
 
+let multiplyPosByZoom pos zoom = {pos with X = pos.X * zoom; Y = pos.Y * zoom}
+
+let multiplyValByZoom value zoom = value * zoom
+
 let drawSelectionBox model =
-    let multiplyZoom pos = {pos with X = pos.X * model.Zoom; Y = pos.Y * model.Zoom}
-    polygon [ SVGAttr.Points(cornersToString (multiplyZoom model.DragStartPos) (multiplyZoom model.DraggingPos))
+    polygon [ SVGAttr.Points(cornersToString (multiplyPosByZoom model.DragStartPos model.Zoom) (multiplyPosByZoom model.DraggingPos model.Zoom))
               SVGAttr.StrokeWidth "1px"
               SVGAttr.Stroke "lightblue"
               SVGAttr.StrokeDasharray "5,5"
@@ -202,11 +205,10 @@ let drawSelectionBox model =
               SVGAttr.Fill "grey" ] []
 
 let drawPortConnectionLine model =
-    let multiplyZoom v = v * model.Zoom 
-    line [ X1 (multiplyZoom model.DragStartPos.X)
-           Y1 (multiplyZoom model.DragStartPos.Y)
-           X2 (multiplyZoom model.DraggingPos.X)
-           Y2 (multiplyZoom model.DraggingPos.Y)
+    line [ X1 (multiplyValByZoom model.DragStartPos.X model.Zoom)
+           Y1 (multiplyValByZoom model.DragStartPos.Y model.Zoom)
+           X2 (multiplyValByZoom model.DraggingPos.X model.Zoom)
+           Y2 (multiplyValByZoom model.DraggingPos.Y model.Zoom)
            Style [ match validConnection model with
                    | Some _ ->
                        Stroke "darkblue"
@@ -218,8 +220,7 @@ let drawPortConnectionLine model =
                        StrokeDasharray "5,5"
                    FillOpacity 0.1 ] ] []
 
-let redCirclesonCorner model box = 
-    let multiplyZoom pos = {pos with X = pos.X * model.Zoom; Y = pos.Y * model.Zoom}
+let highlightCorners model box = 
     let circleGen centre =  
         circle [
             Cx (centre.X)
@@ -232,10 +233,10 @@ let redCirclesonCorner model box =
         ] []
 
     g[][
-        circleGen (multiplyZoom (fst box))
-        circleGen (multiplyZoom (snd box))
-        circleGen (multiplyZoom {X = (fst box).X; Y = (snd box).Y})
-        circleGen (multiplyZoom {X = (snd box).X; Y = (fst box).Y})
+        circleGen (multiplyPosByZoom (fst box) model.Zoom)
+        circleGen (multiplyPosByZoom (snd box) model.Zoom)
+        circleGen (multiplyPosByZoom {X = (fst box).X; Y = (snd box).Y} model.Zoom)
+        circleGen (multiplyPosByZoom {X = (snd box).X; Y = (fst box).Y} model.Zoom)
     ]
 
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
@@ -243,10 +244,12 @@ let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> Non
 
 let mouseDown model mousePos dispatch = 
     match Symbol.isPort model.Wire.Symbol mousePos with
-    | Some (_, portId) -> dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
+    | Some (_, portId) -> 
+        dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
     | None ->
         match nearCorner model mousePos with 
-        | Some (id, topleft, botright) -> dispatch <| BeginSizeEdit id 
+        | Some (id, _, _) -> 
+            dispatch <| BeginSizeEdit id 
         | None ->  
             let overlappingComponentList = 
                 model.SelectedComponents
@@ -337,7 +340,7 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                         | (Some _, _) -> drawPortConnectionLine model
                         | _ -> 
                             match model.EditSizeOf with 
-                            | Some id -> redCirclesonCorner model (Symbol.getBoundingBox model.Wire.Symbol id)
+                            | Some id -> highlightCorners model (Symbol.getBoundingBox model.Wire.Symbol id)
                             | _ ->
                                 if model.SelectingMultiple then
                                     drawSelectionBox model]
@@ -386,18 +389,20 @@ let moveElements model mousePos =
 
 
 let changeSymbolSize model id mousePos =
-    let topleft, botright = Symbol.getBoundingBox model.Wire.Symbol id
-    let mouseXOffset = max (abs (mousePos.X - topleft.X)) (abs (mousePos.X - botright.X))
-    let mouseYOffset = max (abs (mousePos.Y - topleft.Y)) (abs (mousePos.Y  - botright.Y))
+    let topL, botR = Symbol.getBoundingBox model.Wire.Symbol id
+    let mouseXOffset = max (abs (mousePos.X - topL.X)) (abs (mousePos.X - botR.X))
+    let mouseYOffset = max (abs (mousePos.Y - topL.Y)) (abs (mousePos.Y  - botR.Y))
 
     let sizeToGrid = snapGridVector {X = mouseXOffset; Y = mouseYOffset}
 
     let snapX = mouseXOffset + sizeToGrid.X 
     let snapY = mouseYOffset + sizeToGrid.Y
 
-    let currentBoxWidth = abs (topleft.X - botright.X)
-    let currentBoxHeight = abs (topleft.Y - botright.Y)
-    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale (id, {X = snapX/currentBoxWidth; Y = snapY/currentBoxHeight}))) model.Wire
+    let currentBoxWidth = abs (topL.X - botR.X)
+    let currentBoxHeight = abs (topL.Y - botR.Y)
+
+    let scaleMsg = id, {X = snapX / currentBoxWidth; Y = snapY / currentBoxHeight}
+    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale scaleMsg)) model.Wire
     {model with Wire = sModel}, Cmd.map Wire sCmd
 
 
@@ -405,8 +410,8 @@ let snapSymbolToGrid model =
     let transVector =
         Symbol.getBoundingBox model.Wire.Symbol (List.head model.SelectedComponents)
         |> function
-        | (topLeft, _) ->
-            snapGridVector topLeft
+        | (topL, _) ->
+            snapGridVector topL
     let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire 
     { model with 
         Wire = sModel;
@@ -414,7 +419,7 @@ let snapSymbolToGrid model =
         SelectingMultiple = false }, Cmd.map Wire sCmd
 
 let snapWireSegmentToGrid model =
-    //A wire segment can only be dragged and snapped horizontally or vertically
+    // A wire segment can only be dragged and snapped horizontally or vertically
     let transVector =
         if abs (model.DraggingPos.X - model.DragStartPos.X) > abs (model.DraggingPos.Y - model.DragStartPos.Y) then 
             snapGridVector {X = model.DraggingPos.X; Y = 0.0}
@@ -426,6 +431,19 @@ let snapWireSegmentToGrid model =
         Wire = wModel;
         SelectedPort = None, CommonTypes.PortType.Input;
         SelectingMultiple = false }, Cmd.map Wire wCmd
+
+let topleftCorners model =
+    model.SelectedComponents
+    |> List.map (Symbol.getBoundingBox model.Wire.Symbol >> fst)
+
+let foldFunction (model: Model, cmd: Cmd<Msg>) (id: CommonTypes.ComponentId, vector: XYPos) = 
+    let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Move ([id], vector))) model.Wire
+    {model with Wire = sModel}, Cmd.batch [ Cmd.map Wire sCmd; cmd ]
+
+let alignComponents model vector =
+    vector
+    |> List.zip model.SelectedComponents
+    |> List.fold foldFunction (model, Cmd.none)
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -478,41 +496,24 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                 model.Wire
 
         { model with Wire = sModel }, Cmd.map Wire sCmd 
-    
-    | KeyPress AltC | KeyPress AltV -> //Alignment of multiple selected symbols
-        if (List.length model.SelectedComponents) > 1 then
-            let topleftCorners =
-                model.SelectedComponents
-                |> List.map (Symbol.getBoundingBox model.Wire.Symbol >> fst)
-            let vectors = 
-                match msg with 
-                | KeyPress AltC -> //Horizontal alignment
-                    let leftMost =  List.minBy (fun a -> a.X) topleftCorners
-                    List.map (fun a ->
-                        if a.X <> leftMost.X then 
-                            {X = 0.0; Y = leftMost.Y - a.Y}
-                        else 
-                            {X = 0.0; Y = 0.0}) topleftCorners
-                | KeyPress AltV -> //Vertical alignment
-                    let downMost = List.maxBy (fun a -> a.Y) topleftCorners
-                    List.map (fun a ->
-                        if a.Y <> downMost.Y then 
-                            {X = downMost.X - a.X; Y = 0.0}
-                        else 
-                            {X = 0.0; Y = 0.0}) topleftCorners
-                | _ -> 
-                    failwithf "ERROR: Unexpected input for Symbol alignment."
+    /// Align along x-axis
+    | KeyPress AltC ->
+        let leftMost =  List.minBy (fun a -> a.X) (topleftCorners model)
+        List.map (fun a ->
+            if a.X <> leftMost.X then 
+                {X = 0.0; Y = leftMost.Y - a.Y}
+            else 
+                {X = 0.0; Y = 0.0}) (topleftCorners model)
+        |> alignComponents model
+    | KeyPress AltV ->
+        let downMost = List.maxBy (fun a -> a.Y) (topleftCorners model)
+        List.map (fun a ->
+            if a.Y <> downMost.Y then 
+                {X = downMost.X - a.X; Y = 0.0}
+            else 
+                {X = 0.0; Y = 0.0}) (topleftCorners model)
+        |> alignComponents model
 
-            let foldfunction (model: Model, cmd: Cmd<Msg>) (id: CommonTypes.ComponentId, vector: XYPos) = 
-                let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Move ([id], vector))) model.Wire
-                {model with Wire = sModel}, 
-                Cmd.batch [ Cmd.map Wire sCmd; cmd ]
-
-            List.zip model.SelectedComponents vectors
-            |> List.fold foldfunction (model, Cmd.none)
-        else 
-            model, Cmd.none
-            
     | KeyPress s -> // all other keys are turned into SetColor commands
         let c =
             match s with
@@ -534,14 +535,13 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | SelectDragEnd ->
         if not (List.isEmpty model.SelectedComponents) then
             snapSymbolToGrid model
-        else
-            if not (List.isEmpty model.SelectedWireSegments) then
+        elif not (List.isEmpty model.SelectedWireSegments) then
                 snapWireSegmentToGrid model
-            else
-                { model with 
-                    SelectedPort = None, CommonTypes.PortType.Input;
-                    SelectingMultiple = false 
-                    EditSizeOf = None}, Cmd.none
+        else
+            { model with 
+                SelectedPort = None, CommonTypes.PortType.Input;
+                SelectingMultiple = false 
+                EditSizeOf = None}, Cmd.none
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
     | DispatchMove mousePos ->
