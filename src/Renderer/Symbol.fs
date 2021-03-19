@@ -45,6 +45,12 @@ type GenericPort =
 
 type Edge = Top | Bottom | Left | Right
 
+type Rotation = 
+    | R0
+    | R90
+    | R180
+    | R270
+
 type Symbol =
     {
         TopL: XYPos
@@ -59,6 +65,7 @@ type Symbol =
         ShowSlots : bool
         Index : int
         Label : string
+        Rotation : Rotation
     }
 
 type Model = Symbol list
@@ -174,13 +181,28 @@ let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos =
     {X = x; Y = y}
    
 ///Snaps the rotation to one of: 0, 90, 180, 270
-let getRot (rot : int) : int =
+let getRot (oldrot : int) : int =
+    let rot = oldrot % 360 
     if rot >= 0 && rot < 45 then 0
     elif rot >= 45 && rot < 135 then 90
     elif rot >= 135 && rot < 225 then 180
     elif rot >= 225 && rot < 315 then 270
     elif rot >= 315 && rot < 360 then 0
     else 0
+
+//updates rotation state
+(*
+let updaterot (rot : int) (prevRot : Rotation) : Rotation =
+    let incrementRot = 
+        match prevRot with
+        |R0 -> R90
+        |R90 -> R180
+        |R180 -> R270
+        |R270 -> R90
+*)
+    
+
+    
 
 ///Creates the rotation matrix for a given rotation, snapped to a multiple of 90
 let getRotMat (rot : int) : float list list=
@@ -528,6 +550,7 @@ let createSymbol (compType : CommonTypes.ComponentType) (ports : (string * Commo
         ShowSlots = false
         Index = index
         Label = label
+        Rotation =  Rotation.R0
     }
 
 //-----------------------Skeleton Message type for symbols---------------------//
@@ -687,11 +710,14 @@ type private RenderObjProps =
 let private renderObj =
     FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
         fun (props : RenderObjProps) ->
+            let strokeColour = if props.Obj.PortHighlight then "green" else "black"
 
             let color =
                 match props.Obj.GenericType with
                 | Wires -> if props.Obj.Highlight = "lightblue" then
                                 "purple"
+                            else if props.Obj.PortHighlight then
+                                "green"
                             else
                                 "darkgrey"
                 | _ -> props.Obj.Highlight
@@ -718,7 +744,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1.)[])
             
-            let io : ReactElement = drawPolygon (tagCoords props.Obj) "black" color 0.5 []
+            let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 []
 
             let displayBox : ReactElement =
                 rect[
@@ -727,7 +753,7 @@ let private renderObj =
                     SVGAttr.Height (getHWObj props.Obj |> fst)
                     SVGAttr.Width (getHWObj props.Obj |> snd)
                     SVGAttr.Fill color
-                    SVGAttr.Stroke "black"
+                    SVGAttr.Stroke strokeColour
                     SVGAttr.StrokeWidth 0.5][]
 
             let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Name]
