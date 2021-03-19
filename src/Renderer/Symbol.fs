@@ -66,6 +66,7 @@ type Symbol =
         Index : int
         Label : string
         Rotation : Rotation
+        Scale : XYPos
     }
 
 type Model = Symbol list
@@ -558,6 +559,7 @@ let createSymbol (compType : CommonTypes.ComponentType) (ports : (string * Commo
         Index = index
         Label = label
         Rotation =  Rotation.R0
+        Scale = {X=1.;Y=1.}
     }
 
 //-----------------------Skeleton Message type for symbols---------------------//
@@ -658,26 +660,30 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         | Rotate (sId, rot) ->
             model
             |> List.map (fun sym ->
-                let newsym = 
-                    if sId <> sym.Id then
-                        sym
-                    else
-                        trans rotateCoords sym rot
-                {
-                    newsym with
-                        Rotation = updaterot rot sym.Rotation
-                        
-                }
+                if sId <> sym.Id then
+                    sym
+                else
+                    let newsym = trans rotateCoords sym rot
+                    {
+                        newsym with
+                            Rotation = updaterot rot sym.Rotation
+                            
+                    }
         )
         , Cmd.none
 
         | Scale (sId, scale) ->
             model
             |> List.map (fun sym ->
-                if sId <> sym.Id then
-                    sym
-                else
-                    trans scaleCoords sym scale
+                let newsym = 
+                    if sId <> sym.Id then
+                        sym
+                    else
+                        trans scaleCoords sym scale
+                {
+                    newsym with
+                        Scale = {X=sym.Scale.X * scale.X;Y=sym.Scale.Y * scale.Y }
+                }
         )
         , Cmd.none
 
@@ -757,6 +763,53 @@ let private renderObj =
                 |> mapSetup
                 |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1.)[])
             
+
+            let drawClktriangle  (pos:XYPos)  : ReactElement =
+                let height = 5.
+                let width = 5.
+                let scale = props.Obj.Scale
+                let p1:XYPos = {X = pos.X ; Y = pos.Y - (height/2.)}
+                let p2 = {X = pos.X + width; Y = pos.Y }
+                let p3 = {X = pos.X ; Y = pos.Y + (height/2.)}
+                let points = string(p1.X)+","+string(p1.Y)+" "+string(p2.X)+","+string(p2.Y)+" "+string(p3.X)+","+string(p3.Y)
+                let centre = {X = pos.X + (width/2.) ; Y = pos.Y }
+
+                //let scaleMatrix = "matrix(" + string(scale.X) + ",0,0," + string(scale.Y) + "," + string((centre.X-scale.X) * centre.X) + "," + string((centre.Y-scale.Y) * centre.Y) + ")"
+                let rot =
+                    match props.Obj.Rotation with 
+                        |R90 -> "rotate(90," 
+                        |R180 -> "rotate(180,"
+                        |R270 -> "rotate(270,"
+                        |_-> "rotate(0,"
+                let rotstring = rot + string(pos.X) + "," + string(pos.Y) + ")"
+                polygon[
+                    Points points
+                    SVGAttr.Stroke "black"
+                    SVGAttr.Fill "grey"
+                    SVGAttr.StrokeWidth width
+                    SVGAttr.Transform rotstring
+
+                ][]
+            (*
+            let temptext =
+                let rot =
+                    match props.Obj.Rotation with 
+                        |R90 -> "rotate(90," 
+                        |R180 -> "rotate(180"
+                        |R270 -> "rotate(270"
+                        |_-> "rotate(0"
+                text [ 
+                X props.Obj.TopL.X
+                Y props.Obj.BotR.Y
+                Style [
+                    TextAnchor "middle" // left/right/middle: horizontal algnment vs (X,Y)
+                    DominantBaseline "hanging" // auto/middle/hanging: vertical alignment vs (X,Y)
+                    FontSize "25px"
+                    FontWeight "Bold"
+                    Fill "Black" // demo font color
+                ]
+                ] [str <| sprintf "%s"rot] 
+            *)
             let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 []
 
             let displayBox : ReactElement =
@@ -796,7 +849,7 @@ let private renderObj =
                 | IO -> [io]
                 | _ -> [displayBox]
             
-            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos])
+            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos ; ] )
             
     , "Circle"
     , equalsButFunctions
