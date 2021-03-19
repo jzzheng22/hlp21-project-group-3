@@ -529,6 +529,7 @@ let createSymbol (compType : CommonTypes.ComponentType) (ports : (string * Commo
         ShowSlots = false
         Index = index
         Label = label
+        HighlightBoxLine = false
     }
 
 //-----------------------Skeleton Message type for symbols---------------------//
@@ -693,7 +694,7 @@ let private renderObj =
 
             let boxStrokeColour = if props.Obj.HighlightBoxLine then 
                                     "green"
-                                   else
+                                  else
                                      "black"
 
             let color =
