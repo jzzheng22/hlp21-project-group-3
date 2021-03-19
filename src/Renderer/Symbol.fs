@@ -65,7 +65,6 @@ type Symbol =
         ShowSlots : bool
         Index : int
         Label : string
-        Hover : bool
         Rotation : Rotation
     }
 
@@ -551,7 +550,6 @@ let createSymbol (compType : CommonTypes.ComponentType) (ports : (string * Commo
         ShowSlots = false
         Index = index
         Label = label
-        Hover = false
         Rotation =  Rotation.R0
     }
 
@@ -631,10 +629,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     | HighlightPorts sIdList ->
         model
         |> List.map (fun sym ->
-                let contains = List.contains sym.Id sIdList
                 { sym with
-                    PortHighlight = contains
-                    Hover = contains
+                    PortHighlight = List.contains sym.Id sIdList
                 }
         )
         , Cmd.none
@@ -715,16 +711,13 @@ let private renderObj =
     FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
         fun (props : RenderObjProps) ->
 
-            let strokeColour= if props.Obj.Hover then 
-                                    "green"
-                                  else
-                                     "black"
+            let strokeColour = if props.Obj.PortHighlight then "green" else "black"
 
             let color =
                 match props.Obj.GenericType with
                 | Wires -> if props.Obj.Highlight = "lightblue" then
                                 "purple"
-                            else if props.Obj.Hover then
+                            else if props.Obj.PortHighlight then
                                 "green"
                             else
                                 "darkgrey"
