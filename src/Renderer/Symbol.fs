@@ -711,8 +711,6 @@ let private renderObj =
     FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
         fun (props : RenderObjProps) ->
 
-            let strokeColour = if props.Obj.PortHighlight then "green" else "black"
-
             let color =
                 match props.Obj.GenericType with
                 | Wires -> if props.Obj.Highlight = "lightblue" then
@@ -754,7 +752,7 @@ let private renderObj =
                     SVGAttr.Height (getHWObj props.Obj |> fst)
                     SVGAttr.Width (getHWObj props.Obj |> snd)
                     SVGAttr.Fill color
-                    SVGAttr.Stroke strokeColour
+                    SVGAttr.Stroke (if props.Obj.PortHighlight then "green" else "black")
                     SVGAttr.StrokeWidth 0.5][]
 
             let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Name]
