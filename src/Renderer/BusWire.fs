@@ -740,9 +740,8 @@ let wireToIssie (wire : Wire) (wModel : Model) : CommonTypes.Connection =
     }
 
 let extractWires (wModel: Model) : CommonTypes.Connection list = 
-    wModel
+    wModel.WX
     |> List.map (fun x -> wireToIssie x wModel)
-    
     
 
 let extractWiress (wModel: Model) : CommonTypes.Component list = 
