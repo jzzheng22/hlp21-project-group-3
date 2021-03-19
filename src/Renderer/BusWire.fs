@@ -722,10 +722,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 )
         }
         , Cmd.none
-    | HighlightError cId ->
+    | HighlightError cIdList ->
         {model with
             WX = model.WX
-                |> List.map (fun wire -> {wire with HighlightError = List.contains wire.Id cId})
+                |> List.map (fun wire -> {wire with HighlightError = List.contains wire.Id cIdList})
         }
         , Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
