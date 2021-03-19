@@ -401,7 +401,7 @@ let singleWireView =
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
             
-            let colour = if props.HighlightError then "red" elif props.Width = 1 then props.ColorP else "purple"
+            let colour = if props.HighlightError then "red" elif props.Highlight then "green" elif props.Width = 1 then props.ColorP else "purple"
             
             let singleSegmentView (seg: WireSegment) =
                 let SrcP = seg.SourcePos
