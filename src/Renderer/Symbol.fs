@@ -45,6 +45,12 @@ type GenericPort =
 
 type Edge = Top | Bottom | Left | Right
 
+type Rotation = 
+    | R0
+    | R90
+    | R180
+    | R270
+
 type Symbol =
     {
         TopL: XYPos
@@ -60,6 +66,7 @@ type Symbol =
         Index : int
         Label : string
         Hover : bool
+        Rotation : Rotation
     }
 
 type Model = Symbol list
@@ -175,13 +182,28 @@ let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos =
     {X = x; Y = y}
    
 ///Snaps the rotation to one of: 0, 90, 180, 270
-let getRot (rot : int) : int =
+let getRot (oldrot : int) : int =
+    let rot = oldrot % 360 
     if rot >= 0 && rot < 45 then 0
     elif rot >= 45 && rot < 135 then 90
     elif rot >= 135 && rot < 225 then 180
     elif rot >= 225 && rot < 315 then 270
     elif rot >= 315 && rot < 360 then 0
     else 0
+
+//updates rotation state
+(*
+let updaterot (rot : int) (prevRot : Rotation) : Rotation =
+    let incrementRot = 
+        match prevRot with
+        |R0 -> R90
+        |R90 -> R180
+        |R180 -> R270
+        |R270 -> R90
+*)
+    
+
+    
 
 ///Creates the rotation matrix for a given rotation, snapped to a multiple of 90
 let getRotMat (rot : int) : float list list=
@@ -530,6 +552,7 @@ let createSymbol (compType : CommonTypes.ComponentType) (ports : (string * Commo
         Index = index
         Label = label
         Hover = false
+        Rotation =  Rotation.R0
     }
 
 //-----------------------Skeleton Message type for symbols---------------------//
