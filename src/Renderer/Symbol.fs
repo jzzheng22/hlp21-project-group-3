@@ -710,6 +710,7 @@ type private RenderObjProps =
 let private renderObj =
     FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
         fun (props : RenderObjProps) ->
+            let strokeColour = if props.Obj.PortHighlight then "green" else "black"
 
             let color =
                 match props.Obj.GenericType with
@@ -743,7 +744,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1.)[])
             
-            let io : ReactElement = drawPolygon (tagCoords props.Obj) "black" color 0.5 []
+            let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 []
 
             let displayBox : ReactElement =
                 rect[
@@ -752,7 +753,7 @@ let private renderObj =
                     SVGAttr.Height (getHWObj props.Obj |> fst)
                     SVGAttr.Width (getHWObj props.Obj |> snd)
                     SVGAttr.Fill color
-                    SVGAttr.Stroke (if props.Obj.PortHighlight then "green" else "black")
+                    SVGAttr.Stroke strokeColour
                     SVGAttr.StrokeWidth 0.5][]
 
             let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Name]
