@@ -444,6 +444,18 @@ let alignComponents model vector =
     vector
     |> List.zip model.SelectedComponents
     |> List.fold foldFunction (model, Cmd.none)
+    
+/// Finds the highest index for a Symbol type and increments that number
+let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : int = 
+    let symbolList = 
+        model.Wire.Symbol 
+        |> List.filter (fun x -> x.Type = compType)
+
+    if List.isEmpty symbolList then 1 
+    else symbolList
+        |> List.map (fun x -> x.Index)
+        |> List.max
+        |> (+) 1
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -492,7 +504,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress AltA ->
         let sModel, sCmd =
             BusWire.update
-                (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1)))
+                (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, (getNewSymbolIndex model CommonTypes.ComponentType.Mux2))))
                 model.Wire
 
         { model with Wire = sModel }, Cmd.map Wire sCmd 
