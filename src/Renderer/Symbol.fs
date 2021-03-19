@@ -699,74 +699,75 @@ type private RenderObjProps =
 
 /// View for one symbol with caching for efficient execution when input does not change
 let private renderObj =
-    FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
+    FunctionComponent.Of(
         fun (props : RenderObjProps) ->
+            let sym = props.Obj //for ease of use
 
             let color =
-                match props.Obj.GenericType with
-                | Wires -> if props.Obj.Highlight = "lightblue" then
+                match sym.GenericType with
+                | Wires -> if sym.Highlight = "lightblue" then
                                 "purple"
                             else
                                 "darkgrey"
-                | _ -> props.Obj.Highlight
+                | _ -> sym.Highlight
 
             let labels : ReactElement list = 
-                props.Obj
+                sym
                 |> mapSetup
                 |> List.map(fun (i, k) ->
-                    (drawText (displace -2. i props.Obj).X (displace -2. i props.Obj).Y (sprintf "%dpx" labelSize) (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)])
+                    (drawText (displace -2. i sym).X (displace -2. i sym).Y (sprintf "%dpx" labelSize) (getTextAttr sym i))[str <| sprintf "%s" (getPortName k)])
 
             let wires : ReactElement list =
             //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
-                props.Obj
+                sym
                 |> mapSetup
                 |> List.map(fun (i, _) ->
                     polyline[
-                        Points (sprintf "%f,%f %f,%f %f,%f" i.X i.Y (midSymX props.Obj) i.Y (midSymX props.Obj) (midSymY props.Obj))
+                        Points (sprintf "%f,%f %f,%f %f,%f" i.X i.Y (midSymX sym) i.Y (midSymX sym) (midSymY sym))
                         SVGAttr.Stroke color
                         SVGAttr.Fill "none"
                     ][])
 
             let triangles : ReactElement list =
-                props.Obj
+                sym
                 |> mapSetup
-                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1.)[])
+                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i sym) color color 1.)[])
             
-            let io : ReactElement = drawPolygon (tagCoords props.Obj) "black" color 0.5 []
+            let io : ReactElement = drawPolygon (tagCoords sym) "black" color 0.5 []
 
             let displayBox : ReactElement =
                 rect[
-                    X props.Obj.TopL.X
-                    Y props.Obj.TopL.Y
-                    SVGAttr.Height (getHWObj props.Obj |> fst)
-                    SVGAttr.Width (getHWObj props.Obj |> snd)
+                    X sym.TopL.X
+                    Y sym.TopL.Y
+                    SVGAttr.Height (getHWObj sym |> fst)
+                    SVGAttr.Width (getHWObj sym |> snd)
                     SVGAttr.Fill color
                     SVGAttr.Stroke "black"
                     SVGAttr.StrokeWidth 0.5][]
 
-            let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Name]
+            let title = drawText (midSymX sym) (midSymY sym) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
             
-            let symLabel = drawText (midSymX props.Obj) (props.Obj.TopL.Y - 10.) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Label]
+            let symLabel = drawText (midSymX sym) (sym.TopL.Y - 10.) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Label]
             
             let drawInvert =
-                genMapList props.Obj.PortMap (List.filter(fun (_, k) -> isPortInverse k))
-                |> List.map(fun (i, _) -> drawCircle props.Obj i color "black" 1. 0.5[])
+                genMapList sym.PortMap (List.filter(fun (_, k) -> isPortInverse k))
+                |> List.map(fun (i, _) -> drawCircle sym i color "black" 1. 0.5[])
 
             let ports =
-                if props.Obj.PortHighlight then
-                    props.Obj
+                if sym.PortHighlight then
+                    sym
                     |> mapSetup
-                    |> List.map(fun (i, _) -> drawCircle props.Obj i "deepskyblue" "deepskyblue" 0.4 1.[])
+                    |> List.map(fun (i, _) -> drawCircle sym i "deepskyblue" "deepskyblue" 0.4 1.[])
                 else []
 
             let labelPos : ReactElement list = 
-                if props.Obj.ShowSlots then
-                    genMapList props.Obj.PortMap id
-                    |> List.map(fun (i, _) -> drawCircle props.Obj (displace -5. i props.Obj) "purple" "purple" 0.4 1.[])
+                if sym.ShowSlots then
+                    genMapList sym.PortMap id
+                    |> List.map(fun (i, _) -> drawCircle sym (displace -5. i sym) "purple" "purple" 0.4 1.[])
                 else []
             
             let symDraw = 
-                match props.Obj.GenericType with
+                match sym.GenericType with
                 | Wires -> List.concat [wires; triangles]
                 | IO -> [io]
                 | _ -> [displayBox]
