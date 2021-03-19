@@ -59,6 +59,7 @@ type Symbol =
         ShowSlots : bool
         Index : int
         Label : string
+        HighlightBoxLine : bool
     }
 
 type Model = Symbol list
@@ -606,8 +607,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     | HighlightPorts sIdList ->
         model
         |> List.map (fun sym ->
+                let contains = List.contains sym.Id sIdList
                 { sym with
-                    PortHighlight = List.contains sym.Id sIdList
+                    PortHighlight = contains
+                    HighlightBoxLine = contains
                 }
         )
         , Cmd.none
@@ -688,6 +691,11 @@ let private renderObj =
     FunctionComponent.Of( //TODO - THIS NEEDS CHANGING WHENEVER MOVE GETS SORTED OUT
         fun (props : RenderObjProps) ->
 
+            let boxStrokeColour = if props.Obj.HighlightBoxLine then 
+                                    "green"
+                                   else
+                                     "black"
+
             let color =
                 match props.Obj.GenericType with
                 | Wires -> if props.Obj.Highlight = "lightblue" then
@@ -727,7 +735,7 @@ let private renderObj =
                     SVGAttr.Height (getHWObj props.Obj |> fst)
                     SVGAttr.Width (getHWObj props.Obj |> snd)
                     SVGAttr.Fill color
-                    SVGAttr.Stroke "black"
+                    SVGAttr.Stroke boxStrokeColour
                     SVGAttr.StrokeWidth 0.5][]
 
             let title = drawText (midSymX props.Obj) (midSymY props.Obj) "10px" ("middle", "middle") [str <| sprintf "%A" props.Obj.Name]
