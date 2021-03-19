@@ -13,8 +13,9 @@ type Model =
       Zoom: float
       SelectedPort: CommonTypes.PortId option * CommonTypes.PortType
       SelectedComponents: CommonTypes.ComponentId list
-      SelectedWireSegments: (CommonTypes.ConnectionId * int) list
+      SelectedWireSegments: (int * CommonTypes.ConnectionId) list
       SelectingMultiple: bool
+      EditSizeOf: CommonTypes.ComponentId option
       DragStartPos: XYPos
       DraggingPos: XYPos }
 
@@ -39,11 +40,13 @@ type Msg =
     | KeyPress of KeyboardMsg
     | SelectPort of CommonTypes.PortId * CommonTypes.PortType
     | SelectComponents of CommonTypes.ComponentId list
-    | SelectWireSegments of (CommonTypes.ConnectionId * int) list
+    | SelectWireSegments of (int * CommonTypes.ConnectionId) list
     | SelectDragStart of XYPos
     | SelectDragging of XYPos
     | SelectDragEnd
     | DispatchMove of XYPos
+    | BeginSizeEdit of CommonTypes.ComponentId
+    | EditSize of (CommonTypes.ComponentId * XYPos)
 
 type MouseOps =
     | MouseDown
@@ -60,6 +63,13 @@ let unzoomedGrid = unzoomedCanvas / 100.0
 /// Tests if a point is inside a bounding box
 let inBoundingBox point box =
     point.X >= (fst box).X && point.X <= (snd box).X && point.Y >= (fst box).Y && point.Y <= (snd box).Y
+
+/// Tests if a point is within a specified threshold distance from any corner of a bounding box (assuming zoom = 1.0). 
+let pointNearBoxCorner point box =
+    let threshold = 5.0
+    let xClose p1 p2 = (abs (p1.X - p2.X)) < threshold
+    let yClose p1 p2 = (abs (p1.Y - p2.Y)) < threshold
+    ( (xClose point (fst box)) || (xClose point (snd box)) ) && ( (yClose point (fst box)) || (yClose point (snd box)) )
 
 /// Takes in two coordinates and a bounding box
 /// Tests to see if box is between those two coordinates
@@ -78,7 +88,7 @@ let snapGridVector (point: XYPos) =
 
 let getSymbolID (id, _, _) = id
 
-let getWireSegmentID (id, index, _, _) = (id, index)
+let getWireSegmentID (index, id, _, _) = (index, id)
 
 let getSymbolIDList filter lst =
     lst
@@ -94,7 +104,7 @@ let dispatchSelection symbolIDList wireSegmentIDList dispatch =
     dispatch <| SelectComponents symbolIDList
     dispatch <| Symbol(Symbol.Highlight symbolIDList)
     dispatch <| SelectWireSegments wireSegmentIDList
-    dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
+    dispatch <| Wire(BusWire.HighlightWires (List.map snd wireSegmentIDList))
 
 /// Removes ID from Symbol tuple. Used for testing where IDs are not necessary 
 let removeSymbolID predicate coords (_, a, b) = predicate coords (a, b)
@@ -125,6 +135,16 @@ let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>)
 /// Selects elements where mousePos is inside bounding box
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
     dragSelectElements model inBoundingBox mousePos dispatch
+
+let nearCorner model point = 
+    let nearSymbols = 
+        Symbol.getBoundingBoxes model.Wire.Symbol point 
+        |> List.filter (removeSymbolID pointNearBoxCorner point)
+    
+    if List.isEmpty nearSymbols then 
+        None 
+    else 
+        Some (List.last nearSymbols)
 
 let validConnection model =
     match Symbol.isPort model.Wire.Symbol model.DraggingPos with
@@ -198,6 +218,26 @@ let drawPortConnectionLine model =
                        StrokeDasharray "5,5"
                    FillOpacity 0.1 ] ] []
 
+let redCirclesonCorner model box = 
+    let multiplyZoom pos = {pos with X = pos.X * model.Zoom; Y = pos.Y * model.Zoom}
+    let circleGen centre =  
+        circle [
+            Cx (centre.X)
+            Cy (centre.Y)
+            R 5
+            Style [
+                Stroke "black"
+                Fill "red"
+            ]
+        ] []
+
+    g[][
+        circleGen (multiplyZoom (fst box))
+        circleGen (multiplyZoom (snd box))
+        circleGen (multiplyZoom {X = (fst box).X; Y = (snd box).Y})
+        circleGen (multiplyZoom {X = (snd box).X; Y = (fst box).Y})
+    ]
+
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
@@ -205,12 +245,15 @@ let mouseDown model mousePos dispatch =
     match Symbol.isPort model.Wire.Symbol mousePos with
     | Some (_, portId) -> dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
     | None ->
-        let overlappingComponentList = 
-            model.SelectedComponents
-            |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
-            |> List.filter (inBoundingBox mousePos) 
-        if List.isEmpty overlappingComponentList then
-            selectElements model mousePos dispatch
+        match nearCorner model mousePos with 
+        | Some (id, topleft, botright) -> dispatch <| BeginSizeEdit id 
+        | None ->  
+            let overlappingComponentList = 
+                model.SelectedComponents
+                |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
+                |> List.filter (inBoundingBox mousePos) 
+            if List.isEmpty overlappingComponentList then
+                selectElements model mousePos dispatch
     dispatch <| SelectDragStart mousePos
     
 
@@ -242,7 +285,11 @@ let mouseMove model mousePos dispatch mDown =
         match model.SelectedPort with
         | (Some _, _) -> ()
         | _ ->
-            dispatch <| DispatchMove mousePos
+            match model.EditSizeOf with 
+            | Some id -> 
+                dispatch <| EditSize (id, mousePos)
+            | _ -> 
+                dispatch <| DispatchMove mousePos
 
         dispatch <| SelectDragging mousePos
 
@@ -288,9 +335,12 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                 g [] [
                         match model.SelectedPort with
                         | (Some _, _) -> drawPortConnectionLine model
-                        | _ -> ()
-                        if model.SelectingMultiple then
-                            drawSelectionBox model]
+                        | _ -> 
+                            match model.EditSizeOf with 
+                            | Some id -> redCirclesonCorner model (Symbol.getBoundingBox model.Wire.Symbol id)
+                            | _ ->
+                                if model.SelectingMultiple then
+                                    drawSelectionBox model]
         ] 
     ] 
 
@@ -309,7 +359,7 @@ let deleteWires model =
 
     let wiresToDelete =
         connectedWires
-        |> List.append (List.map fst model.SelectedWireSegments)
+        |> List.append (List.map snd model.SelectedWireSegments)
         |> List.distinct
 
     BusWire.update (BusWire.DeleteWires wiresToDelete) model.Wire
@@ -334,6 +384,23 @@ let moveElements model mousePos =
     else
         { model with SelectingMultiple = true}, Cmd.none
 
+
+let changeSymbolSize model id mousePos =
+    let topleft, botright = Symbol.getBoundingBox model.Wire.Symbol id
+    let mouseXOffset = max (abs (mousePos.X - topleft.X)) (abs (mousePos.X - botright.X))
+    let mouseYOffset = max (abs (mousePos.Y - topleft.Y)) (abs (mousePos.Y  - botright.Y))
+
+    let sizeToGrid = snapGridVector {X = mouseXOffset; Y = mouseYOffset}
+
+    let snapX = mouseXOffset + sizeToGrid.X 
+    let snapY = mouseYOffset + sizeToGrid.Y
+
+    let currentBoxWidth = abs (topleft.X - botright.X)
+    let currentBoxHeight = abs (topleft.Y - botright.Y)
+    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale (id, {X = snapX/currentBoxWidth; Y = snapY/currentBoxHeight}))) model.Wire
+    {model with Wire = sModel}, Cmd.map Wire sCmd
+
+
 let snapSymbolToGrid model =
     let transVector =
         Symbol.getBoundingBox model.Wire.Symbol (List.head model.SelectedComponents)
@@ -345,6 +412,20 @@ let snapSymbolToGrid model =
         Wire = sModel;
         SelectedPort = None, CommonTypes.PortType.Input;
         SelectingMultiple = false }, Cmd.map Wire sCmd
+
+let snapWireSegmentToGrid model =
+    //A wire segment can only be dragged and snapped horizontally or vertically
+    let transVector =
+        if abs (model.DraggingPos.X - model.DragStartPos.X) > abs (model.DraggingPos.Y - model.DragStartPos.Y) then 
+            snapGridVector {X = model.DraggingPos.X; Y = 0.0}
+        else 
+            snapGridVector {X = 0.0; Y = model.DraggingPos.Y}
+    let wireSegment = List.head model.SelectedWireSegments
+    let wModel, wCmd = BusWire.update (BusWire.MoveWires(fst wireSegment, snd wireSegment, transVector)) model.Wire 
+    { model with 
+        Wire = wModel;
+        SelectedPort = None, CommonTypes.PortType.Input;
+        SelectingMultiple = false }, Cmd.map Wire wCmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -454,13 +535,21 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         if not (List.isEmpty model.SelectedComponents) then
             snapSymbolToGrid model
         else
-            { model with 
-                SelectedPort = None, CommonTypes.PortType.Input;
-                SelectingMultiple = false }, Cmd.none
+            if not (List.isEmpty model.SelectedWireSegments) then
+                snapWireSegmentToGrid model
+            else
+                { model with 
+                    SelectedPort = None, CommonTypes.PortType.Input;
+                    SelectingMultiple = false 
+                    EditSizeOf = None}, Cmd.none
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
     | DispatchMove mousePos ->
         moveElements model mousePos
+    | BeginSizeEdit id -> 
+        {model with EditSizeOf = Some id}, Cmd.none
+    | EditSize (id, mousePos) -> 
+        changeSymbolSize model id mousePos
 
 let init () =
     let model, cmds = (BusWire.init 400) ()
@@ -471,6 +560,7 @@ let init () =
       SelectedComponents = []
       SelectedWireSegments = []
       SelectingMultiple = false
+      EditSizeOf = None
       DragStartPos = origin
       DraggingPos = origin },
     Cmd.map Wire cmds
