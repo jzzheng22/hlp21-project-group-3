@@ -184,33 +184,35 @@ let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos =
 ///Snaps the rotation to one of: 0, 90, 180, 270
 let getRot (oldrot : int) : int =
     let rot = oldrot % 360 
-    if rot >= 0 && rot < 45 then 0
-    elif rot >= 45 && rot < 135 then 90
-    elif rot >= 135 && rot < 225 then 180
-    elif rot >= 225 && rot < 315 then 270
-    elif rot >= 315 && rot < 360 then 0
+    if rot > 315 then 0
+    elif rot > 225 then 270
+    elif rot > 135 then 180
+    elif rot > 45 then 90
     else 0
+
+let incrementRot (oldRot : Rotation) : Rotation = 
+    match oldRot with
+    | R0 -> R90
+    | R90 -> R180
+    | R180 -> R270
+    | R270 -> R0
 
 //updates rotation state
 let updaterot (rot : int) (oldRot : Rotation) : Rotation =
-    let incrementRot (prevRot:Rotation) :Rotation = 
-        match prevRot with
-        |R0 -> R90
-        |R90 -> R180
-        |R180 -> R270
-        |R270 -> R0
 
-    let snaprot = getRot rot
+    match (getRot rot) with  
+    | 0 -> oldRot
+    | 90 -> incrementRot oldRot
+    | 180-> incrementRot oldRot |> incrementRot
+    | 270-> incrementRot oldRot |> incrementRot |> incrementRot
+    | _-> oldRot
 
-    match snaprot with  
-    |0 -> oldRot
-    |90 -> incrementRot oldRot
-    |180-> incrementRot oldRot |> incrementRot
-    |270-> incrementRot oldRot |> incrementRot |> incrementRot
-    |_-> oldRot
-
-  
-    
+let rotToInt (rot : Rotation) : int =
+    match rot with 
+    | R90 -> 90 
+    | R180 -> 180
+    | R270 -> 270
+    | _-> 0
 
 ///Creates the rotation matrix for a given rotation, snapped to a multiple of 90
 let getRotMat (rot : int) : float list list=
@@ -335,6 +337,16 @@ let triangleCoords (i : XYPos) (sym : Symbol) : string =
     let pos = midSymX sym
     (sprintf "%f,%f %f,%f %f,%f" pos (i.Y + radius) (pos + (radius * 2.)) i.Y pos (i.Y - radius))
 
+///Returns the coordinates for a clock symbol
+let clkCoords (pos : XYPos) =
+    let p1:XYPos = {X = pos.X ; Y = pos.Y - (radius)}
+    let p2 = {X = pos.X + (2. * radius); Y = pos.Y }
+    let p3 = {X = pos.X ; Y = pos.Y + (radius)}
+    sprintf "%f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y
+
+///Returns the rotation for SVG transformations
+let rotString (sym : Symbol) (pos : XYPos) = sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
+
 ///Finds the extra ports required for each side based on the symbol type in the form (left, right, bot)
 let numExPorts (symType : SymbolType) (numIn : int) : (int * int * int) = 
     match symType with
@@ -389,12 +401,13 @@ let drawText (x : float) (y : float) (size : string) (anchor : string, baseline 
             UserSelect UserSelectOptions.None] //Prevent highlighting text
     ]
 
-let drawPolygon (points : string) (stroke : string) (fill : string) (width : float) =
+let drawPolygon (points : string) (stroke : string) (fill : string) (width : float) (trans : string) =
     polygon[
         Points points
         SVGAttr.Stroke stroke
         SVGAttr.Fill fill
         SVGAttr.StrokeWidth width
+        SVGAttr.Transform trans
     ]
 
 let drawCircle (sym : Symbol) (i : XYPos) (fill : string) (stroke : string) (opac : float) (width : float) =
@@ -488,6 +501,10 @@ let getSymLabel (comp : CommonTypes.ComponentType) (i : int) : string =
     match a with 
     | "" -> ""
     | _ -> sprintf "%s%i" a i
+
+let getDisplace (k : PortInfo Option) = 
+    if getPortName k = "Clk" then -7. else -3.
+
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -740,44 +757,19 @@ let private renderObj =
                                 "darkgrey"
                 | _ -> props.Obj.Highlight
 
-            //draw clock and name
-            let drawClk (pos:XYPos) : ReactElement =
-                           // let pos = props.Obj.TopL
-                            let height = 7.
-                            let width = 7.
-                            let scale = props.Obj.Scale
-                            let p1:XYPos = {X = pos.X ; Y = pos.Y - (height/2.)}
-                            let p2 = {X = pos.X + width; Y = pos.Y }
-                            let p3 = {X = pos.X ; Y = pos.Y + (height/2.)}
-                            let points = string(p1.X)+","+string(p1.Y)+" "+string(p2.X)+","+string(p2.Y)+" "+string(p3.X)+","+string(p3.Y)
-                            let centre = {X = pos.X + (width/2.) ; Y = pos.Y }
-
-                            //let scaleMatrix = "matrix(" + string(scale.X) + ",0,0," + string(scale.Y) + "," + string((centre.X-scale.X) * centre.X) + "," + string((centre.Y-scale.Y) * centre.Y) + ")"
-                            let rot =
-                                match props.Obj.Rotation with 
-                                    |R90 -> "rotate(90," 
-                                    |R180 -> "rotate(180,"
-                                    |R270 -> "rotate(270,"
-                                    |_-> "rotate(0,"
-                            let rotstring = rot + string(pos.X) + "," + string(pos.Y) + ")"
-                            polygon[
-                                Points points
-                                SVGAttr.Stroke "black"
-                                SVGAttr.Fill "none"
-                                SVGAttr.StrokeWidth 1.3
-                                SVGAttr.Transform rotstring
-
-                            ][
-                               // drawText (displace -2. i props.Obj).X (displace -2. i props.Obj).Y (sprintf "%dpx" labelSize) (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)]
-                            ]
-                           
+            let drawClk : ReactElement list =
+                props.Obj
+                |> mapSetup
+                |> List.collect (fun (i, k) ->
+                    if getPortName k = "Clk" then
+                        [(drawPolygon (clkCoords i) "black" color 1. (rotString props.Obj i))[]]
+                    else [])
+                
             let labels : ReactElement list = 
                 props.Obj
                 |> mapSetup
-                |> List.map(fun (i, k) ->if (getPortName k ) = "Clk" then
-                                            drawClk i 
-                                         else
-                                            (drawText (displace -2. i props.Obj).X  (displace -2. i props.Obj).Y (sprintf "%dpx" labelSize) (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)])
+                |> List.map(fun (i, k) -> 
+                    (drawText (displace (getDisplace k) i props.Obj).X  (displace (getDisplace k) i props.Obj).Y (sprintf "%dpx" labelSize) (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)])
 
             let wires : ReactElement list =
             //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
@@ -793,12 +785,9 @@ let private renderObj =
             let triangles : ReactElement list =
                 props.Obj
                 |> mapSetup
-                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1.)[])
+                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1. "")[])
             
-
-            
-            
-            let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 []
+            let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 "" []
 
             let displayBox : ReactElement =
                 rect[
@@ -837,7 +826,7 @@ let private renderObj =
                 | IO -> [io]
                 | _ -> [displayBox]
             
-            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos  ] )
+            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos; drawClk] )
             
     , "Circle"
     , equalsButFunctions
