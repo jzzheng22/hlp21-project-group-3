@@ -757,23 +757,23 @@ let private renderObj =
     FunctionComponent.Of(
         fun (props : RenderObjProps) ->
             let sym = props.Obj //for ease of use
-            let strokeColour = if props.Obj.PortHighlight then "green" else "black"
+            let strokeColour = if sym.PortHighlight then "green" else "black"
             let color =
                 match sym.GenericType with
                 | Wires -> if sym.Highlight = "lightblue" then
                                 "purple"
-                            else if props.Obj.PortHighlight then
+                            else if sym.PortHighlight then
                                 "green"
                             else
                                 "darkgrey"
                 | _ -> sym.Highlight
 
             let drawClk : ReactElement list =
-                props.Obj
+                sym
                 |> mapSetup
                 |> List.collect (fun (i, k) ->
                     if getPortName k = "Clk" then
-                        [(drawPolygon (clkCoords i) "black" color 1. (rotString props.Obj i))[]]
+                        [(drawPolygon (clkCoords i) "black" color 1. (rotString sym i))[]]
                     else [])
                 
             let labels : ReactElement list = 
@@ -799,7 +799,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i sym) color color 1. (rotStringObj sym))[])
             
-            let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 (rotStringObj props.Obj)[]
+            let io : ReactElement = drawPolygon (tagCoords sym) strokeColour color 0.5 (rotStringObj sym)[]
 
             let displayBox : ReactElement =
                 rect[
