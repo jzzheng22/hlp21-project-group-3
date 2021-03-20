@@ -507,6 +507,14 @@ let getSymLabel (comp : ComponentType) (i : int) : string =
 let getDisplace (k : PortInfo Option) = 
     if getPortName k = "Clk" then -7. else -3.
 
+let wireCoords (sym : Symbol) (i : XYPos) : string = 
+    let corner = 
+        match sym.Rotation with
+        | R0 | R180 -> {X = midSymX sym; Y = i.Y}
+        | _ -> {X = i.X; Y = midSymY sym}
+    sprintf "%f,%f %f,%f %f,%f" i.X i.Y corner.X corner.Y (midSymX sym) (midSymY sym)
+    
+
 let makeIssiePorts (l, r, b, t) (portType : PortType) : Port list =
     List.concat [l; r; b; t] 
     |> List.filter (fun x -> x.Port.PortType = portType) 
@@ -789,7 +797,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.map(fun (i, _) ->
                     polyline[
-                        Points (sprintf "%f,%f %f,%f %f,%f" i.X i.Y (midSymX sym) i.Y (midSymX sym) (midSymY sym))
+                        Points (wireCoords sym i)
                         SVGAttr.Stroke color
                         SVGAttr.Fill "none"
                     ][])
