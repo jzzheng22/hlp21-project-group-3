@@ -840,12 +840,13 @@ let connectedSymbols (wModel : Model) (connect : CommonTypes.ConnectionId) : Com
 
 //----------------------interface to Issie-----------------------//
 
+/// Converts a wire segment list into a list of distinct vertices
 let segToVert (wSegs : WireSegment list) : (float * float) list = 
     wSegs 
     |> List.collect (fun x -> [(x.SourcePos.X, x.SourcePos.Y); (x.TargetPos.X, x.TargetPos.Y)])
     |> List.distinct
     
-
+/// Converts the Wire type into the Issie Connection type
 let wireToIssie (wire : Wire) (wModel : Model) : CommonTypes.Connection = 
     {
         CommonTypes.Connection.Id = string wire.Id
@@ -854,6 +855,7 @@ let wireToIssie (wire : Wire) (wModel : Model) : CommonTypes.Connection =
         CommonTypes.Connection.Vertices = segToVert wire.Segments
     }
 
+/// Converts the wire model from a Wire list to an Issie Connection list
 let extractWires (wModel: Model) : CommonTypes.Connection list = 
     wModel.WX
     |> List.map (fun x -> wireToIssie x wModel)
