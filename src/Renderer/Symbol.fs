@@ -589,8 +589,8 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         Index = index
         Label = label
         IOList = (inputList, outputList) //Interface with issie
-        Rotation =  Rotation.R0
-        Scale = {X=1.;Y=1.}
+        Rotation = Rotation.R0
+        Scale = {X = 1.; Y = 1.}
     }
 
 //-----------------------Skeleton Message type for symbols---------------------//
