@@ -741,11 +741,44 @@ let private renderObj =
                                 "darkgrey"
                 | _ -> props.Obj.Highlight
 
+            //draw clock and name
+            let drawClk (pos:XYPos) : ReactElement =
+                           // let pos = props.Obj.TopL
+                            let height = 7.
+                            let width = 7.
+                            let scale = props.Obj.Scale
+                            let p1:XYPos = {X = pos.X ; Y = pos.Y - (height/2.)}
+                            let p2 = {X = pos.X + width; Y = pos.Y }
+                            let p3 = {X = pos.X ; Y = pos.Y + (height/2.)}
+                            let points = string(p1.X)+","+string(p1.Y)+" "+string(p2.X)+","+string(p2.Y)+" "+string(p3.X)+","+string(p3.Y)
+                            let centre = {X = pos.X + (width/2.) ; Y = pos.Y }
+
+                            //let scaleMatrix = "matrix(" + string(scale.X) + ",0,0," + string(scale.Y) + "," + string((centre.X-scale.X) * centre.X) + "," + string((centre.Y-scale.Y) * centre.Y) + ")"
+                            let rot =
+                                match props.Obj.Rotation with 
+                                    |R90 -> "rotate(90," 
+                                    |R180 -> "rotate(180,"
+                                    |R270 -> "rotate(270,"
+                                    |_-> "rotate(0,"
+                            let rotstring = rot + string(pos.X) + "," + string(pos.Y) + ")"
+                            polygon[
+                                Points points
+                                SVGAttr.Stroke "black"
+                                SVGAttr.Fill "none"
+                                SVGAttr.StrokeWidth 1.3
+                                SVGAttr.Transform rotstring
+
+                            ][
+                               // drawText (displace -2. i props.Obj).X (displace -2. i props.Obj).Y (sprintf "%dpx" labelSize) (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)]
+                            ]
+                           
             let labels : ReactElement list = 
                 props.Obj
                 |> mapSetup
-                |> List.map(fun (i, k) ->
-                    (drawText (displace -2. i props.Obj).X (displace -2. i props.Obj).Y (sprintf "%dpx" labelSize) (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)])
+                |> List.map(fun (i, k) ->if (getPortName k ) = "Clk" then
+                                            drawClk i 
+                                         else
+                                            (drawText (displace -2. i props.Obj).X  (displace -2. i props.Obj).Y (sprintf "%dpx" labelSize) (getTextAttr props.Obj i))[str <| sprintf "%s" (getPortName k)])
 
             let wires : ReactElement list =
             //line should be (port.x, port.y), (mid.x, port.y), (mid.x, mid.y)
@@ -764,33 +797,7 @@ let private renderObj =
                 |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1.)[])
             
 
-            let drawClktriangle = //(pos:XYPos)  : ReactElement =
-                let pos = props.Obj.TopL
-                let height = 5.
-                let width = 5.
-                let scale = props.Obj.Scale
-                let p1:XYPos = {X = pos.X ; Y = pos.Y - (height/2.)}
-                let p2 = {X = pos.X + width; Y = pos.Y }
-                let p3 = {X = pos.X ; Y = pos.Y + (height/2.)}
-                let points = string(p1.X)+","+string(p1.Y)+" "+string(p2.X)+","+string(p2.Y)+" "+string(p3.X)+","+string(p3.Y)
-                let centre = {X = pos.X + (width/2.) ; Y = pos.Y }
-
-                //let scaleMatrix = "matrix(" + string(scale.X) + ",0,0," + string(scale.Y) + "," + string((centre.X-scale.X) * centre.X) + "," + string((centre.Y-scale.Y) * centre.Y) + ")"
-                let rot =
-                    match props.Obj.Rotation with 
-                        |R90 -> "rotate(90," 
-                        |R180 -> "rotate(180,"
-                        |R270 -> "rotate(270,"
-                        |_-> "rotate(0,"
-                let rotstring = rot + string(pos.X) + "," + string(pos.Y) + ")"
-                polygon[
-                    Points points
-                    SVGAttr.Stroke "black"
-                    SVGAttr.Fill "grey"
-                    SVGAttr.StrokeWidth width
-                    SVGAttr.Transform rotstring
-
-                ][]
+            
             
             let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 []
 
@@ -831,7 +838,7 @@ let private renderObj =
                 | IO -> [io]
                 | _ -> [displayBox]
             
-            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos ; [drawClktriangle] ] )
+            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos  ] )
             
     , "Circle"
     , equalsButFunctions
