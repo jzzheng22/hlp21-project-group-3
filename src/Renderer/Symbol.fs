@@ -614,11 +614,11 @@ let init () =
     }
     [
         (createSymbol (ComponentType.And) [[("IN0", PortType.Input, false); ("IN1", PortType.Input, false)]; [("OUT1", PortType.Output, true)]; []; [("OUT2", PortType.Output, true); ("reallyreallyreallylonglabelname", PortType.Output, true); ("OUT4", PortType.Output, true)]] {X = 250.; Y = 150.} 0 (getSymLabel ComponentType.And 0))
-        (createSymbol (ComponentType.MergeWires) (findPortList 1 4 ComponentType.MergeWires) {X = 50.; Y = 100.} 0 (getSymLabel ComponentType.MergeWires 0))
+        (createSymbol (ComponentType.SplitWire 1) (findPortList 1 2 ComponentType.MergeWires) {X = 50.; Y = 100.} 0 (getSymLabel ComponentType.MergeWires 0))
         (createSymbol (ComponentType.Nand) (findPortList 2 1 ComponentType.Nand) {X = 200.; Y = 50.} 0 (getSymLabel ComponentType.Nand 0))
         (createSymbol (ComponentType.Mux2) (findPortList 2 1 ComponentType.Mux2) {X = 300.; Y = 50.} 0 (getSymLabel ComponentType.Mux2 0))
         (createSymbol (ComponentType.Demux2) (findPortList 1 2 ComponentType.Demux2) {X = 400.; Y = 50.} 0 (getSymLabel ComponentType.Demux2 0))
-        (createSymbol (ComponentType.Input 1) (findPortList 0 1 (ComponentType.Input 1)) {X = 200.; Y = 200.} 0 (getSymLabel (ComponentType.Input 1) 0))
+        (createSymbol (ComponentType.Input 2) (findPortList 0 1 (ComponentType.Input 1)) {X = 200.; Y = 200.} 0 (getSymLabel (ComponentType.Input 1) 0))
         (createSymbol (ComponentType.Decode4) (findPortList 2 4 ComponentType.Decode4) {X = 250.; Y = 250.} 0 (getSymLabel ComponentType.Decode4 0))
         (createSymbol (ComponentType.Register 1) (findPortList 1 1 (ComponentType.Register 1)) {X = 500.; Y = 100.} 0 (getSymLabel (ComponentType.Register 1) 0))
         (createSymbol (ComponentType.DFFE) (findPortList 1 1 ComponentType.DFFE) {X = 500.; Y = 200.} 0 (getSymLabel ComponentType.DFFE 0))
