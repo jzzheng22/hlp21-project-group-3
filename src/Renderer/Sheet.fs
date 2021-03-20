@@ -179,6 +179,10 @@ let dispatchError (model : Model) (dispatch: Dispatch<Msg>) (wires : CommonTypes
     dispatch <| Wire(BusWire.HighlightError wires)
     dispatch <| Symbol(Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))
 
+/// Update width will call inferWidth, which sets up the variables and calls the BusWidthInferer module
+/// This will either return Ok x, which may be Some - in which case we update the connection width
+/// If Ok x is None, we ask Symbol what the width should be, if the two port widths on either end of the connection don't match, we dispatch the error highlighting
+/// If the BusWidthInferer returns Error, then we dispatch the error highlight messages, (TODO: and a message to display a popup on screen)
 let updateWidth (model : Model) (dispatch: Dispatch<Msg>) =
     inferWidth model
     |> function
@@ -194,7 +198,7 @@ let updateWidth (model : Model) (dispatch: Dispatch<Msg>) =
                 let w = checkWidth model k
                 if w = -1 then dispatchError model dispatch [k]
                 else dispatch <| Wire(BusWire.UpdateWidth (k, w)))
-    | Error e -> //this is a {Message : string; Connections : ConnectionId list}
+    | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
         e.ConnectionsAffected
         |> dispatchError model dispatch
 
