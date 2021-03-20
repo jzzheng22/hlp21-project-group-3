@@ -764,7 +764,8 @@ let private renderObj =
                 |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1.)[])
             
 
-            let drawClktriangle  (pos:XYPos)  : ReactElement =
+            let drawClktriangle = //(pos:XYPos)  : ReactElement =
+                let pos = props.Obj.TopL
                 let height = 5.
                 let width = 5.
                 let scale = props.Obj.Scale
@@ -790,26 +791,7 @@ let private renderObj =
                     SVGAttr.Transform rotstring
 
                 ][]
-            (*
-            let temptext =
-                let rot =
-                    match props.Obj.Rotation with 
-                        |R90 -> "rotate(90," 
-                        |R180 -> "rotate(180"
-                        |R270 -> "rotate(270"
-                        |_-> "rotate(0"
-                text [ 
-                X props.Obj.TopL.X
-                Y props.Obj.BotR.Y
-                Style [
-                    TextAnchor "middle" // left/right/middle: horizontal algnment vs (X,Y)
-                    DominantBaseline "hanging" // auto/middle/hanging: vertical alignment vs (X,Y)
-                    FontSize "25px"
-                    FontWeight "Bold"
-                    Fill "Black" // demo font color
-                ]
-                ] [str <| sprintf "%s"rot] 
-            *)
+            
             let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 []
 
             let displayBox : ReactElement =
@@ -849,7 +831,7 @@ let private renderObj =
                 | IO -> [io]
                 | _ -> [displayBox]
             
-            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos ; ] )
+            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos ; [drawClktriangle] ] )
             
     , "Circle"
     , equalsButFunctions
