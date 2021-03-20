@@ -831,8 +831,8 @@ let connectToPort (wModel : Model) (connect : CommonTypes.ConnectionId) : (Commo
     (wire.SourcePortId, wire.TargetPortId)
 
 
-/// Takes a ConnectionId and returns the ComponentId associated with the source port of that connection
-let connectToSym (wModel : Model) (connect : CommonTypes.ConnectionId) : CommonTypes.ComponentId list = 
+/// Takes a ConnectionId and returns the Symbol IDs connected to that connection
+let connectedSymbols (wModel : Model) (connect : CommonTypes.ConnectionId) : CommonTypes.ComponentId list = 
     let (p1, p2) = connectToPort wModel connect
     let sym1 = Symbol.getHostId wModel.Symbol p1
     let sym2 = Symbol.getHostId wModel.Symbol p2

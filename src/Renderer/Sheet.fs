@@ -101,7 +101,7 @@ let getWireSegmentIDList filter lst =
     |> filter
     |> List.map getWireSegmentID
 
-let dispatchSelection symbolIDList wireSegmentIDList dispatch = 
+let dispatchSelection symbolIDList wireSegmentIDList (dispatch: Dispatch<Msg>) = 
     dispatch <| SelectComponents symbolIDList
     dispatch <| Symbol(Symbol.Highlight symbolIDList)
     dispatch <| SelectWireSegments wireSegmentIDList
@@ -175,9 +175,9 @@ let checkWidth (model : Model) (connect : CommonTypes.ConnectionId) =
     if w1 = w2 then w1 else -1
 
 /// Sends a highlight error to buswire and symbol for the connection given
-let dispatchError (model : Model) (dispatch: Dispatch<Msg>) (connect : CommonTypes.ConnectionId)  =
-    dispatch <| Wire(BusWire.HighlightError [connect])
-    dispatch <| Symbol(Symbol.HighlightError (BusWire.connectToSym model.Wire connect))
+let dispatchError (model : Model) (dispatch: Dispatch<Msg>) (wires : CommonTypes.ConnectionId list)  =
+    dispatch <| Wire(BusWire.HighlightError wires)
+    dispatch <| Symbol(Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))
 
 let updateWidth (model : Model) (dispatch: Dispatch<Msg>) =
     inferWidth model
@@ -185,20 +185,18 @@ let updateWidth (model : Model) (dispatch: Dispatch<Msg>) =
     | Ok x -> //this is a Map<ConnectionId, int Option>
         x 
         |> Map.toList 
-        |> List.map (
+        |> List.iter (
             fun (k, v) -> 
             match v with 
             | Some a -> 
                 dispatch <| Wire(BusWire.UpdateWidth (k, a))
             | None -> 
                 let w = checkWidth model k
-                if w = -1 then dispatchError model dispatch k
+                if w = -1 then dispatchError model dispatch [k]
                 else dispatch <| Wire(BusWire.UpdateWidth (k, w)))
     | Error e -> //this is a {Message : string; Connections : ConnectionId list}
         e.ConnectionsAffected
-        |> List.map (dispatchError model dispatch)
-        //dispatch <| displayErrorMessage e.Msg
-
+        |> dispatchError model dispatch
 
 /// This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
@@ -309,7 +307,7 @@ let mouseUp model mousePos dispatch =
         /// Here buswidth inferer should be called? ///
         /// --------------------------------------- ///
             -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
-               updateWidth model dispatch |> ignore
+               updateWidth model dispatch
         | _ -> ()
     | None -> ()
     if model.SelectingMultiple then
@@ -592,7 +590,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         if not (List.isEmpty model.SelectedComponents) then
             snapSymbolToGrid model
         elif not (List.isEmpty model.SelectedWireSegments) then
-                snapWireSegmentToGrid model
+            snapWireSegmentToGrid model
         else
             { model with 
                 SelectedPort = None, CommonTypes.PortType.Input;
