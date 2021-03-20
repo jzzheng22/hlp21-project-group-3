@@ -174,7 +174,7 @@ let checkWidth (model : Model) (connect : CommonTypes.ConnectionId) =
     let (w1, w2) = (Symbol.getPortWidth model.Wire.Symbol port1, Symbol.getPortWidth model.Wire.Symbol port2)
     if w1 = w2 then w1 else -1
 
-/// Sends a highlight error to buswire and symbol for the connection given
+/// Sends a highlight error to buswire and symbol for the connection list given
 let dispatchError (model : Model) (dispatch: Dispatch<Msg>) (wires : CommonTypes.ConnectionId list)  =
     dispatch <| Wire(BusWire.HighlightError wires)
     dispatch <| Symbol(Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))

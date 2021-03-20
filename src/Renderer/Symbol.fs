@@ -951,6 +951,7 @@ let getPort (model : Model) (pId : PortId) : Port =
 
 //----------------------interface to Issie-----------------------------//
 
+/// Converts our Symbol type to Issie Component
 let symToIssie (sym : Symbol) : Component = 
     {
         Component.Id = string sym.Id
@@ -964,13 +965,15 @@ let symToIssie (sym : Symbol) : Component =
         Component.W = getHWObj sym |> snd |> int
      }
 
-let extractComponent (symModel: Model) (sId:ComponentId) : Component= 
+/// Finds a component in the model from its ComponentId, and converts this into the Issie Component
+let extractComponent (symModel: Model) (sId:ComponentId) : Component = 
     symModel 
     |> List.tryFind (fun x -> x.Id = sId)
     |> function
     | Some x -> symToIssie x
     | None -> failwithf "couldnt find symbol id in extract component"
 
+/// Converts the model from a Symbol list to a Issie Component list
 let extractComponents (symModel: Model) : Component list = 
     symModel |> List.map symToIssie
 
