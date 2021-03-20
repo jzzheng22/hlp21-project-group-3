@@ -962,6 +962,15 @@ let getPort (model : Model) (pId : PortId) : Port =
     | Some x -> x.Port
     | None -> failwithf "Unexpected error in getPort"
 
+//Returns the number of inputs and outputs for a given symbol as a tuple
+let getIONums (sym : Symbol) : (int * int) =
+    let (inports, outports) = sym.IOList
+    let (i, o) = (List.length inports, List.length outports)
+    match sym.GenericType with
+    | RAM -> (i - 2, o)
+    | FFE -> (i - 1, o)
+    | Adder -> (i - 1, o - 1)
+    | _ -> (i, o)
 //----------------------interface to Issie-----------------------------//
 
 let symToIssie (sym : Symbol) : Component = 
