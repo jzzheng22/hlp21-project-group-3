@@ -817,6 +817,26 @@ let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : C
     |> List.filter (fun w -> List.contains w.SourcePortId portIds || List.contains w.TargetPortId portIds)
     |> List.map (fun w -> w.Id)
     
+/// Takes a connectionId and returns the wire object associated with it
+let connectToWire (wModel : Model) (connect : CommonTypes.ConnectionId) : Wire =
+    wModel.WX
+    |> List.tryFind (fun x -> x.Id = connect)
+    |> function 
+    | Some x -> x
+    | _ -> failwithf "Error in connectToWire, couldn't find connection id in model"
+
+/// Takes a ConnectionId and returns the source port associated with that connection
+let connectToPort (wModel : Model) (connect : CommonTypes.ConnectionId) : (CommonTypes.PortId * CommonTypes.PortId) = 
+    let wire = (connectToWire wModel connect)
+    (wire.SourcePortId, wire.TargetPortId)
+
+
+/// Takes a ConnectionId and returns the ComponentId associated with the source port of that connection
+let connectToSym (wModel : Model) (connect : CommonTypes.ConnectionId) : CommonTypes.ComponentId list = 
+    let (p1, p2) = connectToPort wModel connect
+    let sym1 = Symbol.getHostId wModel.Symbol p1
+    let sym2 = Symbol.getHostId wModel.Symbol p2
+    [sym1; sym2]
 
 //----------------------interface to Issie-----------------------//
 

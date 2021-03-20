@@ -47,6 +47,7 @@ type Msg =
     | DispatchMove of XYPos
     | BeginSizeEdit of CommonTypes.ComponentId
     | EditSize of (CommonTypes.ComponentId * XYPos)
+    | ErrorMsg of string
 
 type MouseOps =
     | MouseDown
@@ -167,27 +168,36 @@ let inferWidth (model : Model) =
     let canvas = (comps, conns)
     BusWidthInferer.inferConnectionsWidth canvas
 
+/// Checks that the widths are the same for connections that could not be inferred from width inferer
+let checkWidth (model : Model) (connect : CommonTypes.ConnectionId) =
+    let (port1, port2) = (BusWire.connectToPort model.Wire connect)
+    let (w1, w2) = (Symbol.getPortWidth model.Wire.Symbol port1, Symbol.getPortWidth model.Wire.Symbol port2)
+    if w1 = w2 then w1 else -1
 
-// let updateWidth (model : Model) dispatch =
-//     inferWidth model
-//     |> function
-//     | Ok x -> //this is a Map<ConnectionId, int Option>
-//         x 
-//         |> Map.toList 
-//         |> List.map (
-//             fun (k, v) -> 
-//             match v with 
-//             | Some a -> 
-//                 dispatch <| BusWire.UpdateWidth (k, a)
-//             | None -> 
-//                 dispatch <| BusWire.UpdateWidth (k, (Symbol.getPortWidth k)))
-//     | Error e -> //this is a {Message : string; Connections : ConnectionId list}
-//         e.ConnectionsAffected
-//         |> List.iter (
-//             fun x -> 
-//             dispatch <| BusWire.HighlightError [x]
-//             dispatch <| Symbol(Symbol.HighlightError [x])) //need to find the symbol for the connections for symbol highlight error
-//         dispatch <| displayErrorMessage e.Msg
+/// Sends a highlight error to buswire and symbol for the connection given
+let dispatchError (model : Model) (connect : CommonTypes.ConnectionId) dispatch =
+    dispatch <| BusWire.HighlightError [connect]
+    dispatch <| BusWire.Symbol(Symbol.HighlightError (BusWire.connectToSym model.Wire connect))
+
+let updateWidth (model : Model) dispatch =
+    inferWidth model
+    |> function
+    | Ok x -> //this is a Map<ConnectionId, int Option>
+        x 
+        |> Map.toList 
+        |> List.map (
+            fun (k, v) -> 
+            match v with 
+            | Some a -> 
+                dispatch <| BusWire.UpdateWidth (k, a)
+            | None -> 
+                let w = checkWidth model k
+                if w = -1 then dispatchError model k
+                else dispatch <| BusWire.UpdateWidth (k, w))
+    | Error e -> //this is a {Message : string; Connections : ConnectionId list}
+        e.ConnectionsAffected
+        |> List.map (dispatchError model)
+        //dispatch <| displayErrorMessage e.Msg
 
 
 /// This function generates the background grid for the canvas by drawing spaced out lines
@@ -299,6 +309,7 @@ let mouseUp model mousePos dispatch =
         /// Here buswidth inferer should be called? ///
         /// --------------------------------------- ///
             -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
+               updateWidth model
         | _ -> ()
     | None -> ()
     if model.SelectingMultiple then
