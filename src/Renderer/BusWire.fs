@@ -360,7 +360,7 @@ let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) (width: int)
 
     (routeWire model sourcePortId targetPortId)
     |> List.pairwise
-    |> List.map (fun (src,tgt) -> makeWireSegment wId width src tgt)
+    |> List.map (fun (src,tgt) -> makeWireSegment wId 1 src tgt)
     |> setIndex
 
 
@@ -543,17 +543,18 @@ let ruleUnique (model: Model) (wire: Wire) : bool =
     |> List.isEmpty
 
 /// Checks if the Width of the Source Port is equal to that of the Target Port
+(*
 let ruleWidthEquality (model: Model) (wire: Wire) : bool =
     if Symbol.getPortWidth model.Symbol wire.SourcePortId = Symbol.getPortWidth model.Symbol wire.TargetPortId then 
         true
     else 
         false
-
+*)
 let wireRuleList =
     [
         ruleOutToIn;
         ruleUnique;
-        ruleWidthEquality
+        //ruleWidthEquality Removed because Dr Clarke wanted it gone
     ]
     
 /// Verifies if a supplied wire is compliant with the rules for wires.
@@ -677,10 +678,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     | AddWire (portId1,portId2) ->
         let unverifiedWire =
             match Symbol.getPortType model.Symbol portId1 , Symbol.getPortType model.Symbol portId2 with
-            | CommonTypes.Output , CommonTypes.Input -> makeNewWire model portId1 portId2 (Symbol.getPortWidth model.Symbol portId1) // Wire was drawn from Output to Input
-            | CommonTypes.Input , CommonTypes.Output -> makeNewWire model portId2 portId1 (Symbol.getPortWidth model.Symbol portId2) // Wire was drawn from Input to Output
-            | _ , _ -> makeNewWire model portId1 portId2 (Symbol.getPortWidth model.Symbol portId1) // Invalid port combination, will be caught by verifyWire
-            
+            | CommonTypes.Output , CommonTypes.Input -> makeNewWire model portId1 portId2 1 // Wire was drawn from Output to Input
+            | CommonTypes.Input , CommonTypes.Output -> makeNewWire model portId2 portId1 1 // Wire was drawn from Input to Output
+            | _ , _ -> makeNewWire model portId1 portId2 1 // Invalid port combination, will be caught by verifyWire
+             
         match verifyWire model unverifiedWire with
         | Some w -> {model with WX = w::model.WX}, Cmd.none
         | None -> model, Cmd.none
