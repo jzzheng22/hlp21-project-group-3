@@ -95,6 +95,7 @@ Sheet can also access Symbol directly if needed.
 - Changes the label on a component to the name given
 
 ## BusWidthInferer interface
+
 `BusWidthInferer.inferConnectionsWidth ((comps,conns) : CanvasState) : Result<ConnectionsWidth, WidthInferError>`
 - Takes in a list of Issie Components and Issie Connections and returns 
     * Ok x -> Some <Map<ConnectionId, int Option> | None
@@ -130,14 +131,11 @@ Sheet can also access Symbol directly if needed.
  - Returns list of ports for a given symbol ID.
  - Used to find wires connected to a symbol.
 
-*Optional interface functions:*
-Called by jzzheng22's Sheet and implemented by JEMerrick's Symbol:
 `Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
  - Returns the ComponentID which the PortID belongs to.
 
 `Symbol.getBoundingBox symModel symID`
  - Returns the bounding box for a given Symbol ID
- - Called in jzzheng22's Sheet
 
 ## Bounding Box
  - Each buswire and symbol owns its bounding box. 
