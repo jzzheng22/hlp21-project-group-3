@@ -675,15 +675,14 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         | Scale (sId, scale) ->
             model
             |> List.map (fun sym ->
-                let newsym = 
-                    if sId <> sym.Id then
-                        sym
-                    else
-                        trans scaleCoords sym scale
-                {
-                    newsym with
-                        Scale = {X=sym.Scale.X * scale.X;Y=sym.Scale.Y * scale.Y }
-                }
+                if sId <> sym.Id then
+                    sym
+                else
+                    let newsym = trans scaleCoords sym scale
+                    {
+                        newsym with
+                            Scale = {X=sym.Scale.X * scale.X;Y=sym.Scale.Y * scale.Y }
+                    }
         )
         , Cmd.none
 
