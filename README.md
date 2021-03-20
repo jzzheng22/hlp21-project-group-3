@@ -1,6 +1,11 @@
 # HLP21 Group 3 Main Repo
 
-Code written by the group members for their individual modules may be found in these directories:
+## TODO: Test to see if 100 components and 200 wires works
+
+This code may be run by running the command `npm run dev` in this root directory.
+
+Code written by the group members for their individual modules may be found by navigating to the `indiv_code` branch and entering these directories:
+
 **Symbol**
 - [SY_JEMErrick](SY_JEMerrick) - Joanna Merrick
 - [SY_shafir360](SY_shafir360) - Shafir Rahman
