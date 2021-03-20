@@ -333,10 +333,14 @@ let tagCoords (sym : Symbol) : string =
         (sym.BotR.X - ((i * 1.2) + (a * 5.))) midY 
         (midX - ((i/7.) + (a * 5.))) (midY - 10.))
 
-///Returns the coordinates of a triangle where midpoint of the flat side = input position i
-let triangleCoords (i : XYPos) (sym : Symbol) : string =
-    let pos = midSymX sym
-    (sprintf "%f,%f %f,%f %f,%f" pos (i.Y + radius) (pos + (radius * 2.)) i.Y pos (i.Y - radius))
+let cornerCoords (sym : Symbol) (i : XYPos) : XYPos = 
+    match sym.Rotation with
+    | R0 | R180 -> {X = midSymX sym; Y = i.Y}
+    | _ -> {X = i.X; Y = midSymY sym}
+
+let wireCoords (sym : Symbol) (i : XYPos) : string = 
+    let corner = cornerCoords sym i
+    sprintf "%f,%f %f,%f %f,%f" i.X i.Y corner.X corner.Y (midSymX sym) (midSymY sym)
 
 ///Returns the coordinates for a clock symbol
 let clkCoords (pos : XYPos) =
@@ -506,13 +510,6 @@ let getSymLabel (comp : ComponentType) (i : int) : string =
 
 let getDisplace (k : PortInfo Option) = 
     if getPortName k = "Clk" then -7. else -3.
-
-let wireCoords (sym : Symbol) (i : XYPos) : string = 
-    let corner = 
-        match sym.Rotation with
-        | R0 | R180 -> {X = midSymX sym; Y = i.Y}
-        | _ -> {X = i.X; Y = midSymY sym}
-    sprintf "%f,%f %f,%f %f,%f" i.X i.Y corner.X corner.Y (midSymX sym) (midSymY sym)
     
 let makeIssiePorts (l, r, b, t) (portType : PortType) : Port list =
     List.concat [l; r; b; t] 
@@ -804,7 +801,7 @@ let private renderObj =
             let triangles : ReactElement list =
                 sym
                 |> mapSetup
-                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i sym) color color 1. (rotStringObj sym))[])
+                |> List.map(fun (i, _) -> (drawPolygon (clkCoords (cornerCoords sym i)) color color 1. (rotString sym (cornerCoords sym i)))[])
             
             let io : ReactElement = drawPolygon (tagCoords sym) strokeColour color 0.5 (rotStringObj sym)[]
 
