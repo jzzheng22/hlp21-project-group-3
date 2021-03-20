@@ -42,6 +42,7 @@ type Wire = {
     //BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
     Width: int
     Highlight: bool
+    HighlightError : bool
     Manual: bool
     StartHoriz: bool
     EndHoriz: bool
@@ -68,6 +69,8 @@ type Msg =
     | MoveWires of CommonTypes.ConnectionId * int * XYPos
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
+    | UpdateWidth of cId : CommonTypes.ConnectionId * w : int
+    | HighlightError of CommonTypes.ConnectionId list
 
 //-------------------Helpers for functions------------------------//
 
@@ -381,6 +384,7 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
         Segments = newSegments
         Width = width
         Highlight = false
+        HighlightError = false
         Manual = false
         StartHoriz=startHoriz
         EndHoriz=endHoriz
@@ -394,6 +398,7 @@ type WireRenderProps = {
     Segments: WireSegment list
     Width: int
     Highlight: bool
+    HighlightError : bool
     ColorP: string
     StrokeWidthP: string }
 
@@ -403,6 +408,9 @@ type WireRenderProps = {
 let singleWireView =        
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
+            
+            let colour = if props.HighlightError then "red" elif props.Highlight then "green" elif props.Width = 1 then props.ColorP else "purple"
+            
             let singleSegmentView (seg: WireSegment) =
                 let SrcP = seg.SourcePos
                 let TgtP = seg.TargetPos
@@ -412,7 +420,7 @@ let singleWireView =
                     X2 TgtP.X
                     Y2 TgtP.Y
                     // Qualify these props to avoid name collision with CSSProp
-                    SVGAttr.Stroke (if props.Width = 1 then props.ColorP else "purple")
+                    SVGAttr.Stroke colour
                     SVGAttr.StrokeWidth props.StrokeWidthP
                     SVGAttr.StrokeLinecap "round"] []
             let widthAnnotation = 
@@ -486,6 +494,7 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
                 Segments = w.Segments
                 Width = w.Width
                 Highlight = w.Highlight
+                HighlightError = w.HighlightError
                 ColorP = model.Color.Text()
                 StrokeWidthP = "1px" }
             singleWireView props)
@@ -765,6 +774,26 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         //{model with WX = wList}, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
+    | UpdateWidth (cId, w) ->
+        {model with
+            WX = model.WX
+                |> List.map (fun wire ->
+                    if wire.Id = cId then
+                        { wire with
+                            Width = w
+                            Segments = List.map (fun x -> {x with Width = w}) wire.Segments
+                        }
+                    else
+                        wire
+                )
+        }
+        , Cmd.none
+    | HighlightError cIdList ->
+        {model with
+            WX = model.WX
+                |> List.map (fun wire -> {wire with HighlightError = List.contains wire.Id cIdList})
+        }
+        , Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
 
 //---------------Other interface functions--------------------//
@@ -789,12 +818,28 @@ let getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : C
     |> List.map (fun w -> w.Id)
     
 
-
 //----------------------interface to Issie-----------------------//
-let extractWire (wModel: Model) (sId:CommonTypes.ComponentId) : CommonTypes.Component= 
-    failwithf "Not implemented"
 
-let extractWires (wModel: Model) : CommonTypes.Component list = 
+let segToVert (wSegs : WireSegment list) : (float * float) list = 
+    wSegs 
+    |> List.collect (fun x -> [(x.SourcePos.X, x.SourcePos.Y); (x.TargetPos.X, x.TargetPos.Y)])
+    |> List.distinct
+    
+
+let wireToIssie (wire : Wire) (wModel : Model) : CommonTypes.Connection = 
+    {
+        CommonTypes.Connection.Id = string wire.Id
+        CommonTypes.Connection.Source = Symbol.getPort wModel.Symbol wire.SourcePortId
+        CommonTypes.Connection.Target = Symbol.getPort wModel.Symbol wire.TargetPortId
+        CommonTypes.Connection.Vertices = segToVert wire.Segments
+    }
+
+let extractWires (wModel: Model) : CommonTypes.Connection list = 
+    wModel.WX
+    |> List.map (fun x -> wireToIssie x wModel)
+    
+
+let extractWiress (wModel: Model) : CommonTypes.Component list = 
     failwithf "Not implemented"
 
 /// Update the symbol with matching componentId to comp, or add a new symbol based on comp.
