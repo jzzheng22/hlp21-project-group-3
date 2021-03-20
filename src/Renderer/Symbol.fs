@@ -514,7 +514,6 @@ let wireCoords (sym : Symbol) (i : XYPos) : string =
         | _ -> {X = i.X; Y = midSymY sym}
     sprintf "%f,%f %f,%f %f,%f" i.X i.Y corner.X corner.Y (midSymX sym) (midSymY sym)
     
-
 let makeIssiePorts (l, r, b, t) (portType : PortType) : Port list =
     List.concat [l; r; b; t] 
     |> List.filter (fun x -> x.Port.PortType = portType) 
