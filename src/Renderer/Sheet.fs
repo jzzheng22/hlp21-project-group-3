@@ -312,11 +312,12 @@ let pasteElements model mousePos dispatch =
     oldComponents
     |> List.iter (fun compId -> 
         let sym = Symbol.getSymbol model.Wire.Symbol compId
+        let input, output = Symbol.getNumIOs sym
         let addMsg: Symbol.SymbolAdd = {
             CompType = sym.Type
             PagePos = newPos sym.TopL transVector
-            Input = 0
-            Output = 0
+            Input = input
+            Output = output
             Index = getNewSymbolIndex model sym.Type}
 
         dispatch <| Symbol(Symbol.Add addMsg))
