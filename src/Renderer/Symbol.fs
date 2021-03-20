@@ -502,11 +502,19 @@ let getSymLabel (comp : ComponentType) (i : int) : string =
 let getDisplace (k : PortInfo Option) = 
     if getPortName k = "Clk" then -7. else -3.
     
-let makeIssiePorts (l, r, b, t) (portType : PortType) : Port list =
-    List.concat [l; r; b; t] 
-    |> List.filter (fun x -> x.Port.PortType = portType) 
-    |> List.map (fun x -> x.Port)
+let makePort (i : int) (portType : PortType) (compId : ComponentId) : Port =
+    {
+        Id = uuid()
+        PortNumber = Some i
+        PortType =  portType
+        HostId = string(compId)
+    }
 
+let makeIssiePorts (ports : (string * PortType * bool) list list) (_id : ComponentId) (portType : PortType) : Port list =
+     ports 
+     |> List.concat 
+     |> List.filter (fun (_, pType, _) -> pType = portType) 
+     |> List.mapi (fun i (_, pType, _) -> makePort i pType _id)
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -518,12 +526,7 @@ let makeIssiePorts (l, r, b, t) (portType : PortType) : Port list =
 let createPortInfo (i : int) (portType : PortType) (compId : ComponentId) (name : string) (invert : bool) (w : int) : PortInfo = 
     //Object creation
     {      
-        Port = {
-            Id = uuid()
-            PortNumber = Some i
-            PortType =  portType
-            HostId = string(compId)
-        }
+        Port = makePort i portType compId
         NumWires = 0
         Name = name
         Invert = invert
@@ -538,6 +541,7 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
     //Getting type info for symbol/port construction
     let (_, name, wIn, _, symType) = typeToInfo compType
     let len = String.length(name) |> float
+    
 
     let portInfos = List.map (List.mapi (fun i (name, pType, inv) -> createPortInfo i pType _id name inv wIn)) ports
     let (leftPort, rightPort, botPort, topPort) = (portInfos.[0], portInfos.[1], portInfos.[2], portInfos.[3])
@@ -569,8 +573,8 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
     let portMap = getPortMap leftPort rightPort botPort topPort (makePosList (int n) nBot pos botR)
 
     // ---- Making list for Issie ---//
-    let inputList = makeIssiePorts (leftPort, rightPort, topPort, botPort) PortType.Input
-    let outputList = makeIssiePorts (leftPort, rightPort, topPort, botPort) PortType.Output
+    let ins = makeIssiePorts ports _id PortType.Input
+    let outs =  makeIssiePorts ports _id PortType.Output
 
     // ------- Symbol Creation ------ ///
     {
@@ -586,7 +590,7 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         ShowSlots = false
         Index = index
         Label = label
-        IOList = (inputList, outputList) //Interface with issie
+        IOList = (ins, outs) //Interface with issie
         Rotation = R0
         Scale = {X = 1.; Y = 1.}
     }
