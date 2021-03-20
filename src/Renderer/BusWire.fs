@@ -825,7 +825,7 @@ let connectToWire (wModel : Model) (connect : CommonTypes.ConnectionId) : Wire =
     | Some x -> x
     | _ -> failwithf "Error in connectToWire, couldn't find connection id in model"
 
-/// Takes a ConnectionId and returns the source port associated with that connection
+/// Takes a ConnectionId and returns the (source port, target port) associated with that connection
 let connectToPort (wModel : Model) (connect : CommonTypes.ConnectionId) : (CommonTypes.PortId * CommonTypes.PortId) = 
     let wire = (connectToWire wModel connect)
     (wire.SourcePortId, wire.TargetPortId)
