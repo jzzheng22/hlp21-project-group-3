@@ -202,6 +202,32 @@ let updateWidth (model : Model) (dispatch: Dispatch<Msg>) =
         e.ConnectionsAffected
         |> dispatchError model dispatch
 
+let drawError (msg : string) : ReactElement list = 
+    let drawBox = 
+        rect[
+            X 0
+            Y 0
+            SVGAttr.Height 30.
+            SVGAttr.Width (String.length msg * 7)
+            SVGAttr.Fill "red"
+            SVGAttr.Stroke "red"
+            SVGAttr.Opacity 0.5
+            SVGAttr.StrokeWidth 1.][]
+
+    let drawText = 
+        text[
+            X 0
+            Y 0
+            Style[
+                TextAnchor "middle"
+                DominantBaseline "middle"
+                FontSize 6.
+                FontWeight "bold"
+                Fill "Black"
+                UserSelect UserSelectOptions.None]][str <| msg] //Prevent highlighting text
+        
+    [drawText; drawBox]
+
 /// This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
     let canvasSize = unzoomedCanvas * zoom
