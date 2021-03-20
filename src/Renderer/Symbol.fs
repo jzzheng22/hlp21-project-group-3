@@ -939,6 +939,17 @@ let getBoundingBox symModel symID =
     | Some x -> (x.TopL, x.BotR)
     | None -> failwithf "Could not get bounding box"
 
+/// Returns the CommonTypes.Port object of a given pId
+let getPort (model : Model) (pId : PortId) : Port = 
+    model
+    |> initPortSearch
+    |> List.map (fun (_, x) -> x)
+    |> List.filter (fun x -> getPortId x = pId)
+    |> List.item 0
+    |> function
+    | Some x -> x.Port
+    | None -> failwithf "Unexpected error in getPort"
+
 //----------------------interface to Issie-----------------------------//
 
 /// Converts our Symbol type to Issie Component
