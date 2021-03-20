@@ -513,7 +513,7 @@ let makePort (i : int) (portType : PortType) (compId : ComponentId) : Port =
 let makeIssiePorts (ports : (string * PortType * bool) list list) (_id : ComponentId) (portType : PortType) : Port list =
      ports 
      |> List.concat 
-     |> List.filter (fun (_, pType, _) -> pType = portType) 
+     |> List.filter (fun (name, pType, _) -> pType = portType && name <> "Clk") 
      |> List.mapi (fun i (_, pType, _) -> makePort i pType _id)
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
