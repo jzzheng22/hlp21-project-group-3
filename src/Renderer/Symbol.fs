@@ -346,6 +346,7 @@ let clkCoords (pos : XYPos) =
 
 ///Returns the rotation for SVG transformations
 let rotString (sym : Symbol) (pos : XYPos) = sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
+let rotStringObj (sym : Symbol) = rotString sym (midSym sym)
 
 ///Finds the extra ports required for each side based on the symbol type in the form (left, right, bot)
 let numExPorts (symType : SymbolType) (numIn : int) : (int * int * int) = 
@@ -785,9 +786,9 @@ let private renderObj =
             let triangles : ReactElement list =
                 props.Obj
                 |> mapSetup
-                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1. "")[])
+                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i props.Obj) color color 1. (rotStringObj props.Obj))[])
             
-            let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 "" []
+            let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 (rotStringObj props.Obj)[]
 
             let displayBox : ReactElement =
                 rect[
