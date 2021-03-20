@@ -71,13 +71,22 @@ type Symbol =
         Scale : XYPos
     }
 
+type SymbolAdd = {
+    CompType : ComponentType
+    PagePos: XYPos
+    Input: int
+    Output: int
+    Index: int    
+}
+
 type Model = Symbol list
 
 type Msg =
     /// Mouse info with coords adjusted form top-level zoom
     | MouseMsg of MouseT
     | Move of sIDList : ComponentId list * pagePos : XYPos
-    | Add of compType: ComponentType * pagePos : XYPos * numIn : int * numOut : int * i : int 
+    // | Add of compType: ComponentType * pagePos : XYPos * numIn : int * numOut : int * index : int 
+    | Add of addMsg: SymbolAdd
     | Delete of sIdList : ComponentId list
     | Highlight of sIdList: ComponentId list
     | HighlightError of sIdList: ComponentId list
@@ -625,8 +634,9 @@ let init () =
 
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     match msg with
-    | Add (compType, pagePos, numIn, numOut, i) ->
-        (createSymbol compType (findPortList numIn numOut compType) pagePos i (getSymLabel compType i)) :: model, Cmd.none
+    // | Add (compType, pagePos, numIn, numOut, index) ->
+    | Add addMsg ->
+        (createSymbol addMsg.CompType (findPortList addMsg.Input addMsg.Output addMsg.CompType) addMsg.PagePos addMsg.Index (getSymLabel addMsg.CompType addMsg.Index)) :: model, Cmd.none
 
     | Delete sIdList -> 
         List.filter (fun sym -> not (List.contains sym.Id sIdList)) model, Cmd.none

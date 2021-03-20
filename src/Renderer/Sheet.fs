@@ -17,13 +17,14 @@ type Model =
       SelectingMultiple: bool
       EditSizeOf: CommonTypes.ComponentId option
       DragStartPos: XYPos
-      DraggingPos: XYPos }
+      DraggingPos: XYPos 
+      Clipboard: CommonTypes.ComponentId list * (CommonTypes.ConnectionId * int) list}
 
 type KeyboardMsg =
-    | CtrlS
+    // | CtrlS
     | AltX
     | AltY
-    | AltZ
+    // | AltZ
     | AltShiftZ
     | Del
     | AltA
@@ -36,6 +37,7 @@ type KeyboardMsg =
     | CtrlShiftC
     | CtrlShiftX
     | CtrlShiftV
+    | Esc
 
 type Msg =
     | Wire of BusWire.Msg
@@ -50,11 +52,20 @@ type Msg =
     | DispatchMove of XYPos
     | BeginSizeEdit of CommonTypes.ComponentId
     | EditSize of (CommonTypes.ComponentId * XYPos)
+    // | Paste
 
 type MouseOps =
     | MouseDown
     | MouseUp
     | MouseMove
+
+// type SymbolAdd = {
+//     CompType : CommonTypes.ComponentType
+//     PagePos: XYPos
+//     Input: int
+//     Output: int
+//     Index: int    
+// }
 
 
 let origin = { X = 0.; Y = 0. }
@@ -109,9 +120,8 @@ let dispatchSelection symbolIDList wireSegmentIDList dispatch =
     dispatch <| SelectWireSegments wireSegmentIDList
     dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
 
-/// Removes ID from Symbol tuple. Used for testing where IDs are not necessary 
 let removeSymbolID predicate coords (_, a, b) = predicate coords (a, b)
-/// Remove wire ID from tuple.
+
 let removeWireSegmentID predicate coords (_, _, a, b) = predicate coords (a, b)
 
 let filterBySelectingMultiple predicate lst =
@@ -164,11 +174,11 @@ let cornersToString startCoord endCoord =
         startCoord.X endCoord.Y
 
 ///Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
-let inferWidth (model : Model) = 
-    let comps = Symbol.extractComponents model.Wire.Symbol
-    let conns = BusWire.extractWires model.Wire 
-    let canvas = (comps, conns)
-    BusWidthInferer.inferConnectionsWidth canvas
+// let inferWidth (model : Model) = 
+//     let comps = Symbol.extractComponents model.Wire.Symbol
+//     let conns = BusWire.extractWires model.Wire 
+//     let canvas = (comps, conns)
+//     BusWidthInferer.inferConnectionsWidth canvas
 
 
 // let updateWidth (model : Model) dispatch =
@@ -275,22 +285,42 @@ let highlightCorners model box =
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
+    // | Add of compType: ComponentType * pagePos : XYPos * numIn : int * numOut : int * i : int 
+
+
+
+// let pasteElements model mousePos dispatch = 
+//     let oldComponents, oldConnections = model.Clipboard
+//     let oldPos = {X = (List.head oldComponents).TopL.X; Y = (List.head oldComponents).TopL.Y}
+//     let transVector = {X = mousePos.X - oldPos.X; Y = mousePos.Y - oldPos.Y}
+//     let newPos oldPos transVector =
+//         {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
+//     let newComponents = 
+//         oldComponents
+//         |> List.iter ((comp ->
+//             dispatch <| Symbol(Symbol.Add comp.Type newPos comp.TopL transVector  )
+
+
 let mouseDown model mousePos dispatch = 
-    match Symbol.isPort model.Wire.Symbol mousePos with
-    | Some (_, portId) -> 
-        dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
-    | None ->
-        match nearCorner model mousePos with 
-        | Some (id, _, _) -> 
-            dispatch <| BeginSizeEdit id 
-        | None ->  
-            let overlappingComponentList = 
-                model.SelectedComponents
-                |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
-                |> List.filter (inBoundingBox mousePos) 
-            if List.isEmpty overlappingComponentList then
-                selectElements model mousePos dispatch
-    dispatch <| SelectDragStart mousePos
+    if not (List.isEmpty (fst model.Clipboard)) then
+        // pasteElements model mousePos dispatch
+        ()
+    else
+        match Symbol.isPort model.Wire.Symbol mousePos with
+        | Some (_, portId) -> 
+            dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
+        | None ->
+            match nearCorner model mousePos with 
+            | Some (id, _, _) -> 
+                dispatch <| BeginSizeEdit id 
+            | None ->  
+                let overlappingComponentList = 
+                    model.SelectedComponents
+                    |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
+                    |> List.filter (inBoundingBox mousePos) 
+                if List.isEmpty overlappingComponentList then
+                    selectElements model mousePos dispatch
+        dispatch <| SelectDragStart mousePos
     
 
 let mouseUp model mousePos dispatch = 
@@ -518,6 +548,7 @@ let handleSelectDragEndMsg model =
 let getFirstSymbol model = List.head model.SelectedComponents
 let magnifyFactor = {X = 1.25; Y = 1.25}
 let shrinkFactor = {X = 0.8; Y = 0.8}
+
 let horizAlignVector model = 
     let leftMost =  List.minBy (fun a -> a.X) (topleftCorners model)
     List.map (fun a ->
@@ -564,9 +595,10 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress Del -> 
         deleteElements model
     | KeyPress AltA ->
+        let addMsg: Symbol.SymbolAdd = {CompType = CommonTypes.ComponentType.Mux2; PagePos = model.DraggingPos; Input= 2; Output= 1; Index= getNewSymbolIndex model CommonTypes.ComponentType.Mux2}
         let sModel, sCmd =
             BusWire.update
-                (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, (getNewSymbolIndex model CommonTypes.ComponentType.Mux2))))
+                (BusWire.Symbol(Symbol.Add addMsg))
                 model.Wire
         { model with Wire = sModel }, Cmd.map Wire sCmd 
     | KeyPress AltX ->
@@ -578,28 +610,30 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         vertAlignVector model
         |> alignComponents model
     | KeyPress CtrlShiftC ->
-        printf "ctrl shift c"
-        model, Cmd.none
+        {model with Clipboard = model.SelectedComponents, model.SelectedWireSegments}, Cmd.none
     | KeyPress CtrlShiftX ->
-        printf "ctrl shift c"
         model, Cmd.none
     | KeyPress CtrlShiftV ->
-        printf "ctrl shift c"
+        // pasteElements model
         model, Cmd.none
-    | KeyPress s -> // all other keys are turned into SetColor commands
-        let c =
-            match s with
-            | AltZ -> CommonTypes.Red
-            | _ -> CommonTypes.Grey
-        model, Cmd.ofMsg (Wire <| BusWire.SetColor c)
-    | SelectPort (portID, portType) -> { model with SelectedPort = Some portID, portType }, Cmd.none
+    | KeyPress Esc ->
+        {model with 
+            SelectedPort = None, CommonTypes.PortType.Input
+            SelectedComponents = []
+            SelectedWireSegments = []
+            SelectingMultiple = false
+            EditSizeOf = None
+            Clipboard = [], []            
+            }, Cmd.none
+    | SelectPort (portID, portType) -> 
+        { model with SelectedPort = Some portID, portType }, Cmd.none
     | SelectComponents scMsg ->
         { model with SelectedComponents = scMsg }, Cmd.none
     | SelectWireSegments swMsg -> { model with SelectedWireSegments = swMsg }, Cmd.none
     | SelectDragStart dragMsg ->
         { model with
-              DragStartPos = dragMsg;
-              DraggingPos = dragMsg },
+            DragStartPos = dragMsg;
+            DraggingPos = dragMsg },
         Cmd.none
     | SelectDragEnd ->
         handleSelectDragEndMsg model
@@ -623,5 +657,6 @@ let init () =
       SelectingMultiple = false
       EditSizeOf = None
       DragStartPos = origin
-      DraggingPos = origin },
+      DraggingPos = origin 
+      Clipboard = [], []},
     Cmd.map Wire cmds
