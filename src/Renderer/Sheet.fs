@@ -160,6 +160,30 @@ let cornersToString startCoord endCoord =
         endCoord.X endCoord.Y
         startCoord.X endCoord.Y
 
+///Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
+let inferWidth (model : Model) = 
+    let comps = Symbol.extractComponents model.Wire.Symbol
+    let conns = BusWire.extractWires model.Wire 
+    let canvas = (comps, conns)
+    BusWidthInferer.inferConnectionsWidth canvas
+
+(*
+let updateWidth (model : Model) =
+    inferWidth model
+    |> function
+    | Ok x -> //this is a Map<ConnectionId, int Option>
+              //x |> Map.toList |> List.map (
+                                    fun (k, v) -> 
+                                        match v with 
+                                        | Some a -> dispatch BusWire.updateWidth k a
+                                        | None -> dispatch BusWire.updateWidth k (Symbol.getPortWidth k)
+    | Error e -> //this is a {Message : string; Connections : ConnectionId list}
+                e.Connections 
+                |> List.iter (
+                    fun x -> dispatch Wire.highlighterror x, dispatch Symbol.highlighterror x) //need to find the symbol for the connections for symbol highlight error
+                dispatch Sheet.displayErrorMessage e.Message
+*)
+
 /// This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
     let canvasSize = unzoomedCanvas * zoom
@@ -265,6 +289,9 @@ let mouseUp model mousePos dispatch =
     | Some endPort ->
         match model.SelectedPort with
         | (Some startPort, _) when Symbol.getPortType model.Wire.Symbol endPort <> snd model.SelectedPort 
+        /// --------------------------------------- ///
+        /// Here buswidth inferer should be called? ///
+        /// --------------------------------------- ///
             -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
         | _ -> ()
     | None -> ()

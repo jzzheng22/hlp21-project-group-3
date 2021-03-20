@@ -93,6 +93,20 @@ let printStats() =
         printfn "%s time: min=%.3fms max=%.3fms av=%.3fms samples:%d" name st.Min st.Max st.Av (int st.Num))
     executionStats <- Map [] // reset stats
 
+
+let assertThat cond msg =
+    if not cond
+    then failwithf "what? assert failed: %s" msg
+
+/// Return the first error found in a list of results, or the list of Oks if
+/// there are none.
+let tryFindError (lst : Result<'a,'b> list) : Result<'a list, 'b> =
+    let isError el = match el with | Error _ -> true | Ok _ -> false
+    let extractOk el = match el with | Ok ok -> ok | Error _ -> failwith "what? Impossible case in tryFindError"
+    match List.tryFind isError lst with
+    | Some (Error err) -> Error err
+    | None -> List.map extractOk lst |> Ok
+    | _ -> failwith "what? Impossible case in tryFindError"
 //--------------------------------Constants----------------------------------//
 
 /// these determine the size of the canvas relative to the objects on it.
