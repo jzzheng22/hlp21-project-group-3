@@ -37,9 +37,6 @@ Each Symbol owns its ports.
  - Returns list of port IDs for a given symbol ID.
  - Used to find wires connected to a symbol.
 
-*Optional interface functions*
-
-These are called by BusWire and implemented in JEMerrick's Symbol:
 `Symbol.getPortWidth (model : Model) (pId : CommonTypes.PortId) : int`
  - Returns width of specified port.
 
@@ -57,6 +54,21 @@ These are called by BusWire and implemented in JEMerrick's Symbol:
  `isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
  - Returns an option if the user clicked on a port label or not
 
+## Issie interface functions
+
+`getPort (model : Model) (pId : PortId) : Port`
+- Returns the CommonTypes.Port object of a given pId
+- Used by buswire to convert to Issie datatypes
+
+`symToIssie (sym : Symbol) : Component`
+- Converts our Symbol type to Issie Component
+
+`extractComponent (symModel: Model) (sId:ComponentId) : Component`
+- Finds a component in the model from its ComponentId, and converts this into the Issie Component
+
+`extractComponents (symModel: Model) : Component list`
+- Converts the model from a Symbol list to a Issie Component list
+
 ## Messages
 **Received from Sheet via BusWire**
 
@@ -71,11 +83,7 @@ These are called by BusWire and implemented in JEMerrick's Symbol:
  - numIn: number of input ports.
     - This number does not include any enable or clock signals
  - numOut: number of output ports.
- - Properties like "inputPortList", "outputPortList", "highlighted", "Id", "boundingBoxCoordinates" (XYPos * XYPos) can be set up and calculated by Symbol in addition to what is provided.
- - Initial position of symbol:
-    - ISSIE chooses an arbitrary random position to put the symbol. From here we can drag. 
-    - This arbitrary initial position changes each time.
-- i : the number indicating how many of that symbol are currently on the sheet
+ - i : the number indicating how many of that symbol are currently on the sheet
 
 `Delete of CommonTypes.ComponentId list`
  - Deletes symbols from model based on IDs in list.
@@ -85,9 +93,6 @@ These are called by BusWire and implemented in JEMerrick's Symbol:
 
 `HighlightPorts of CommonTypes.ComponentId list`
  - Highlights all ports of symbols in list.
-
-*Optional messages implemented in JEMerrick's Symbol* 
-The below messages can also be sent to JEMerrick's version of Symbol:
 
 `Rotate of sId : CommonTypes.ComponentId * rot : int`
  - Rotates a single symbol clockwise by `rot` degrees.
