@@ -175,11 +175,11 @@ let checkWidth (model : Model) (connect : CommonTypes.ConnectionId) =
     if w1 = w2 then w1 else -1
 
 /// Sends a highlight error to buswire and symbol for the connection given
-let dispatchError (model : Model) (connect : CommonTypes.ConnectionId) dispatch =
-    dispatch <| BusWire.HighlightError [connect]
-    dispatch <| BusWire.Symbol(Symbol.HighlightError (BusWire.connectToSym model.Wire connect))
+let dispatchError (model : Model) (dispatch: Dispatch<Msg>) (connect : CommonTypes.ConnectionId)  =
+    dispatch <| Wire(BusWire.HighlightError [connect])
+    dispatch <| Symbol(Symbol.HighlightError (BusWire.connectToSym model.Wire connect))
 
-let updateWidth (model : Model) dispatch =
+let updateWidth (model : Model) (dispatch: Dispatch<Msg>) =
     inferWidth model
     |> function
     | Ok x -> //this is a Map<ConnectionId, int Option>
@@ -189,14 +189,14 @@ let updateWidth (model : Model) dispatch =
             fun (k, v) -> 
             match v with 
             | Some a -> 
-                dispatch <| BusWire.UpdateWidth (k, a)
+                dispatch <| Wire(BusWire.UpdateWidth (k, a))
             | None -> 
                 let w = checkWidth model k
-                if w = -1 then dispatchError model k
-                else dispatch <| BusWire.UpdateWidth (k, w))
+                if w = -1 then dispatchError model dispatch k
+                else dispatch <| Wire(BusWire.UpdateWidth (k, w)))
     | Error e -> //this is a {Message : string; Connections : ConnectionId list}
         e.ConnectionsAffected
-        |> List.map (dispatchError model)
+        |> List.map (dispatchError model dispatch)
         //dispatch <| displayErrorMessage e.Msg
 
 
@@ -309,7 +309,7 @@ let mouseUp model mousePos dispatch =
         /// Here buswidth inferer should be called? ///
         /// --------------------------------------- ///
             -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
-               updateWidth model
+               updateWidth model dispatch |> ignore
         | _ -> ()
     | None -> ()
     if model.SelectingMultiple then
@@ -606,6 +606,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         {model with EditSizeOf = Some id}, Cmd.none
     | EditSize (id, mousePos) -> 
         changeSymbolSize model id mousePos
+    | ErrorMsg msg -> model, Cmd.none
 
 let init () =
     let model, cmds = (BusWire.init 400) ()
