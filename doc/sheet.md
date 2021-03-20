@@ -97,12 +97,13 @@ Sheet can also access Symbol directly if needed.
 ## BusWidthInferer interface
 `BusWidthInferer.inferConnectionsWidth ((comps,conns) : CanvasState) : Result<ConnectionsWidth, WidthInferError>`
 - Takes in a list of Issie Components and Issie Connections and returns 
-    - Ok x -> Some <Map<ConnectionId, int Option> | None
-    - Error {Msg : string; ConnectionsAffected : ConnectionId list}
+    * Ok x -> Some <Map<ConnectionId, int Option> | None
+    * Error {Msg : string; ConnectionsAffected : ConnectionId list}
 - In the first case where we have Ok x and Some y, we simply tell all the connections to update with the specified width
 - In the second case where we have Ok x and None, we ask Symbol what the width should be.
-    If both port widths for the connection are equal, update the connection to that width
-    If
+    * If both port widths for the connection are equal, update the connection to that width
+    * If the port widths are not equal, then send the error highlight messages for the relavent connections/symbols
+- In the third case where we have Error then send the error highlight messages for the relavent connections/symbols
 
 ## Interface Functions
 
