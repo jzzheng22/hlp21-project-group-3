@@ -200,8 +200,7 @@ let incrementRot (oldRot : Rotation) : Rotation =
     | R270 -> R0
 
 //updates rotation state
-let updaterot (rot : int) (oldRot : Rotation) : Rotation =
-
+let updateRot (rot : int) (oldRot : Rotation) : Rotation =
     match (getRot rot) with  
     | 0 -> oldRot
     | 90 -> incrementRot oldRot
@@ -695,11 +694,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 if sId <> sym.Id then
                     sym
                 else
-                    let newsym = trans rotateCoords sym rot
-                    {
-                        newsym with
-                            Rotation = updaterot rot sym.Rotation
-                            
+                    let newSym = trans rotateCoords sym rot
+                    { newSym with
+                        Rotation = updateRot rot sym.Rotation     
                     }
         )
         , Cmd.none
@@ -710,10 +707,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
                 if sId <> sym.Id then
                     sym
                 else
-                    let newsym = trans scaleCoords sym scale
-                    {
-                        newsym with
-                            Scale = {X=sym.Scale.X * scale.X;Y=sym.Scale.Y * scale.Y }
+                    let newSym = trans scaleCoords sym scale
+                    { newSym with
+                        Scale = {X = sym.Scale.X * scale.X; Y = sym.Scale.Y * scale.Y }
                     }
         )
         , Cmd.none
@@ -801,7 +797,7 @@ let private renderObj =
             let triangles : ReactElement list =
                 sym
                 |> mapSetup
-                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i sym) color color 1. (rotStringObj sym)[])
+                |> List.map(fun (i, _) -> (drawPolygon (triangleCoords i sym) color color 1. (rotStringObj sym))[])
             
             let io : ReactElement = drawPolygon (tagCoords props.Obj) strokeColour color 0.5 (rotStringObj props.Obj)[]
 
