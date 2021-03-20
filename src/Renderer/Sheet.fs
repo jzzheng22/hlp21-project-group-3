@@ -21,8 +21,8 @@ type Model =
 
 type KeyboardMsg =
     | CtrlS
-    | AltC
-    | AltV
+    | AltX
+    | AltY
     | AltZ
     | AltShiftZ
     | Del
@@ -33,6 +33,9 @@ type KeyboardMsg =
     | SymbolAntiClock
     | SymbolMagnify
     | SymbolShrink 
+    | CtrlShiftC
+    | CtrlShiftX
+    | CtrlShiftV
 
 type Msg =
     | Wire of BusWire.Msg
@@ -442,9 +445,8 @@ let changeSymbolSize model id mousePos =
 let snapSymbolToGrid model =
     let transVector =
         Symbol.getBoundingBox model.Wire.Symbol (List.head model.SelectedComponents)
-        |> function
-        | (topL, _) ->
-            snapGridVector topL
+        |> fst
+        |> snapGridVector
     let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire 
     { model with 
         Wire = sModel;
@@ -490,6 +492,48 @@ let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : i
         |> List.max
         |> (+) 1
 
+let deleteElements model = 
+    let wModel, wCmd = deleteWires model
+    let sModel, sCmd = deleteSymbols model wModel
+
+    { model with
+          Wire = sModel
+          SelectedPort = None, CommonTypes.PortType.Input
+          SelectedComponents = []
+          SelectedWireSegments = [] },
+    Cmd.batch [ Cmd.map Wire wCmd;
+                Cmd.map Wire sCmd ]
+
+let handleSelectDragEndMsg model =
+    if not (List.isEmpty model.SelectedComponents) then
+        snapSymbolToGrid model
+    elif not (List.isEmpty model.SelectedWireSegments) then
+            snapWireSegmentToGrid model
+    else
+        { model with 
+            SelectedPort = None, CommonTypes.PortType.Input;
+            SelectingMultiple = false 
+            EditSizeOf = None}, Cmd.none
+
+let getFirstSymbol model = List.head model.SelectedComponents
+let magnifyFactor = {X = 1.25; Y = 1.25}
+let shrinkFactor = {X = 0.8; Y = 0.8}
+let horizAlignVector model = 
+    let leftMost =  List.minBy (fun a -> a.X) (topleftCorners model)
+    List.map (fun a ->
+        if a.X <> leftMost.X then 
+            {X = 0.0; Y = leftMost.Y - a.Y}
+        else 
+            {X = 0.0; Y = 0.0}) (topleftCorners model)
+
+let vertAlignVector model =
+    let downMost = List.maxBy (fun a -> a.Y) (topleftCorners model)
+    List.map (fun a ->
+        if a.Y <> downMost.Y then 
+            {X = downMost.X - a.X; Y = 0.0}
+        else 
+            {X = 0.0; Y = 0.0}) (topleftCorners model)
+
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
     | Wire wMsg ->
@@ -501,72 +545,52 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress AltShiftZ ->
         printStats () // print and reset the performance statistics in dev tools window
         model, Cmd.none // do nothing else and return model unchanged
-    | KeyPress SymbolClockwise | KeyPress SymbolAntiClock | KeyPress SymbolMagnify | KeyPress SymbolShrink -> 
-        if List.isEmpty model.SelectedComponents then 
-            model, Cmd.none
-        else 
-            let symid = List.head model.SelectedComponents
-            let sModel, sCmd = 
-                match msg with 
-                | KeyPress SymbolClockwise -> 
-                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symid, 90))) model.Wire
-                | KeyPress SymbolAntiClock ->
-                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symid, 270))) model.Wire
-                | KeyPress SymbolMagnify ->
-                    BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 1.25; Y = 1.25}))) model.Wire
-                | KeyPress SymbolShrink -> 
-                    BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 0.8; Y = 0.8}))) model.Wire
-                | _ -> 
-                    failwithf "Unexpected input in symbol transformation."
-            { model with Wire = sModel }, Cmd.map Wire sCmd
+    | KeyPress SymbolClockwise ->
+        let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Rotate (getFirstSymbol model, 90))) model.Wire
+        { model with Wire = sModel }, Cmd.map Wire sCmd
+    | KeyPress SymbolAntiClock ->
+        let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Rotate (getFirstSymbol model, 270))) model.Wire
+        { model with Wire = sModel }, Cmd.map Wire sCmd
+    | KeyPress SymbolMagnify ->
+        let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Scale (getFirstSymbol model, magnifyFactor))) model.Wire
+        { model with Wire = sModel }, Cmd.map Wire sCmd
+    | KeyPress SymbolShrink -> 
+        let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Scale (getFirstSymbol model, shrinkFactor))) model.Wire
+        { model with Wire = sModel }, Cmd.map Wire sCmd
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
     | KeyPress ZoomCanvasOut -> 
         ({model with Zoom = model.Zoom/1.25}, Cmd.none)
-    | KeyPress Del ->
-        let wModel, wCmd = deleteWires model
-        let sModel, sCmd = deleteSymbols model wModel
-
-        { model with
-              Wire = sModel
-              SelectedPort = None, CommonTypes.PortType.Input
-              SelectedComponents = []
-              SelectedWireSegments = [] },
-        Cmd.batch [ Cmd.map Wire wCmd;
-                    Cmd.map Wire sCmd ]
+    | KeyPress Del -> 
+        deleteElements model
     | KeyPress AltA ->
         let sModel, sCmd =
             BusWire.update
                 (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, (getNewSymbolIndex model CommonTypes.ComponentType.Mux2))))
                 model.Wire
-
         { model with Wire = sModel }, Cmd.map Wire sCmd 
-    /// Align along x-axis
-    | KeyPress AltC ->
-        let leftMost =  List.minBy (fun a -> a.X) (topleftCorners model)
-        List.map (fun a ->
-            if a.X <> leftMost.X then 
-                {X = 0.0; Y = leftMost.Y - a.Y}
-            else 
-                {X = 0.0; Y = 0.0}) (topleftCorners model)
+    | KeyPress AltX ->
+        /// Align along x-axis
+        horizAlignVector model
         |> alignComponents model
-    | KeyPress AltV ->
-        let downMost = List.maxBy (fun a -> a.Y) (topleftCorners model)
-        List.map (fun a ->
-            if a.Y <> downMost.Y then 
-                {X = downMost.X - a.X; Y = 0.0}
-            else 
-                {X = 0.0; Y = 0.0}) (topleftCorners model)
+    | KeyPress AltY ->
+        /// Align along y-axis
+        vertAlignVector model
         |> alignComponents model
-
+    | KeyPress CtrlShiftC ->
+        printf "ctrl shift c"
+        model, Cmd.none
+    | KeyPress CtrlShiftX ->
+        printf "ctrl shift c"
+        model, Cmd.none
+    | KeyPress CtrlShiftV ->
+        printf "ctrl shift c"
+        model, Cmd.none
     | KeyPress s -> // all other keys are turned into SetColor commands
         let c =
             match s with
-            | AltC -> CommonTypes.Blue
-            | AltV -> CommonTypes.Green
             | AltZ -> CommonTypes.Red
             | _ -> CommonTypes.Grey
-
         model, Cmd.ofMsg (Wire <| BusWire.SetColor c)
     | SelectPort (portID, portType) -> { model with SelectedPort = Some portID, portType }, Cmd.none
     | SelectComponents scMsg ->
@@ -578,15 +602,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               DraggingPos = dragMsg },
         Cmd.none
     | SelectDragEnd ->
-        if not (List.isEmpty model.SelectedComponents) then
-            snapSymbolToGrid model
-        elif not (List.isEmpty model.SelectedWireSegments) then
-                snapWireSegmentToGrid model
-        else
-            { model with 
-                SelectedPort = None, CommonTypes.PortType.Input;
-                SelectingMultiple = false 
-                EditSizeOf = None}, Cmd.none
+        handleSelectDragEndMsg model
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
     | DispatchMove mousePos ->

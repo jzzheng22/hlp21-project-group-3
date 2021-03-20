@@ -46,8 +46,8 @@
                 [| makeKeyItem "Default" "CmdOrCtrl+S" (fun () -> dispatch KeyboardMsg.CtrlS)
                    makeKeyItem "Red" "Alt+Z" (fun () -> dispatch KeyboardMsg.AltZ)
                    menuSeparator
-                   makeKeyItem "Diagram Zoom In" "CmdOrCtrl+z" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
-                   makeKeyItem "Diagram Zoom Out" "CmdOrCtrl+y" (fun () -> dispatch KeyboardMsg.ZoomCanvasOut)
+                   makeKeyItem "Diagram Zoom In" "CmdOrCtrl+Z" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
+                   makeKeyItem "Diagram Zoom Out" "CmdOrCtrl+Y" (fun () -> dispatch KeyboardMsg.ZoomCanvasOut)
                    menuSeparator
                    makeKeyItem "Print Statistics" "Alt+Shift+Z" (fun () -> dispatch KeyboardMsg.AltShiftZ)
                    makeRoleItem MenuItemRole.ForceReload
@@ -79,13 +79,17 @@
                 [| makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.AltA)
                    makeKeyItem "Delete"  "delete" (fun () -> dispatch KeyboardMsg.Del)
                    menuSeparator
-                   makeKeyItem "Align Horizontally" "Alt+C" (fun () -> dispatch KeyboardMsg.AltC)
-                   makeKeyItem "Align Vertically" "Alt+V" (fun () -> dispatch KeyboardMsg.AltV)
+                   makeKeyItem "Align Horizontally" "Alt+X" (fun () -> dispatch KeyboardMsg.AltX)
+                   makeKeyItem "Align Vertically" "Alt+Y" (fun () -> dispatch KeyboardMsg.AltY)
                    menuSeparator
                    makeKeyItem "Rotate Clockwise" "CmdOrCtrl+Q" (fun () -> dispatch KeyboardMsg.SymbolClockwise)
                    makeKeyItem "Rotate Anticlockwise" "CmdOrCtrl+E" (fun () -> dispatch KeyboardMsg.SymbolAntiClock)
                    makeKeyItem "Magnify" "Alt+M" (fun () -> dispatch KeyboardMsg.SymbolMagnify)
                    makeKeyItem "Shrink"  "Alt+D" (fun () -> dispatch KeyboardMsg.SymbolShrink)
+                   makeKeyItem "Copy"  "CmdOrCtrl+Shift+C" (fun () -> dispatch KeyboardMsg.CtrlShiftC)
+                   makeKeyItem "Cut"  "CmdOrCtrl+Shift+X" (fun () -> dispatch KeyboardMsg.CtrlShiftX)
+                   makeKeyItem "Paste"  "CmdOrCtrl+Shift+V" (fun () -> dispatch KeyboardMsg.CtrlShiftV)
+
                 |]
                 |> U2.Case1
     
