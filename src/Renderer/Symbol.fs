@@ -920,6 +920,13 @@ let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (XYPos * PortId)
     | None -> None
     
 
+let getSymbol (model : Model) (sId : ComponentId) : Symbol = 
+    model
+    |> List.tryFind (fun sym -> sym.Id = sId)
+    |> function
+    | Some sym -> sym
+    | None -> failwithf "Error in getSymbol, couldn't find symbol"
+
 //Returns a list of Port Ids for a given symbol
 let getPortIds (model : Model) (sId : ComponentId) : PortId list = 
     model

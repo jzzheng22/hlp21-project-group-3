@@ -285,26 +285,47 @@ let highlightCorners model box =
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
+/// Finds the highest index for a Symbol type and increments that number
+let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : int = 
+    let symbolList = 
+        model.Wire.Symbol 
+        |> List.filter (fun x -> x.Type = compType)
+
+    if List.isEmpty symbolList then 1 
+    else symbolList
+        |> List.map (fun x -> x.Index)
+        |> List.max
+        |> (+) 1
+
     // | Add of compType: ComponentType * pagePos : XYPos * numIn : int * numOut : int * i : int 
 
 
 
-// let pasteElements model mousePos dispatch = 
-//     let oldComponents, oldConnections = model.Clipboard
-//     let oldPos = {X = (List.head oldComponents).TopL.X; Y = (List.head oldComponents).TopL.Y}
-//     let transVector = {X = mousePos.X - oldPos.X; Y = mousePos.Y - oldPos.Y}
-//     let newPos oldPos transVector =
-//         {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
-//     let newComponents = 
-//         oldComponents
-//         |> List.iter ((comp ->
-//             dispatch <| Symbol(Symbol.Add comp.Type newPos comp.TopL transVector  )
+let pasteElements model mousePos dispatch = 
+    let oldComponents, oldConnections = model.Clipboard
+    let firstSymbol = Symbol.getSymbol model.Wire.Symbol (List.head oldComponents)
+    let oldPos = {X = firstSymbol.TopL.X; Y = firstSymbol.TopL.Y}
+    let transVector = {X = mousePos.X - oldPos.X; Y = mousePos.Y - oldPos.Y}
+    let newPos oldPos transVector =
+        {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
+    // let newComponents = 
+    oldComponents
+    |> List.iter (fun compId -> 
+        let sym = Symbol.getSymbol model.Wire.Symbol compId
+        let addMsg: Symbol.SymbolAdd = {
+            CompType = sym.Type
+            PagePos = newPos sym.TopL transVector
+            Input = 0
+            Output = 0
+            Index = getNewSymbolIndex model sym.Type}
+
+        dispatch <| Symbol(Symbol.Add addMsg))
 
 
 let mouseDown model mousePos dispatch = 
     if not (List.isEmpty (fst model.Clipboard)) then
-        // pasteElements model mousePos dispatch
-        ()
+        pasteElements model mousePos dispatch
+        // ()
     else
         match Symbol.isPort model.Wire.Symbol mousePos with
         | Some (_, portId) -> 
@@ -510,17 +531,7 @@ let alignComponents model vector =
     |> List.zip model.SelectedComponents
     |> List.fold foldFunction (model, Cmd.none)
     
-/// Finds the highest index for a Symbol type and increments that number
-let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : int = 
-    let symbolList = 
-        model.Wire.Symbol 
-        |> List.filter (fun x -> x.Type = compType)
 
-    if List.isEmpty symbolList then 1 
-    else symbolList
-        |> List.map (fun x -> x.Index)
-        |> List.max
-        |> (+) 1
 
 let deleteElements model = 
     let wModel, wCmd = deleteWires model
@@ -595,7 +606,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress Del -> 
         deleteElements model
     | KeyPress AltA ->
-        let addMsg: Symbol.SymbolAdd = {CompType = CommonTypes.ComponentType.Mux2; PagePos = model.DraggingPos; Input= 2; Output= 1; Index= getNewSymbolIndex model CommonTypes.ComponentType.Mux2}
+        let addMsg: Symbol.SymbolAdd = {CompType = CommonTypes.ComponentType.Mux2; PagePos = model.DraggingPos; Input = 2; Output = 1; Index = getNewSymbolIndex model CommonTypes.ComponentType.Mux2}
         let sModel, sCmd =
             BusWire.update
                 (BusWire.Symbol(Symbol.Add addMsg))
