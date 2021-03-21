@@ -43,10 +43,7 @@
             invisibleMenu.label <- "Edit"
             invisibleMenu.visible <- true // false if you want keys but no "Edit" menu
             invisibleMenu.submenu <-
-                [| makeKeyItem "Default" "CmdOrCtrl+S" (fun () -> dispatch KeyboardMsg.CtrlS)
-                   makeKeyItem "Red" "Alt+Z" (fun () -> dispatch KeyboardMsg.AltZ)
-                   menuSeparator
-                   makeKeyItem "Diagram Zoom In" "CmdOrCtrl+z" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
+                [| makeKeyItem "Diagram Zoom In" "CmdOrCtrl+z" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
                    makeKeyItem "Diagram Zoom Out" "CmdOrCtrl+y" (fun () -> dispatch KeyboardMsg.ZoomCanvasOut)
                    menuSeparator
                    makeKeyItem "Print Statistics" "Alt+Shift+Z" (fun () -> dispatch KeyboardMsg.AltShiftZ)
@@ -76,11 +73,11 @@
             invisibleMenu.label <- "Symbol"
             invisibleMenu.visible <- true // visible
             invisibleMenu.submenu <-
-                [| makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.AltA)
+                [| makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.SymbolAddBegin)
                    makeKeyItem "Delete"  "delete" (fun () -> dispatch KeyboardMsg.Del)
                    menuSeparator
-                   makeKeyItem "Align Horizontally" "Alt+C" (fun () -> dispatch KeyboardMsg.AltC)
-                   makeKeyItem "Align Vertically" "Alt+V" (fun () -> dispatch KeyboardMsg.AltV)
+                   makeKeyItem "Align Horizontally" "Alt+X" (fun () -> dispatch KeyboardMsg.AltX)
+                   makeKeyItem "Align Vertically" "Alt+Y" (fun () -> dispatch KeyboardMsg.AltY)
                    menuSeparator
                    makeKeyItem "Rotate Clockwise" "CmdOrCtrl+Q" (fun () -> dispatch KeyboardMsg.SymbolClockwise)
                    makeKeyItem "Rotate Anticlockwise" "CmdOrCtrl+E" (fun () -> dispatch KeyboardMsg.SymbolAntiClock)
