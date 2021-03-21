@@ -39,8 +39,8 @@ let editMenu dispatch =
             [|(*makeKeyItem "Default" "CmdOrCtrl+S" (fun () -> dispatch KeyboardMsg.CtrlS)
                makeKeyItem "Red" "Alt+Z" (fun () -> dispatch KeyboardMsg.AltZ)
                menuSeparator*)
-               makeKeyItem "Diagram Zoom In" "CmdOrCtrl+Z" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
-               makeKeyItem "Diagram Zoom Out" "CmdOrCtrl+Y" (fun () -> dispatch KeyboardMsg.ZoomCanvasOut)
+               makeKeyItem "Zoom Canvas In" "CmdOrCtrl+]" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
+               makeKeyItem "Zoom Canvas Out" "CmdOrCtrl+[" (fun () -> dispatch KeyboardMsg.ZoomCanvasOut)
                menuSeparator
                makeKeyItem "Print Statistics" "Alt+Shift+Z" (fun () -> dispatch KeyboardMsg.AltShiftZ)
                makeRoleItem MenuItemRole.ForceReload

@@ -71,8 +71,8 @@ type MouseOps =
 let origin = { X = 0.; Y = 0. }
 
 /// The length of one side of the square canvas in pixels without zoom.
-let unzoomedCanvas = 1000.0
-let unzoomedGrid = unzoomedCanvas / 100.0
+let unzoomedCanvas = 2000.0
+let unzoomedGrid = 10.0
 
 /// Tests if a point is inside a bounding box
 let inBoundingBox point box =
@@ -603,7 +603,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
     | KeyPress ZoomCanvasOut -> 
-        ({model with Zoom = model.Zoom/1.25}, Cmd.none)
+        ({model with Zoom = model.Zoom / 1.25}, Cmd.none)
     | KeyPress Del -> 
         deleteElements model
     | KeyPress AltA ->
