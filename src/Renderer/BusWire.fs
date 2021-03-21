@@ -665,6 +665,9 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
 // Name must be of format routeRuleXXX
 // Must have signature Wire -> Symbol.Model -> bool
 
+/// Rule that chekds if a the number of segments would change after 
+/// routing the wire to its new position, as this indicates a need to 
+/// switch back to autorouting.
 let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) : bool =
     let currentSegmentCount = wire.Segments.Length
     let newVertexCount = 
@@ -675,12 +678,14 @@ let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) : bool =
     else 
         true
 
+/// Rule that states that the wire must switch back to autorouting after symbol rotation
 let routeRuleAfterRotation (wire: Wire) (sm: Symbol.Model) : bool =
     if (wire.SourcePortEdge,wire.TargetPortEdge) <> (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId) then
         false
     else 
         true
 
+/// Rule stating two segment wires may not be autorouted
 let routeRuleTwoSegment (wire: Wire) (sm: Symbol.Model) : bool =
     if List.length wire.Segments < 3 then
         false
@@ -704,7 +709,9 @@ let decideManual (wire: Wire) (sm: Symbol.Model) : Wire =
         | true -> {wire with Manual = false} 
         | false -> wire
 
-(*let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model) 
+/// Calculates and returns the IDs of wires that must be updated using a  
+/// provided list of symbols that have been updated.
+let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model) 
     : CommonTypes.ConnectionId list =
     sIds
     |> List.collect (fun sId -> Symbol.getPortIds sm sId)
@@ -718,11 +725,13 @@ let decideManual (wire: Wire) (sm: Symbol.Model) : Wire =
         )
     )
     |> List.map (fun w -> w.Id)
-    |> List.distinct*)
+    |> List.distinct
 
-let updateWires (model: Model) (sm: Symbol.Model) : Wire list =
+/// Updates the wires in the model as specified by the provided list
+let updateWires (model: Model) (sm: Symbol.Model) (wIds: CommonTypes.ConnectionId list): Wire list =
     model.WX
     |> List.map (fun w -> 
+        if List.contains w.Id wIds then
             let newWire = decideManual w sm
             let srcEdge = Symbol.getPortEdge sm newWire.SourcePortId
             let tgtEdge = Symbol.getPortEdge sm newWire.TargetPortId
@@ -738,11 +747,8 @@ let updateWires (model: Model) (sm: Symbol.Model) : Wire list =
                             StartHoriz = startHoriz
                             EndHoriz = endHoriz}
             | true -> {newWire with Segments = (manualRoute newWire sm)}
-        )
-        
-    
-    
-
+        else w
+    )
 
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
@@ -752,16 +758,17 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             match sMsg with
             | Symbol.Move (sIds,_) -> 
                 printfn "BusWire: Move Message Detected"
-                updateWires  model sm
+                chooseWiresToUpdate sIds model sm
+                |> updateWires  model sm
             | Symbol.Rotate (sId,_) ->
                 printfn "BusWire: Rotate Message Detected"
-                updateWires model sm
+                chooseWiresToUpdate [sId] model sm
+                |> updateWires model sm
             | Symbol.Scale (sId,_) ->
                 printfn "BusWire: Scale Message Detected"
-                updateWires model sm
-
+                chooseWiresToUpdate [sId] model sm
+                |> updateWires model sm
             | _ -> model.WX
-                //updateWires model sm
             
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
@@ -800,7 +807,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             let last = (List.length w.Segments) - 1
             match idx with
             | 0  -> seg
-            | x when (x=last && seg.Index=last ) -> seg
+            | x when (x=last) -> seg
             | _ when w.Id <> wId -> seg
             | _ when (idx%2=0 && w.StartHoriz) || (idx%2=1 && not w.StartHoriz)  -> 
                 match seg.Index with 
