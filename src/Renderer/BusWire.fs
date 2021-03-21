@@ -69,7 +69,7 @@ type Msg =
     | MoveWires of CommonTypes.ConnectionId * int * XYPos
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
-    | UpdateWidth of cId : CommonTypes.ConnectionId * w : int
+    | UpdateWidth of (CommonTypes.ConnectionId * int) 
     | HighlightError of CommonTypes.ConnectionId list
 
 //-------------------Helpers for functions------------------------//
@@ -776,6 +776,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | UpdateWidth (cId, w) ->
+    // | UpdateWidth lst ->
         {model with
             WX = model.WX
                 |> List.map (fun wire ->
@@ -788,6 +789,21 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                         wire
                 )
         }
+        
+        // {model with
+        //     WX = model.WX
+        //         |> List.map (fun wire ->
+        //             List.tryFind (fun x -> fst x = wire.Id) lst
+        //             |> function
+        //             | Some (_, width) -> 
+        //                 { wire with
+        //                     Width = width
+        //                     Segments = List.map (fun x -> {x with Width = width}) wire.Segments
+        //                 }
+        //             | None -> 
+        //                 wire
+        //         )
+        // }
         , Cmd.none
     | HighlightError cIdList ->
         {model with
