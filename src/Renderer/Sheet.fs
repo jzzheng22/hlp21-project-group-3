@@ -535,16 +535,32 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress ZoomCanvasOut -> 
         ({model with Zoom = model.Zoom/1.25}, Cmd.none)
     | KeyPress Del ->
-        let wModel, wCmd = deleteWires model
-        let sModel, sCmd = deleteSymbols model wModel
+        let wModel1, wCmd1 = deleteWires model
+        let sModel1, sCmd1 = deleteSymbols model wModel1
 
-        { model with
-              Wire = sModel
-              SelectedPort = None, CommonTypes.PortType.Input
-              SelectedComponents = []
-              SelectedWireSegments = [] },
-        Cmd.batch [ Cmd.map Wire wCmd;
-                    Cmd.map Wire sCmd ]
+        let deleteModel = 
+            { model with
+                  Wire = sModel1
+                  SelectedPort = None, CommonTypes.PortType.Input
+                  SelectedComponents = []
+                  SelectedWireSegments = [] 
+            }
+        
+        inferWidth deleteModel
+        |> function
+        | Ok x -> //this is a Map<ConnectionId, int Option>
+            let conList = x |> Map.toList 
+            printf "hello UpdateWidth %A" conList
+            let wModel2, wCmd2 = BusWire.update (BusWire.UpdateWidth conList) model.Wire
+            {deleteModel with Wire = wModel2}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2]
+        | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
+            let wires = e.ConnectionsAffected
+            let wModel2, wCmd2 = BusWire.update (BusWire.HighlightError wires) model.Wire
+            let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel2
+            printf "hello UpdateWidth Error \n Message: %s \n Connections: \n %A" e.Msg wires
+            {deleteModel with Wire = sModel2}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
+
+        
     | KeyPress AltA ->
         let sModel, sCmd =
             BusWire.update
