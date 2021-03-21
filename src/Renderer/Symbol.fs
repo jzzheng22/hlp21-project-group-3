@@ -312,7 +312,11 @@ let isPortInverse (port : PortInfo Option) : bool =
 
 /// Coordinates to create the tag shape used for input/output symbols,
 let tagCoords (sym : Symbol) : string =
-    let (i, a) = if sym.Type = ComponentType.Input 1 then 0., -1. else snd (getHWObj sym), 1.
+    let (i, a) = 
+        match sym.Type with 
+        | ComponentType.Input _ ->  0., -1. 
+        | _ -> snd (getHWObj sym), 1.
+
     let midX = midSymX sym
     let midY = midSymY sym
     (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" 
