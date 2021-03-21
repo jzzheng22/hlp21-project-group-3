@@ -59,7 +59,8 @@ type Symbol =
         Id : ComponentId
         Type : ComponentType
         Name : string
-        Highlight : string
+        Highlight : bool
+        HighlightError : bool
         PortHighlight : bool
         PortMap : Map<XYPos, PortInfo Option>
         GenericType : SymbolType
@@ -122,8 +123,8 @@ let typeToInfo (compType : ComponentType) : (string * string * int * int * Symbo
     | ComponentType.AsyncROM x -> ("AROM", "AROM", x.AddressWidth, x.WordWidth, LogMem)
     | ComponentType.ROM x -> ("ROM", "ROM", x.AddressWidth, x.WordWidth, FF)
     | ComponentType.RAM x -> ("RAM", "RAM", x.AddressWidth, x.WordWidth, RAM)
-    | ComponentType.Input x -> ("", (sprintf "In<%d:0>" (x - 1)), x, x, IO) 
-    | ComponentType.Output x -> ("", (sprintf "Out<%d:0>" (x - 1)), x, x, IO) 
+    | ComponentType.Input x -> ((sprintf "In<%d:0>" (x - 1)), "" , x, x, IO) 
+    | ComponentType.Output x -> ((sprintf "Out<%d:0>" (x - 1)), "" , x, x, IO) 
     | ComponentType.IOLabel -> ("", "", 0, 0, IO) //Check generic type WHAT IS THIS?? 
     | ComponentType.BusSelection (x, y) -> ("", "", x, y, Wires)
     | ComponentType.MergeWires -> ("", "", 0, 0, Wires)
@@ -321,14 +322,18 @@ let isPortInverse (port : PortInfo Option) : bool =
 
 /// Coordinates to create the tag shape used for input/output symbols,
 let tagCoords (sym : Symbol) : string =
-    let (i, a) = if sym.Type = ComponentType.Input 1 then 0., -1. else snd (getHWObj sym), 1.
+    let (i, a) = 
+        match sym.Type with 
+        | ComponentType.Input _ ->  0., -1. 
+        | _ -> snd (getHWObj sym), 1.
+
     let midX = midSymX sym
     let midY = midSymY sym
     (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" 
-        (sym.TopL.X + (i + (a * 5.))) (midY - 10.) 
-        (sym.TopL.X + (i + (a * 5.))) (midY + 10.) 
+        (midX - 20. + (i + (a * 5.))) (midY - 10.) 
+        (midX - 20. + (i + (a * 5.))) (midY + 10.) 
         (midX - ((i/7.) + (a * 5.))) (midY + 10.) 
-        (sym.BotR.X - ((i * 1.2) + (a * 5.))) midY 
+        (midX + 20. - ((i * 1.2) + (a * 5.))) midY 
         (midX - ((i/7.) + (a * 5.))) (midY - 10.))
 
 let cornerCoords (sym : Symbol) (i : XYPos) : XYPos = 
@@ -352,6 +357,14 @@ let rotString (sym : Symbol) (pos : XYPos) =
     sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
 
 let rotStringObj (sym : Symbol) = rotString sym (midSym sym)
+
+/// Converts a scale and a centre and returns the matrix for svg scaling about that central point
+let scaleString (scale : XYPos) (centre : XYPos) : string = 
+    let (cx, cy) = centre.X, centre.Y
+    let (sx, sy) = scale.X, scale.Y
+    let xScale = cx-sx*cx
+    let yScale = cy-sy*cy
+    sprintf "matrix(%f, 0, 0, %f, %f, %f)" sx sy xScale yScale
 
 /// Finds the extra ports required for each side based on the symbol type in the form (left, right, bot)
 let numExPorts (symType : SymbolType) (numIn : int) : (int * int * int) = 
@@ -503,19 +516,28 @@ let findPortList (numIn : int) (numOut : int) (compType : ComponentType) : (stri
     [List.concat[ins; l]; List.concat[outs; r]; b; []]
 
 let getSymLabel (comp : ComponentType) (i : int) : string = 
-    let (a, _, _, _, _) = typeToInfo comp
-    match a with 
+    let (name, _, _, _, symType) = typeToInfo comp
+    match name with 
     | "" -> ""
-    | _ -> sprintf "%s%i" a i
+    | _ -> match symType with
+           | IO | Wires -> name
+           | _ -> sprintf "%s%i" name i
 
 let getDisplace (k : PortInfo Option) = 
     if getPortName k = "Clk" then -7. else -3.
     
+let makePort (i : int) (portType : PortType) (compId : ComponentId) : Port =
+    {
+        Id = uuid()
+        PortNumber = Some i
+        PortType =  portType
+        HostId = string(compId)
+    }
+
 let makeIssiePorts (l, r, b, t) (portType : PortType) : Port list =
     List.concat [l; r; b; t] 
-    |> List.filter (fun x -> x.Port.PortType = portType) 
+    |> List.filter (fun x -> x.Port.PortType = portType && x.Name <> "Clk") 
     |> List.map (fun x -> x.Port)
-
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -527,17 +549,18 @@ let makeIssiePorts (l, r, b, t) (portType : PortType) : Port list =
 let createPortInfo (i : int) (portType : PortType) (compId : ComponentId) (name : string) (invert : bool) (w : int) : PortInfo = 
     //Object creation
     {      
-        Port = {
-            Id = uuid()
-            PortNumber = Some i
-            PortType =  portType
-            HostId = string(compId)
-        }
+        Port = makePort i portType compId
         NumWires = 0
         Name = name
         Invert = invert
         Width = w
     }
+
+let portIndex (symType : SymbolType) (i : int) (len : int) (name : string) : int =
+    match symType with
+    | FFE when name <> "D" && name <> "Q" -> len - 2
+    | Mux when name = "S0" -> len - 1
+    | _ -> i
     
 /// Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) list list) (pos : XYPos) (index : int) (label : string) : Symbol =
@@ -547,8 +570,13 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
     //Getting type info for symbol/port construction
     let (_, name, wIn, _, symType) = typeToInfo compType
     let len = String.length(name) |> float
-
-    let portInfos = List.map (List.mapi (fun i (name, pType, inv) -> createPortInfo i pType _id name inv wIn)) ports
+    let inSize = 
+        List.concat ports
+        |> List.map (fun (_, y, _) -> y) 
+        |> List.filter (fun y -> y = PortType.Input) 
+        |> List.length
+    
+    let portInfos = List.map (List.mapi (fun i (name, pType, inv) -> createPortInfo (portIndex symType i inSize name)  pType _id name inv wIn)) ports
     let (leftPort, rightPort, botPort, topPort) = (portInfos.[0], portInfos.[1], portInfos.[2], portInfos.[3])
     let (left, right, bot, top) = (leftPort.Length, rightPort.Length, botPort.Length, topPort.Length)
 
@@ -588,7 +616,8 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         Id = _id
         Type = compType
         Name = name
-        Highlight = "gainsboro"
+        Highlight = true
+        HighlightError = false
         PortHighlight = false
         GenericType = symType
         PortMap = portMap
@@ -614,16 +643,16 @@ let init () =
     let custom = {
         CustomComponentType.Name = "reallyLongComponentName"
         // Tuples with (label * connection width).
-        CustomComponentType.InputLabels = [("myIn1", 0); ("myIn2", 1)] // (string * int) list
-        CustomComponentType.OutputLabels = [("myOut1", 0); ("myOut2", 1)]  //(string * int) list 
+        CustomComponentType.InputLabels = [("myIn1", 1); ("myIn2", 1)] // (string * int) list
+        CustomComponentType.OutputLabels = [("myOut1", 1); ("myOut2", 1)]  //(string * int) list 
     }
     [
-        (createSymbol (ComponentType.And) [[("IN0", PortType.Input, false); ("IN1", PortType.Input, false)]; [("OUT1", PortType.Output, true)]; []; [("OUT2", PortType.Output, true); ("reallyreallyreallylonglabelname", PortType.Output, true); ("OUT4", PortType.Output, true)]] {X = 250.; Y = 150.} 0 (getSymLabel ComponentType.And 0))
-        (createSymbol (ComponentType.MergeWires) (findPortList 1 4 ComponentType.MergeWires) {X = 50.; Y = 100.} 0 (getSymLabel ComponentType.MergeWires 0))
+        //(createSymbol (ComponentType.And) [[("IN0", PortType.Input, false); ("IN1", PortType.Input, false)]; [("OUT1", PortType.Output, true)]; []; [("OUT2", PortType.Output, true); ("reallyreallyreallylonglabelname", PortType.Output, true); ("OUT4", PortType.Output, true)]] {X = 250.; Y = 150.} 0 (getSymLabel ComponentType.And 0))
+        (createSymbol (ComponentType.SplitWire 1) (findPortList 1 2 (ComponentType.SplitWire 1)) {X = 50.; Y = 100.} 0 (getSymLabel (ComponentType.SplitWire 1)0))
         (createSymbol (ComponentType.Nand) (findPortList 2 1 ComponentType.Nand) {X = 200.; Y = 50.} 0 (getSymLabel ComponentType.Nand 0))
         (createSymbol (ComponentType.Mux2) (findPortList 2 1 ComponentType.Mux2) {X = 300.; Y = 50.} 0 (getSymLabel ComponentType.Mux2 0))
         (createSymbol (ComponentType.Demux2) (findPortList 1 2 ComponentType.Demux2) {X = 400.; Y = 50.} 0 (getSymLabel ComponentType.Demux2 0))
-        (createSymbol (ComponentType.Input 1) (findPortList 0 1 (ComponentType.Input 1)) {X = 200.; Y = 200.} 0 (getSymLabel (ComponentType.Input 1) 0))
+        (createSymbol (ComponentType.Input 2) (findPortList 0 1 (ComponentType.Input 2)) {X = 200.; Y = 200.} 0 (getSymLabel (ComponentType.Input 2) 0))
         (createSymbol (ComponentType.Decode4) (findPortList 2 4 ComponentType.Decode4) {X = 250.; Y = 250.} 0 (getSymLabel ComponentType.Decode4 0))
         (createSymbol (ComponentType.Register 1) (findPortList 1 1 (ComponentType.Register 1)) {X = 500.; Y = 100.} 0 (getSymLabel (ComponentType.Register 1) 0))
         (createSymbol (ComponentType.DFFE) (findPortList 1 1 ComponentType.DFFE) {X = 500.; Y = 200.} 0 (getSymLabel ComponentType.DFFE 0))
@@ -659,7 +688,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         model
         |> List.map (fun sym ->
             { sym with
-                Highlight = if List.contains sym.Id sIdList then "lightblue" else "gainsboro"
+                Highlight = List.contains sym.Id sIdList
             }
         )
         , Cmd.none
@@ -668,7 +697,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         model
         |> List.map (fun sym ->
             { sym with
-                Highlight = if List.contains sym.Id sIdList then "red" else "gainsboro"
+                HighlightError = List.contains sym.Id sIdList
             }
         )
         , Cmd.none
@@ -769,13 +798,13 @@ let private renderObj =
             let color =
                 match sym.GenericType with
                 | Wires -> 
-                    if sym.Highlight = "lightblue" then
-                        "purple"
-                    else if sym.PortHighlight then
-                        "green"
-                    else
-                        "darkgrey"
-                | _ -> sym.Highlight
+                    if sym.HighlightError then "red"
+                    elif sym.Highlight then "purple"
+                    else "darkgrey"
+                | _ -> 
+                    if sym.HighlightError then "red"
+                    elif sym.Highlight then "lightblue"
+                    else "gainsboro"
 
             let drawClk : ReactElement list =
                 sym
@@ -807,7 +836,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.map(fun (i, _) -> (drawPolygon (clkCoords (cornerCoords sym i)) color color 1. (rotString sym (cornerCoords sym i)))[])
             
-            let io : ReactElement = drawPolygon (tagCoords sym) strokeColour color 0.5 (rotStringObj sym)[]
+            let io : ReactElement = drawPolygon (tagCoords sym) strokeColour color 0.5 (sprintf "%s \n %s" (rotStringObj sym) (scaleString sym.Scale (midSym sym)))[]
 
             let displayBox : ReactElement =
                 rect[
@@ -935,9 +964,6 @@ let getPortIds (model : Model) (sId : ComponentId) : PortId list =
     | Some sym -> genMapList sym.PortMap (List.map (fun (_, k) -> getPortId k))
     | None -> failwithf "Error in getPortIds, couldn't find symbol"
 
-let getPortWidth (model : Model) (pId : PortId) : int = 
-    (getPortInfo model pId).Width
-
 let getHostId (model : Model) (pId : PortId) : ComponentId =
     ComponentId ((getPortInfo model pId).Port.HostId)
 
@@ -952,6 +978,7 @@ let getBoundingBox symModel symID =
     | Some x -> (x.TopL, x.BotR)
     | None -> failwithf "Could not get bounding box"
 
+/// Returns the CommonTypes.Port object of a given pId
 let getPort (model : Model) (pId : PortId) : Port = 
     model
     |> initPortSearch
@@ -975,6 +1002,7 @@ let getNumIOs (sym : Symbol) : (int * int) =
     
 //----------------------interface to Issie-----------------------------//
 
+/// Converts our Symbol type to Issie Component
 let symToIssie (sym : Symbol) : Component = 
     {
         Component.Id = string sym.Id
@@ -988,13 +1016,15 @@ let symToIssie (sym : Symbol) : Component =
         Component.W = getHWObj sym |> snd |> int
      }
 
-let extractComponent (symModel: Model) (sId:ComponentId) : Component= 
+/// Finds a component in the model from its ComponentId, and converts this into the Issie Component
+let extractComponent (symModel: Model) (sId:ComponentId) : Component = 
     symModel 
     |> List.tryFind (fun x -> x.Id = sId)
     |> function
     | Some x -> symToIssie x
     | None -> failwithf "couldnt find symbol id in extract component"
 
+/// Converts the model from a Symbol list to a Issie Component list
 let extractComponents (symModel: Model) : Component list = 
     symModel |> List.map symToIssie
 

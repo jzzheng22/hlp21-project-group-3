@@ -50,7 +50,6 @@ let editMenu dispatch =
                makeRoleItem MenuItemRole.ZoomOut|]
             |> U2.Case1
 
-
 ///Menu for operations relating to symbols    
 let symbolMenu dispatch =    
     jsOptions<MenuItemOptions> <| fun invisibleMenu ->
@@ -58,7 +57,7 @@ let symbolMenu dispatch =
         invisibleMenu.label <- "Symbol"
         invisibleMenu.visible <- true // visible
         invisibleMenu.submenu <-
-            [| makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.AltA)
+            [| makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.SymbolAddBegin)
                makeKeyItem "Delete"  "delete" (fun () -> dispatch KeyboardMsg.Del)
                menuSeparator
                makeKeyItem "Align Horizontally" "Alt+X" (fun () -> dispatch KeyboardMsg.AltX)
