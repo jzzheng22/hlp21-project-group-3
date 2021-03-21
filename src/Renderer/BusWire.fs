@@ -366,7 +366,7 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
     let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
     let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
-    let newSegments = makeWireSegments model.Symbol wId width srcPortId tgtPortId
+    let newSegments = makeWireSegments model.Symbol wId 1 srcPortId tgtPortId
     let startHoriz = 
         if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
     let endHoriz = 
