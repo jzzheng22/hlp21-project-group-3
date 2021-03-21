@@ -671,15 +671,9 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         inferWidth model
         |> function
         | Ok x -> //this is a Map<ConnectionId, int Option>
-            x 
-            |> Map.toList 
-            |> List.iter (
-                fun (k, v) -> 
-                match v with 
-                | Some a -> 
-                    let wModel, wCmd = BusWire.update (BusWire.UpdateWidth (k, a)) model.Wire
-                    {model with Wire = wModel}, Cmd.map Wire wCmd
-                | None -> model, Cmd.none
+            let conList = x |> Map.toList 
+            let wModel, wCmd = BusWire.update (BusWire.UpdateWidth conList) model.Wire
+            {model with Wire = wModel}, Cmd.map Wire wCmd
         | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
             // e.ConnectionsAffected
             // |> dispatchError model

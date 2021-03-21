@@ -69,7 +69,7 @@ type Msg =
     | MoveWires of CommonTypes.ConnectionId * int * XYPos
     | SetColor of CommonTypes.HighLightColor
     | MouseMsg of MouseT
-    | UpdateWidth of (CommonTypes.ConnectionId * int) 
+    | UpdateWidth of (CommonTypes.ConnectionId * int Option) list
     | HighlightError of CommonTypes.ConnectionId list
 
 //-------------------Helpers for functions------------------------//
@@ -775,35 +775,38 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         //{model with WX = wList}, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
-    | UpdateWidth (cId, w) ->
-    // | UpdateWidth lst ->
-        {model with
-            WX = model.WX
-                |> List.map (fun wire ->
-                    if wire.Id = cId then
-                        { wire with
-                            Width = w
-                            Segments = List.map (fun x -> {x with Width = w}) wire.Segments
-                        }
-                    else
-                        wire
-                )
-        }
+    | UpdateWidth lst ->
+    // | UpdateWidth (cId, w) ->
+        //{model with
+        //    WX = model.WX
+        //        |> List.map (fun wire ->
+        //            if wire.Id = cId then
+        //                { wire with
+        //                    Width = w
+        //                    Segments = List.map (fun x -> {x with Width = w}) wire.Segments
+        //                }
+        //            else
+        //                wire
+        //        )
+        //}
         
-        // {model with
-        //     WX = model.WX
-        //         |> List.map (fun wire ->
-        //             List.tryFind (fun x -> fst x = wire.Id) lst
-        //             |> function
-        //             | Some (_, width) -> 
-        //                 { wire with
-        //                     Width = width
-        //                     Segments = List.map (fun x -> {x with Width = width}) wire.Segments
-        //                 }
-        //             | None -> 
-        //                 wire
-        //         )
-        // }
+         {model with
+             WX = model.WX
+                 |> List.map (fun wire ->
+                     List.tryFind (fun x -> fst x = wire.Id) lst
+                     |> function
+                     | Some (_, width) -> 
+                        match width with
+                        | Some w ->
+                             { wire with
+                                 Width = w
+                                 Segments = List.map (fun x -> {x with Width = w}) wire.Segments
+                             }
+                        | _ -> wire
+                     | None -> 
+                         wire
+                 )
+         }
         , Cmd.none
     | HighlightError cIdList ->
         {model with
