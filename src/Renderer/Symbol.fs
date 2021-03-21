@@ -922,9 +922,6 @@ let getPortIds (model : Model) (sId : ComponentId) : PortId list =
     | Some sym -> genMapList sym.PortMap (List.map (fun (_, k) -> getPortId k))
     | None -> failwithf "Error in getPortIds, couldn't find symbol"
 
-let getPortWidth (model : Model) (pId : PortId) : int = 
-    (getPortInfo model pId).Width
-
 let getHostId (model : Model) (pId : PortId) : ComponentId =
     ComponentId ((getPortInfo model pId).Port.HostId)
 

@@ -171,12 +171,6 @@ let inferWidth (model : Model) =
     let canvas = (comps, conns)
     BusWidthInferer.inferConnectionsWidth canvas
 
-/// Checks that the widths are the same for connections that could not be inferred from width inferer
-let checkWidth (model : Model) (connect : CommonTypes.ConnectionId) =
-    let (port1, port2) = (BusWire.connectToPort model.Wire connect)
-    let (w1, w2) = (Symbol.getPortWidth model.Wire.Symbol port1, Symbol.getPortWidth model.Wire.Symbol port2)
-    if w1 = w2 then w1 else -1
-
 /// Sends a highlight error to buswire and symbol for the connection list given
 let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
     let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
@@ -685,15 +679,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                 | Some a -> 
                     let wModel, wCmd = BusWire.update (BusWire.UpdateWidth (k, a)) model.Wire
                     {model with Wire = wModel}, Cmd.map Wire wCmd
-
-                | None -> 
-                    let w = checkWidth model k
-                    if w = -1 then 
-                        dispatchError model [k]
-                    else 
-                        let wModel, wCmd = BusWire.update (BusWire.UpdateWidth (k, w)) model.Wire
-                        {model with Wire = wModel}, Cmd.map Wire wCmd
-
+                | None -> model, Cmd.none
         | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
             // e.ConnectionsAffected
             // |> dispatchError model
