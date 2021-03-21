@@ -550,13 +550,15 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         |> function
         | Ok x -> //this is a Map<ConnectionId, int Option>
             let conList = x |> Map.toList 
+            let conns = conList |> List.map (fun (x, _) -> x) |> BusWire.getWires deleteModel.Wire
             printf "hello UpdateWidth %A" conList
-            let wModel2, wCmd2 = BusWire.update (BusWire.UpdateWidth conList) model.Wire
-            {deleteModel with Wire = wModel2}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2]
+            let wModel2, wCmd2 = BusWire.update (BusWire.UpdateWidth conList) deleteModel.Wire
+            let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) conns))) wModel2
+            {deleteModel with Wire = sModel2}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
         | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
             let wires = e.ConnectionsAffected
-            let wModel2, wCmd2 = BusWire.update (BusWire.HighlightError wires) model.Wire
-            let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel2
+            let wModel2, wCmd2 = BusWire.update (BusWire.HighlightError wires) deleteModel.Wire
+            let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) wires))) wModel2
             printf "hello UpdateWidth Error \n Message: %s \n Connections: \n %A" e.Msg wires
             {deleteModel with Wire = sModel2}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
 

@@ -845,6 +845,10 @@ let connectedSymbols (wModel : Model) (connect : CommonTypes.ConnectionId) : Com
     let sym2 = Symbol.getHostId wModel.Symbol p2
     [sym1; sym2]
 
+let getWires (wModel : Model) (cIdList : CommonTypes.ConnectionId list) : CommonTypes.ConnectionId list =
+    wModel.WX
+    |> List.map (fun x -> x.Id)
+    |> List.filter (fun x -> not (List.contains x cIdList))
 //----------------------interface to Issie-----------------------//
 
 /// Converts a wire segment list into a list of distinct vertices
