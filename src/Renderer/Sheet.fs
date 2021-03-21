@@ -613,7 +613,6 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         inferWidth model
         |> function
         | Ok x -> //this is a Map<ConnectionId, int Option>
-            
             let conList = x |> Map.toList 
             printf "hello UpdateWidth %A" conList
             let wModel, wCmd = BusWire.update (BusWire.UpdateWidth conList) model.Wire

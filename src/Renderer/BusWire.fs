@@ -434,6 +434,7 @@ let singleWireView =
                         FontSize "7px"
                         FontWeight "Bold"
                         Fill "Black"
+                        UserSelect UserSelectOptions.None
                     ]
                 ] [str <| sprintf "%i" props.Width]   
             let highlightCircles =
