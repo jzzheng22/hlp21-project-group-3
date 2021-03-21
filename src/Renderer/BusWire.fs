@@ -82,7 +82,7 @@ let routeWire (model: Symbol.Model) (sourcePortId: CommonTypes.PortId) (targetPo
     let yOffset = 10. // Length of Vertical line coming out of/going into port
     match Symbol.getPortEdge model sourcePortId, Symbol.getPortEdge model targetPortId with 
     | Symbol.Right,Symbol.Left -> 
-        if diff.X >= 0. then // Three Segement Case
+        if diff.X > 0. then // Three Segement Case
             let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
             let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
             [sourcePos;endPosSeg0;endPosSeg1;targetPos]
@@ -541,6 +541,27 @@ let segLength (seg: WireSegment): float =
     ||> Symbol.posDiff
     |> fun diff -> (sqrt diff.X ** 2. + diff.Y ** 2.)
 
+///Returns true if first segment is shorter than offset (9.) and false otherwise
+let checkFirstSegmentLength (wire:Wire) (sm: Symbol.Model) =
+    let src= Symbol.getPortCoords sm wire.SourcePortId
+    let head= List.head wire.Segments
+    match wire.SourcePortEdge with 
+    | Symbol.Right when head.TargetPos.X<src.X + 9. -> true
+    | Symbol.Left when head.TargetPos.X>src.X - 9. ->true
+    | Symbol.Top when head.TargetPos.Y>src.Y - 9. ->true
+    | Symbol.Bottom when head.TargetPos.Y<src.Y + 9. ->true
+    | _ -> false
+///Returns true if first segment is shorter than offset (9.) and true otherwise
+let checkLastSegmentLength (wire:Wire) (sm: Symbol.Model) =
+
+    let tgt= Symbol.getPortCoords sm wire.TargetPortId
+    let tail = List.last wire.Segments
+    match wire.TargetPortEdge with 
+    | Symbol.Right when tail.SourcePos.X<tgt.X + 9. -> true
+    | Symbol.Left when tail.SourcePos.X>tgt.X - 9. ->true
+    | Symbol.Top when tail.SourcePos.Y>tgt.Y - 9. ->true
+    | Symbol.Bottom when tail.SourcePos.Y<tgt.Y + 9. ->true
+    | _ -> false
 let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
     let noOfSegments= List.length wire.Segments
     let last = noOfSegments - 1
@@ -554,22 +575,11 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
     let head= List.head wire.Segments
     let tail = List.last wire.Segments
 
-    let fstLength = 
-        match wire.SourcePortEdge with 
-        | Symbol.Right when head.TargetPos.X<src.X + 9. -> true
-        | Symbol.Left when head.TargetPos.X>src.X - 9. ->true
-        | Symbol.Top when head.TargetPos.Y>src.Y - 9. ->true
-        | Symbol.Bottom when head.TargetPos.Y<src.Y + 9. ->true
-        | _ -> false
+    let fstLength = checkFirstSegmentLength wire sm
     
     //if head.TargetPos.X<src.X + 9. then true else false
-    let LstLength = 
-        match wire.TargetPortEdge with 
-        | Symbol.Right when tail.SourcePos.X<tgt.X + 9. -> true
-        | Symbol.Left when tail.SourcePos.X>tgt.X - 9. ->true
-        | Symbol.Top when tail.SourcePos.Y>tgt.Y - 9. ->true
-        | Symbol.Bottom when tail.SourcePos.Y<tgt.Y + 9. ->true
-        | _ -> false
+    let lstLength = checkLastSegmentLength wire sm
+
 
 
     wire.Segments
@@ -593,22 +603,22 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
         | 2,false,_ when fstLength ->
             makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X ; Y=seg.SourcePos.Y+ vecSrc.Y} seg.TargetPos
         
-        | x,_,true when x=last && LstLength ->
+        | x,_,true when x=last && lstLength ->
             makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
 
-        | x,_,true when x=last - 1 && LstLength ->
+        | x,_,true when x=last - 1 && lstLength ->
             makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X + vecTgt.X; Y=seg.SourcePos.Y} (Symbol.posAdd seg.TargetPos vecTgt)
 
-        | x,_,true when x=last - 2 && LstLength ->
+        | x,_,true when x=last - 2 && lstLength ->
             makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X + vecTgt.X; Y=seg.TargetPos.Y}
 
-        | x,_,false when x=last && LstLength ->
+        | x,_,false when x=last && lstLength ->
             makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
 
-        | x,_,false when x=last - 1 && LstLength ->
+        | x,_,false when x=last - 1 && lstLength ->
             makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X ; Y=seg.SourcePos.Y + vecTgt.Y} (Symbol.posAdd seg.TargetPos vecTgt)
 
-        | x,_,false when x=last - 2 && LstLength ->
+        | x,_,false when x=last - 2 && lstLength ->
             makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X ; Y=seg.TargetPos.Y + vecTgt.Y}
         
         | 0,true,_ ->
@@ -664,6 +674,11 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
 /// Rule that chekds if a the number of segments would change after 
 /// routing the wire to its new position, as this indicates a need to 
 /// switch back to autorouting.
+/// 
+let routeRuleShortEnds (wire: Wire) (sm: Symbol.Model) : bool =
+    not (checkFirstSegmentLength wire sm && checkLastSegmentLength wire sm) 
+
+
 let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) : bool =
     let currentSegmentCount = wire.Segments.Length
     let newVertexCount = 
@@ -687,6 +702,7 @@ let routeRuleList =
         routeRuleCaseChange
         routeRuleAfterRotation
         routeRuleTwoSegment
+        routeRuleShortEnds
     ]
 
 /// Decides whether a wire ought to continue being manually routed or be
