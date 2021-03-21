@@ -539,7 +539,7 @@ let verifyWire (model: Model) (wire: Wire): Wire option =
 let segLength (seg: WireSegment): float =
     (seg.TargetPos,seg.SourcePos)
     ||> Symbol.posDiff
-    |> (fun diff -> (sqrt diff.X ** 2. + diff.Y ** 2.))
+    |> fun diff -> (sqrt diff.X ** 2. + diff.Y ** 2.)
 
 let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
     let noOfSegments= List.length wire.Segments
@@ -709,12 +709,7 @@ let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm:
     |> List.collect (fun pId ->
         model.WX
         |> List.filter (fun w ->
-            if pId = w.SourcePortId || pId = w.TargetPortId then 
-                true 
-            else 
-                false
-        )
-    )
+            pId = w.SourcePortId || pId = w.TargetPortId))
     |> List.map (fun w -> w.Id)
     |> List.distinct
 
@@ -843,8 +838,10 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 else 
                     w 
             )
-        if validateWires wList then {model with WX = wList}, Cmd.none else model, Cmd.none
-        //{model with WX = wList}, Cmd.none
+        if validateWires wList then 
+            {model with WX = wList}, Cmd.none 
+        else 
+            model, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | UpdateWidth lst ->        
