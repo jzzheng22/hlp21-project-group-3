@@ -514,7 +514,7 @@ let makePort (i : int) (portType : PortType) (compId : ComponentId) : Port =
     }
 
 let makeIssiePorts (l, r, b, t) (portType : PortType) : Port list =
-    List.concat [l; r; b] 
+    List.concat [l; r; b; t] 
     |> List.filter (fun x -> x.Port.PortType = portType && x.Name <> "Clk") 
     |> List.map (fun x -> x.Port)
 //---------------------------------------------------------------------------//
@@ -534,6 +534,12 @@ let createPortInfo (i : int) (portType : PortType) (compId : ComponentId) (name 
         Invert = invert
         Width = w
     }
+
+let portIndex (symType : SymbolType) (i : int) (len : int) (name : string) : int =
+    match symType with
+    | FFE when name <> "D" && name <> "Q" -> len - 2
+    | Mux when name = "S0" -> len - 1
+    | _ -> i
     
 /// Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) list list) (pos : XYPos) (index : int) (label : string) : Symbol =
@@ -543,9 +549,9 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
     //Getting type info for symbol/port construction
     let (_, name, wIn, _, symType) = typeToInfo compType
     let len = String.length(name) |> float
+    let inSize = ports |> List.concat |> List.map (fun (x, y, z) -> y) |> List.filter (fun y -> y = PortType.Input) |> List.length
     
-
-    let portInfos = List.map (List.mapi (fun i (name, pType, inv) -> createPortInfo i pType _id name inv wIn)) ports
+    let portInfos = List.map (List.mapi (fun i (name, pType, inv) -> createPortInfo (portIndex symType i inSize name)  pType _id name inv wIn)) ports
     let (leftPort, rightPort, botPort, topPort) = (portInfos.[0], portInfos.[1], portInfos.[2], portInfos.[3])
     let (left, right, bot, top) = (leftPort.Length, rightPort.Length, botPort.Length, topPort.Length)
 
@@ -619,12 +625,12 @@ let init () =
         //(createSymbol (ComponentType.And) [[("IN0", PortType.Input, false); ("IN1", PortType.Input, false)]; [("OUT1", PortType.Output, true)]; []; [("OUT2", PortType.Output, true); ("reallyreallyreallylonglabelname", PortType.Output, true); ("OUT4", PortType.Output, true)]] {X = 250.; Y = 150.} 0 (getSymLabel ComponentType.And 0))
         (createSymbol (ComponentType.SplitWire 1) (findPortList 1 2 (ComponentType.SplitWire 1)) {X = 50.; Y = 100.} 0 (getSymLabel (ComponentType.SplitWire 1)0))
         (createSymbol (ComponentType.Nand) (findPortList 2 1 ComponentType.Nand) {X = 200.; Y = 50.} 0 (getSymLabel ComponentType.Nand 0))
-        //(createSymbol (ComponentType.Mux2) (findPortList 2 1 ComponentType.Mux2) {X = 300.; Y = 50.} 0 (getSymLabel ComponentType.Mux2 0))
-        //(createSymbol (ComponentType.Demux2) (findPortList 1 2 ComponentType.Demux2) {X = 400.; Y = 50.} 0 (getSymLabel ComponentType.Demux2 0))
+        (createSymbol (ComponentType.Mux2) (findPortList 2 1 ComponentType.Mux2) {X = 300.; Y = 50.} 0 (getSymLabel ComponentType.Mux2 0))
+        (createSymbol (ComponentType.Demux2) (findPortList 1 2 ComponentType.Demux2) {X = 400.; Y = 50.} 0 (getSymLabel ComponentType.Demux2 0))
         (createSymbol (ComponentType.Input 2) (findPortList 0 1 (ComponentType.Input 2)) {X = 200.; Y = 200.} 0 (getSymLabel (ComponentType.Input 2) 0))
         (createSymbol (ComponentType.Decode4) (findPortList 2 4 ComponentType.Decode4) {X = 250.; Y = 250.} 0 (getSymLabel ComponentType.Decode4 0))
         (createSymbol (ComponentType.Register 1) (findPortList 1 1 (ComponentType.Register 1)) {X = 500.; Y = 100.} 0 (getSymLabel (ComponentType.Register 1) 0))
-        //(createSymbol (ComponentType.DFFE) (findPortList 1 1 ComponentType.DFFE) {X = 500.; Y = 200.} 0 (getSymLabel ComponentType.DFFE 0))
+        (createSymbol (ComponentType.DFFE) (findPortList 1 1 ComponentType.DFFE) {X = 500.; Y = 200.} 0 (getSymLabel ComponentType.DFFE 0))
         (createSymbol (ComponentType.RAM memory) (findPortList 1 1 (ComponentType.RAM memory)) {X = 500.; Y = 300.} 0 (getSymLabel (ComponentType.RAM memory) 0))
         (createSymbol (ComponentType.Custom custom) (findPortList (List.length custom.InputLabels) (List.length custom.OutputLabels) (ComponentType.Custom custom)) {X = 20.; Y = 300.} 0 (getSymLabel (ComponentType.Custom custom) 0))
     ]
