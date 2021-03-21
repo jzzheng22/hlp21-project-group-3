@@ -59,7 +59,8 @@ type Symbol =
         Id : ComponentId
         Type : ComponentType
         Name : string
-        Highlight : string
+        Highlight : bool
+        HighlightError : bool
         PortHighlight : bool
         PortMap : Map<XYPos, PortInfo Option>
         GenericType : SymbolType
@@ -583,7 +584,8 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         Id = _id
         Type = compType
         Name = name
-        Highlight = "gainsboro"
+        Highlight = true
+        HighlightError = false
         PortHighlight = false
         GenericType = symType
         PortMap = portMap
@@ -653,7 +655,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         model
         |> List.map (fun sym ->
             { sym with
-                Highlight = if List.contains sym.Id sIdList then "lightblue" else "gainsboro"
+                Highlight = List.contains sym.Id sIdList
             }
         )
         , Cmd.none
@@ -662,7 +664,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         model
         |> List.map (fun sym ->
             { sym with
-                Highlight = if List.contains sym.Id sIdList then "red" else "gainsboro"
+                HighlightError = List.contains sym.Id sIdList
             }
         )
         , Cmd.none
@@ -763,13 +765,13 @@ let private renderObj =
             let color =
                 match sym.GenericType with
                 | Wires -> 
-                    if sym.Highlight = "lightblue" then
-                        "purple"
-                    else if sym.PortHighlight then
-                        "green"
-                    else
-                        "darkgrey"
-                | _ -> sym.Highlight
+                    if sym.HighlightError then "red"
+                    elif sym.Highlight then "purple"
+                    else "darkgrey"
+                | _ -> 
+                    if sym.HighlightError then "red"
+                    elif sym.Highlight then "lightblue"
+                    else "gainsboro"
 
             let drawClk : ReactElement list =
                 sym
