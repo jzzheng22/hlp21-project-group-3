@@ -48,6 +48,7 @@ type Msg =
     | BeginSizeEdit of CommonTypes.ComponentId
     | EditSize of (CommonTypes.ComponentId * XYPos)
     | ErrorMsg of string
+    | UpdateWidths 
 
 type MouseOps =
     | MouseDown
@@ -164,7 +165,9 @@ let cornersToString startCoord endCoord =
 ///Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
 let inferWidth (model : Model) = 
     let comps = Symbol.extractComponents model.Wire.Symbol
+    printf"hello\n inferWidth comps:\n %A" comps
     let conns = BusWire.extractWires model.Wire 
+    printf"hello\n inferWidth conns:\n %A" conns
     let canvas = (comps, conns)
     BusWidthInferer.inferConnectionsWidth canvas
 
@@ -175,15 +178,18 @@ let checkWidth (model : Model) (connect : CommonTypes.ConnectionId) =
     if w1 = w2 then w1 else -1
 
 /// Sends a highlight error to buswire and symbol for the connection list given
-let dispatchError (model : Model) (dispatch: Dispatch<Msg>) (wires : CommonTypes.ConnectionId list)  =
-    dispatch <| Wire(BusWire.HighlightError wires)
-    dispatch <| Symbol(Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))
+let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
+    BusWire.update (BusWire.HighlightError wires) model.Wire
+    BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) model.Wire.Symbol
+
+//BusWire.update (BusWire.DeleteWires wiresToDelete) model.Wire
+//BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
 
 /// Update width will call inferWidth, which sets up the variables and calls the BusWidthInferer module
 /// This will either return Ok x, which may be Some - in which case we update the connection width
 /// If Ok x is None, we ask Symbol what the width should be, if the two port widths on either end of the connection don't match, we dispatch the error highlighting
 /// If the BusWidthInferer returns Error, then we dispatch the error highlight messages, (TODO: and a message to display a popup on screen)
-let updateWidth (model : Model) (dispatch: Dispatch<Msg>) =
+let updateWidth (model : Model)  =
     inferWidth model
     |> function
     | Ok x -> //this is a Map<ConnectionId, int Option>
@@ -193,14 +199,18 @@ let updateWidth (model : Model) (dispatch: Dispatch<Msg>) =
             fun (k, v) -> 
             match v with 
             | Some a -> 
-                dispatch <| Wire(BusWire.UpdateWidth (k, a))
+                BusWire.update (BusWire.UpdateWidth (k, a)) model.Wire
             | None -> 
                 let w = checkWidth model k
-                if w = -1 then dispatchError model dispatch [k]
-                else dispatch <| Wire(BusWire.UpdateWidth (k, w)))
+                if w = -1 then dispatchError model [k]
+                else BusWire.update (BusWire.UpdateWidth (k, w))) model.Wire
     | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
         e.ConnectionsAffected
-        |> dispatchError model dispatch
+        |> dispatchError model
+
+//let deleteSymbols model wModel =
+//BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
+//BusWire.update (BusWire.DeleteWires wiresToDelete) model.Wire
 
 let drawError (msg : string) : ReactElement list = 
     let drawBox = 
@@ -337,7 +347,7 @@ let mouseUp model mousePos dispatch =
         /// Here buswidth inferer should be called? ///
         /// --------------------------------------- ///
             -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
-               updateWidth model dispatch
+               
         | _ -> ()
     | None -> ()
     if model.SelectingMultiple then
@@ -634,6 +644,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         {model with EditSizeOf = Some id}, Cmd.none
     | EditSize (id, mousePos) -> 
         changeSymbolSize model id mousePos
+    | UpdateWidths -> updateWidth model dispatch, Cmd.none
     | ErrorMsg msg -> model, Cmd.none
 
 let init () =
