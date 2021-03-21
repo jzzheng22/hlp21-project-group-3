@@ -509,9 +509,9 @@ let init n () =
 
 /// Checks if a wire connects an Output Port to an Input Port
 let ruleOutToIn (model: Model) (wire: Wire) : bool = 
-    match Symbol.getPortType model.Symbol wire.SourcePortId , Symbol.getPortType model.Symbol wire.TargetPortId with 
-    | CommonTypes.Output , CommonTypes.Input -> true
-    | _ , _ -> false
+    match Symbol.getPortType model.Symbol wire.SourcePortId, Symbol.getPortType model.Symbol wire.TargetPortId with 
+    | CommonTypes.Output, CommonTypes.Input -> true
+    | _ -> false
 
 /// Checks if the wire's target port already has a wire driving it. By-product of this is that it disallows duplicate wire creation.
 let ruleUnique (model: Model) (wire: Wire) : bool =
@@ -674,12 +674,12 @@ let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) : bool =
 
 /// Rule that states that the wire must switch back to autorouting after symbol rotation
 let routeRuleAfterRotation (wire: Wire) (sm: Symbol.Model) : bool =
-    (wire.SourcePortEdge,wire.TargetPortEdge) = (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId) 
+    (wire.SourcePortEdge, wire.TargetPortEdge) = (Symbol.getPortEdge sm wire.SourcePortId, Symbol.getPortEdge sm wire.TargetPortId) 
 
 
 /// Rule stating two segment wires may not be autorouted
 let routeRuleTwoSegment (wire: Wire) (sm: Symbol.Model) : bool =
-    not(List.length wire.Segments < 3)
+    not (List.length wire.Segments < 3)
 
         
 let routeRuleList =
@@ -721,17 +721,17 @@ let updateWires (model: Model) (sm: Symbol.Model) (wIds: CommonTypes.ConnectionI
             let newWire = decideManual w sm
             let srcEdge = Symbol.getPortEdge sm newWire.SourcePortId
             let tgtEdge = Symbol.getPortEdge sm newWire.TargetPortId
-            let startHoriz = not(srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
-            let endHoriz = not(tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
-                
-            match newWire.Manual with
-            | false -> {newWire with 
-                            Segments = makeWireSegments sm newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
-                            SourcePortEdge = srcEdge
-                            TargetPortEdge = tgtEdge
-                            StartHoriz = startHoriz
-                            EndHoriz = endHoriz}
-            | true -> {newWire with Segments = (manualRoute newWire sm)}
+            let startHoriz = not (srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
+            let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
+            if newWire.Manual then
+                {newWire with Segments = (manualRoute newWire sm)}
+            else
+                {newWire with 
+                    Segments = makeWireSegments sm newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
+                    SourcePortEdge = srcEdge
+                    TargetPortEdge = tgtEdge
+                    StartHoriz = startHoriz
+                    EndHoriz = endHoriz}
         else w
     )
 
@@ -759,7 +759,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             match Symbol.getPortType model.Symbol portId1 , Symbol.getPortType model.Symbol portId2 with
             | CommonTypes.Output , CommonTypes.Input -> makeNewWire model portId1 portId2 // Wire was drawn from Output to Input
             | CommonTypes.Input , CommonTypes.Output -> makeNewWire model portId2 portId1 // Wire was drawn from Input to Output
-            | _ , _ -> makeNewWire model portId1 portId2 // Invalid port combination, will be caught by verifyWire
+            | _ -> makeNewWire model portId1 portId2 // Invalid port combination, will be caught by verifyWire
              
         match verifyWire model unverifiedWire with
         | Some w -> {model with WX = w::model.WX}, Cmd.none
@@ -947,10 +947,3 @@ let extractWiress (wModel: Model) : CommonTypes.Component list =
 /// Update the symbol with matching componentId to comp, or add a new symbol based on comp.
 let updateSymbolModelWithComponent (symModel: Model) (comp:CommonTypes.Component) =
     failwithf "Not Implemented"
-
-
-
-    
-
-
-
