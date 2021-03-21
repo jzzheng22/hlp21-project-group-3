@@ -809,7 +809,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.map(fun (i, _) -> (drawPolygon (clkCoords (cornerCoords sym i)) color color 1. (rotString sym (cornerCoords sym i)))[])
             
-            let io : ReactElement = drawPolygon (tagCoords sym) strokeColour color 0.5 (rotStringObj sym)[]
+            let io : ReactElement = drawPolygon (tagCoords sym) strokeColour color 0.5 (sprintf "%s \n %s" (rotStringObj sym) (scaleString sym.Scale (midSym sym)))[]
 
             let displayBox : ReactElement =
                 rect[
