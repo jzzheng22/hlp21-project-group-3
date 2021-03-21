@@ -16,17 +16,16 @@ type Model =
       SelectedWireSegments: (CommonTypes.ConnectionId * int) list
       SelectingMultiple: bool
       EditSizeOf: CommonTypes.ComponentId option
+      AddingSymbol: bool
       DragStartPos: XYPos
       DraggingPos: XYPos }
 
 type KeyboardMsg =
-    | CtrlS
-    | AltC
-    | AltV
-    | AltZ
+    | AltX
+    | AltY
     | AltShiftZ
     | Del
-    | AltA
+    | BeginAddingSymbol
     | ZoomCanvasIn 
     | ZoomCanvasOut
     | SymbolClockwise
@@ -47,6 +46,7 @@ type Msg =
     | DispatchMove of XYPos
     | BeginSizeEdit of CommonTypes.ComponentId
     | EditSize of (CommonTypes.ComponentId * XYPos)
+    | FinishSymbolAddition
 
 type MouseOps =
     | MouseDown
@@ -272,22 +272,25 @@ let highlightCorners model box =
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
-let mouseDown model mousePos dispatch = 
-    match Symbol.isPort model.Wire.Symbol mousePos with
-    | Some (_, portId) -> 
-        dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
-    | None ->
-        match nearCorner model mousePos with 
-        | Some (id, _, _) -> 
-            dispatch <| BeginSizeEdit id 
-        | None ->  
-            let overlappingComponentList = 
-                model.SelectedComponents
-                |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
-                |> List.filter (inBoundingBox mousePos) 
-            if List.isEmpty overlappingComponentList then
-                selectElements model mousePos dispatch
-    dispatch <| SelectDragStart mousePos
+let mouseDown model mousePos dispatch =
+    if model.AddingSymbol then
+        dispatch <| FinishSymbolAddition
+    else
+        match Symbol.isPort model.Wire.Symbol mousePos with
+        | Some (_, portId) -> 
+            dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
+        | None ->
+            match nearCorner model mousePos with 
+            | Some (id, _, _) -> 
+                dispatch <| BeginSizeEdit id 
+            | None ->  
+                let overlappingComponentList = 
+                    model.SelectedComponents
+                    |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
+                    |> List.filter (inBoundingBox mousePos) 
+                if List.isEmpty overlappingComponentList then
+                    selectElements model mousePos dispatch
+        dispatch <| SelectDragStart mousePos
     
 
 let mouseUp model mousePos dispatch = 
@@ -310,24 +313,28 @@ let increaseBoundingBox (a, topL, botR) =
     a, {X = topL.X - 10.; Y = topL.Y - 10.}, {X = botR.X + 10.; Y = botR.Y + 10.}
 
 let mouseMove model mousePos dispatch mDown = 
-    let symbolIDList =
-        Symbol.getBoundingBoxes model.Wire.Symbol mousePos
-        |> List.map increaseBoundingBox
-        |> getSymbolIDList (List.filter (removeSymbolID inBoundingBox mousePos))
-
-    dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
-
-    if mDown then // Drag
-        match model.SelectedPort with
-        | (Some _, _) -> ()
-        | _ ->
-            match model.EditSizeOf with 
-            | Some id -> 
-                dispatch <| EditSize (id, mousePos)
-            | _ -> 
-                dispatch <| DispatchMove mousePos
-
+    if model.AddingSymbol then 
+        dispatch <| DispatchMove mousePos
         dispatch <| SelectDragging mousePos
+    else 
+        let symbolIDList =
+            Symbol.getBoundingBoxes model.Wire.Symbol mousePos
+            |> List.map increaseBoundingBox
+            |> getSymbolIDList (List.filter (removeSymbolID inBoundingBox mousePos))
+
+        dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
+
+        if mDown then // Drag
+            match model.SelectedPort with
+            | (Some _, _) -> ()
+            | _ ->
+                match model.EditSizeOf with 
+                | Some id -> 
+                    dispatch <| EditSize (id, mousePos)
+                | _ -> 
+                    dispatch <| DispatchMove mousePos
+
+            dispatch <| SelectDragging mousePos
 
 
 let mDown (ev: Types.MouseEvent) = ev.buttons <> 0.
@@ -420,7 +427,7 @@ let moveElements model mousePos =
     else
         { model with SelectingMultiple = true}, Cmd.none
 
-
+///Scales a symbol according to the mouse position.
 let changeSymbolSize model id mousePos =
     let topL, botR = Symbol.getBoundingBox model.Wire.Symbol id
     let mouseXOffset = max (abs (mousePos.X - topL.X)) (abs (mousePos.X - botR.X))
@@ -434,11 +441,15 @@ let changeSymbolSize model id mousePos =
     let currentBoxWidth = abs (topL.X - botR.X)
     let currentBoxHeight = abs (topL.Y - botR.Y)
 
-    let scaleMsg = id, {X = snapX / currentBoxWidth; Y = snapY / currentBoxHeight}
-    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale scaleMsg)) model.Wire
-    {model with Wire = sModel}, Cmd.map Wire sCmd
+    let condition (boxWidth: float) (adjustment: float) = boxWidth <= unzoomedGrid && adjustment < boxWidth
+    if ((condition currentBoxWidth snapX) || (condition currentBoxHeight snapY)) then
+        model, Cmd.none
+    else 
+        let scaleMsg = id, {X = snapX / currentBoxWidth; Y = snapY / currentBoxHeight}
+        let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale scaleMsg)) model.Wire
+        {model with Wire = sModel}, Cmd.map Wire sCmd
 
-
+///Moves a symbol so that it snaps to grid.
 let snapSymbolToGrid model =
     let transVector =
         Symbol.getBoundingBox model.Wire.Symbol (List.head model.SelectedComponents)
@@ -451,19 +462,6 @@ let snapSymbolToGrid model =
         SelectedPort = None, CommonTypes.PortType.Input;
         SelectingMultiple = false }, Cmd.map Wire sCmd
 
-let snapWireSegmentToGrid model =
-    // A wire segment can only be dragged and snapped horizontally or vertically
-    let transVector =
-        if abs (model.DraggingPos.X - model.DragStartPos.X) > abs (model.DraggingPos.Y - model.DragStartPos.Y) then 
-            snapGridVector {X = model.DraggingPos.X; Y = 0.0}
-        else 
-            snapGridVector {X = 0.0; Y = model.DraggingPos.Y}
-    let wireSegment = List.head model.SelectedWireSegments
-    let wModel, wCmd = BusWire.update (BusWire.MoveWires(fst wireSegment, snd wireSegment, transVector)) model.Wire 
-    { model with 
-        Wire = wModel;
-        SelectedPort = None, CommonTypes.PortType.Input;
-        SelectingMultiple = false }, Cmd.map Wire wCmd
 
 let topleftCorners model =
     model.SelectedComponents
@@ -534,15 +532,25 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               SelectedWireSegments = [] },
         Cmd.batch [ Cmd.map Wire wCmd;
                     Cmd.map Wire sCmd ]
-    | KeyPress AltA ->
+    | KeyPress BeginAddingSymbol ->
         let sModel, sCmd =
             BusWire.update
                 (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, (getNewSymbolIndex model CommonTypes.ComponentType.Mux2))))
                 model.Wire
-
-        { model with Wire = sModel }, Cmd.map Wire sCmd 
+        let newModel = {model with Wire = sModel}
+        let newSymPos = {X = newModel.DraggingPos.X + unzoomedGrid; Y = newModel.DraggingPos.Y + unzoomedGrid}
+        //Find id of new symbol that was not in the old model.
+        let symbolIDList =
+            Symbol.getBoundingBoxes newModel.Wire.Symbol newSymPos
+            |> List.filter (fun a -> not <| List.contains a (Symbol.getBoundingBoxes model.Wire.Symbol newSymPos))
+            |> List.map getSymbolID 
+        { newModel with SelectedComponents = symbolIDList;
+                     AddingSymbol = true;
+                     SelectedPort = None, CommonTypes.PortType.Input;
+                     SelectingMultiple = false; 
+                     EditSizeOf = None}, Cmd.map Wire sCmd 
     /// Align along x-axis
-    | KeyPress AltC ->
+    | KeyPress AltX ->
         let leftMost =  List.minBy (fun a -> a.X) (topleftCorners model)
         List.map (fun a ->
             if a.X <> leftMost.X then 
@@ -550,7 +558,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             else 
                 {X = 0.0; Y = 0.0}) (topleftCorners model)
         |> alignComponents model
-    | KeyPress AltV ->
+    ///Align along y-axis
+    | KeyPress AltY ->
         let downMost = List.maxBy (fun a -> a.Y) (topleftCorners model)
         List.map (fun a ->
             if a.Y <> downMost.Y then 
@@ -559,15 +568,6 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                 {X = 0.0; Y = 0.0}) (topleftCorners model)
         |> alignComponents model
 
-    | KeyPress s -> // all other keys are turned into SetColor commands
-        let c =
-            match s with
-            | AltC -> CommonTypes.Blue
-            | AltV -> CommonTypes.Green
-            | AltZ -> CommonTypes.Red
-            | _ -> CommonTypes.Grey
-
-        model, Cmd.ofMsg (Wire <| BusWire.SetColor c)
     | SelectPort (portID, portType) -> { model with SelectedPort = Some portID, portType }, Cmd.none
     | SelectComponents scMsg ->
         { model with SelectedComponents = scMsg }, Cmd.none
@@ -580,8 +580,6 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | SelectDragEnd ->
         if not (List.isEmpty model.SelectedComponents) then
             snapSymbolToGrid model
-        elif not (List.isEmpty model.SelectedWireSegments) then
-                snapWireSegmentToGrid model
         else
             { model with 
                 SelectedPort = None, CommonTypes.PortType.Input;
@@ -595,6 +593,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         {model with EditSizeOf = Some id}, Cmd.none
     | EditSize (id, mousePos) -> 
         changeSymbolSize model id mousePos
+    | FinishSymbolAddition ->
+        {model with SelectedComponents = []; AddingSymbol = false}, Cmd.none
 
 let init () =
     let model, cmds = (BusWire.init 400) ()
@@ -606,6 +606,7 @@ let init () =
       SelectedWireSegments = []
       SelectingMultiple = false
       EditSizeOf = None
+      AddingSymbol = false
       DragStartPos = origin
       DraggingPos = origin },
     Cmd.map Wire cmds
