@@ -312,14 +312,18 @@ let isPortInverse (port : PortInfo Option) : bool =
 
 /// Coordinates to create the tag shape used for input/output symbols,
 let tagCoords (sym : Symbol) : string =
-    let (i, a) = if sym.Type = ComponentType.Input 1 then 0., -1. else snd (getHWObj sym), 1.
+    let (i, a) = 
+        match sym.Type with 
+        | ComponentType.Input _ ->  0., -1. 
+        | _ -> snd (getHWObj sym), 1.
+
     let midX = midSymX sym
     let midY = midSymY sym
     (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" 
-        (sym.TopL.X + (i + (a * 5.))) (midY - 10.) 
-        (sym.TopL.X + (i + (a * 5.))) (midY + 10.) 
+        (midX - 20. + (i + (a * 5.))) (midY - 10.) 
+        (midX - 20. + (i + (a * 5.))) (midY + 10.) 
         (midX - ((i/7.) + (a * 5.))) (midY + 10.) 
-        (sym.BotR.X - ((i * 1.2) + (a * 5.))) midY 
+        (midX + 20. - ((i * 1.2) + (a * 5.))) midY 
         (midX - ((i/7.) + (a * 5.))) (midY - 10.))
 
 let cornerCoords (sym : Symbol) (i : XYPos) : XYPos = 
@@ -343,6 +347,14 @@ let rotString (sym : Symbol) (pos : XYPos) =
     sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
 
 let rotStringObj (sym : Symbol) = rotString sym (midSym sym)
+
+/// Converts a scale and a centre and returns the matrix for svg scaling about that central point
+let scaleString (scale : XYPos) (centre : XYPos) : string = 
+    let (cx, cy) = centre.X, centre.Y
+    let (sx, sy) = scale.X, scale.Y
+    let xScale = cx-sx*cx
+    let yScale = cy-sy*cy
+    sprintf "matrix(%f, 0, 0, %f, %f, %f)" sx sy xScale yScale
 
 /// Finds the extra ports required for each side based on the symbol type in the form (left, right, bot)
 let numExPorts (symType : SymbolType) (numIn : int) : (int * int * int) = 
@@ -797,7 +809,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.map(fun (i, _) -> (drawPolygon (clkCoords (cornerCoords sym i)) color color 1. (rotString sym (cornerCoords sym i)))[])
             
-            let io : ReactElement = drawPolygon (tagCoords sym) strokeColour color 0.5 (rotStringObj sym)[]
+            let io : ReactElement = drawPolygon (tagCoords sym) strokeColour color 0.5 (sprintf "%s \n %s" (rotStringObj sym) (scaleString sym.Scale (midSym sym)))[]
 
             let displayBox : ReactElement =
                 rect[
