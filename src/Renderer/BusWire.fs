@@ -74,13 +74,13 @@ type Msg =
 
 /// Takes Source and Target ports of a wire and returns the 
 /// vertices of the path it should follow
-let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : XYPos list =
-    let sourcePos = Symbol.getPortCoords model.Symbol sourcePortId
-    let targetPos = Symbol.getPortCoords model.Symbol targetPortId
+let routeWire (model: Symbol.Model) (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : XYPos list =
+    let sourcePos = Symbol.getPortCoords model sourcePortId
+    let targetPos = Symbol.getPortCoords model targetPortId
     let diff = Symbol.posDiff targetPos sourcePos
     let xOffset = 10. // Length of Horizontal line coming out of/going into port
     let yOffset = 10. // Length of Vertical line coming out of/going into port
-    match Symbol.getPortEdge model.Symbol sourcePortId, Symbol.getPortEdge model.Symbol targetPortId with 
+    match Symbol.getPortEdge model sourcePortId, Symbol.getPortEdge model targetPortId with 
     | Symbol.Right,Symbol.Left -> 
         if diff.X >= 0. then // Three Segement Case
             let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
@@ -352,10 +352,10 @@ let setIndex (lst: WireSegment list) =
     |> List.mapi (fun i seg-> {seg with Index= i})
 
 /// Calculates and creates all wire segments
-let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) 
+let makeWireSegments (sm: Symbol.Model) (wId: CommonTypes.ConnectionId) (width: int) 
     (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : WireSegment list =
 
-    (routeWire model sourcePortId targetPortId)
+    (routeWire sm sourcePortId targetPortId)
     |> List.pairwise
     |> List.map (fun (src,tgt) -> makeWireSegment wId 1 src tgt)
     |> setIndex
@@ -366,9 +366,12 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
     let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
     let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
-    let newSegments = makeWireSegments model wId srcPortId tgtPortId
-    let startHoriz = not (srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
-    let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
+    let newSegments = makeWireSegments model.Symbol wId width srcPortId tgtPortId
+    let startHoriz = 
+        if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
+    let endHoriz = 
+        if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
+            
     {
         Id = wId
         SourcePortId = srcPortId
@@ -500,24 +503,7 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
 let init n () =
     let symbols, cmd = Symbol.init()
     let symIds = List.map (fun (sym:Symbol.Symbol) -> sym.Id) symbols
-    (*let rng = System.Random 0
-    let ports = Symbol.initPortSearch symbols 
-    let outPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Output) ports).Value
-    let inPort = (List.tryFind (fun (p: Symbol.Portinfo) -> p.Port.PortType = CommonTypes.Input && p.Port.HostId <> outPort.Port.HostId) ports).Value
-    let id = CommonTypes.ConnectionId (Helpers.uuid())
-    let vert = routeWire (Symbol.getPortCoords symbols (CommonTypes.PortId outPort.Port.Id)) (Symbol.getPortCoords symbols (CommonTypes.PortId inPort.Port.Id))
-    let bb = singleWireBoundingBoxes vert id
-    let testWire: Wire = 
-        {
-            Id = id
-            SourcePortId = CommonTypes.PortId outPort.Port.Id
-            TargetPortId = CommonTypes.PortId inPort.Port.Id
-            Vertices = vert
-            BoundingBoxes = bb
-            Width = Symbol.getPortWidth symbols (CommonTypes.PortId outPort.Port.Id)
-            Highlight = false
-        }*)
-    []
+    [] // No wires initially in model
     |> (fun wires -> {WX=wires;Symbol=symbols; Color=CommonTypes.Red},Cmd.none)
 
 //-------------------Helpers for Update Function-------------------//
@@ -535,19 +521,10 @@ let ruleUnique (model: Model) (wire: Wire) : bool =
     |> List.filter (fun w -> w.TargetPortId = wire.TargetPortId)
     |> List.isEmpty
 
-/// Checks if the Width of the Source Port is equal to that of the Target Port
-(*
-let ruleWidthEquality (model: Model) (wire: Wire) : bool =
-    if Symbol.getPortWidth model.Symbol wire.SourcePortId = Symbol.getPortWidth model.Symbol wire.TargetPortId then 
-        true
-    else 
-        false
-*)
 let wireRuleList =
     [
         ruleOutToIn;
         ruleUnique;
-        //ruleWidthEquality Removed because Dr Clarke wanted it gone
     ]
     
 /// Verifies if a supplied wire is compliant with the rules for wires.
@@ -566,107 +543,231 @@ let segLength (seg: WireSegment): float =
     ||> Symbol.posDiff
     |> (fun diff -> (sqrt diff.X ** 2. + diff.Y ** 2.))
 
+let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
+    let noOfSegments= List.length wire.Segments
+    let last = noOfSegments - 1
+    let prevSrc= wire.Segments.[0].SourcePos
+    let prevTgt= wire.Segments.[last].TargetPos
+    let src= Symbol.getPortCoords sm wire.SourcePortId
+    let tgt= Symbol.getPortCoords sm wire.TargetPortId
+
+    let vecSrc = {X=src.X-prevSrc.X;Y=src.Y-prevSrc.Y}
+    let vecTgt = {X=tgt.X-prevTgt.X;Y=tgt.Y-prevTgt.Y}
+    let head= List.head wire.Segments
+    let tail = List.last wire.Segments
+
+    let fstLength = 
+        match wire.SourcePortEdge with 
+        | Symbol.Right when head.TargetPos.X<src.X + 9. -> true
+        | Symbol.Left when head.TargetPos.X>src.X - 9. ->true
+        | Symbol.Top when head.TargetPos.Y>src.Y - 9. ->true
+        | Symbol.Bottom when head.TargetPos.Y<src.Y + 9. ->true
+        | _ -> false
+    
+    //if head.TargetPos.X<src.X + 9. then true else false
+    let LstLength = 
+        match wire.TargetPortEdge with 
+        | Symbol.Right when tail.SourcePos.X<tgt.X + 9. -> true
+        | Symbol.Left when tail.SourcePos.X>tgt.X - 9. ->true
+        | Symbol.Top when tail.SourcePos.Y>tgt.Y - 9. ->true
+        | Symbol.Bottom when tail.SourcePos.Y<tgt.Y + 9. ->true
+        | _ -> false
+
+
+    wire.Segments
+    |> List.mapi (fun i seg -> 
+        match i ,wire.StartHoriz ,wire.EndHoriz with
+        | 0,true,_ when fstLength ->
+            makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
+
+        | 1,true,_ when fstLength ->
+            makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X + vecSrc.X; Y=seg.TargetPos.Y}
+
+        | 2,true,_ when fstLength ->
+            makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X + vecSrc.X; Y=seg.SourcePos.Y} seg.TargetPos
+
+        | 0,false,_ when fstLength ->
+            makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
+
+        | 1,false,_ when fstLength ->
+            makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X ; Y=seg.TargetPos.Y+vecSrc.Y}
+
+        | 2,false,_ when fstLength ->
+            makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X ; Y=seg.SourcePos.Y+ vecSrc.Y} seg.TargetPos
+        
+        | x,_,true when x=last && LstLength ->
+            makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
+
+        | x,_,true when x=last - 1 && LstLength ->
+            makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X + vecTgt.X; Y=seg.SourcePos.Y} (Symbol.posAdd seg.TargetPos vecTgt)
+
+        | x,_,true when x=last - 2 && LstLength ->
+            makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X + vecTgt.X; Y=seg.TargetPos.Y}
+
+        | x,_,false when x=last && LstLength ->
+            makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
+
+        | x,_,false when x=last - 1 && LstLength ->
+            makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X ; Y=seg.SourcePos.Y + vecTgt.Y} (Symbol.posAdd seg.TargetPos vecTgt)
+
+        | x,_,false when x=last - 2 && LstLength ->
+            makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X ; Y=seg.TargetPos.Y + vecTgt.Y}
+        
+        | 0,true,_ ->
+            makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
+
+        | 1,true,_ when noOfSegments>3 ->
+            makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
+
+        | x,true,true when (x= last - 1 && noOfSegments>3 )-> 
+            makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
+
+        | 1,true,true ->
+            makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} {X=seg.SourcePos.X;Y=tgt.Y} 
+
+        | x,true,true when x=last-> 
+            makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=tgt.Y} tgt 
+
+        | x,true,false when (x= last - 1 && noOfSegments>3 )-> 
+            makeWireSegment wire.Id wire.Width seg.SourcePos {X=tgt.X;Y=seg.SourcePos.Y}
+
+        | x,true,false when x=last-> 
+            makeWireSegment wire.Id wire.Width {X=tgt.X;Y=seg.SourcePos.Y} tgt
+
+        | 0,false,_ ->
+            makeWireSegment wire.Id wire.Width src {X=src.X;Y=seg.TargetPos.Y} 
+
+        | 1,false,_ when noOfSegments>3 ->
+            makeWireSegment wire.Id wire.Width {X=src.X;Y=seg.SourcePos.Y} seg.TargetPos
+
+        | x,false,false when (x= last - 1 && noOfSegments>3 )-> 
+            makeWireSegment wire.Id wire.Width seg.SourcePos {X=tgt.X;Y=seg.SourcePos.Y}
+
+        | 1,false,false ->
+            makeWireSegment wire.Id wire.Width {X=src.X;Y=seg.SourcePos.Y} {X=tgt.X;Y=seg.SourcePos.Y} 
+
+        | x,false,false when x=last-> 
+            makeWireSegment wire.Id wire.Width {X=tgt.X;Y=seg.SourcePos.Y} tgt 
+
+        | x,false,true when (x= last - 1 && noOfSegments>3 )-> 
+            makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}
+
+        | x,false,true when x=last-> 
+            makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=tgt.Y} tgt
+
+        | _ -> seg    
+    )
+    |> setIndex
+
+// RULES FOR DECIDING WIRE ROUTING METHOD: 
+// Name must be of format routeRuleXXX
+// Must have signature Wire -> Symbol.Model -> bool
+
+/// Rule that chekds if a the number of segments would change after 
+/// routing the wire to its new position, as this indicates a need to 
+/// switch back to autorouting.
+let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) : bool =
+    let currentSegmentCount = wire.Segments.Length
+    let newVertexCount = 
+        routeWire sm wire.SourcePortId wire.TargetPortId
+        |> List.length
+    if currentSegmentCount <> newVertexCount - 1 then
+        false
+    else 
+        true
+
+/// Rule that states that the wire must switch back to autorouting after symbol rotation
+let routeRuleAfterRotation (wire: Wire) (sm: Symbol.Model) : bool =
+    if (wire.SourcePortEdge,wire.TargetPortEdge) <> (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId) then
+        false
+    else 
+        true
+
+/// Rule stating two segment wires may not be autorouted
+let routeRuleTwoSegment (wire: Wire) (sm: Symbol.Model) : bool =
+    if List.length wire.Segments < 3 then
+        false
+    else
+        true
+        
+let routeRuleList =
+    [
+        routeRuleCaseChange
+        routeRuleAfterRotation
+        routeRuleTwoSegment
+    ]
+
+/// Decides whether a wire ought to continue being manually routed or be
+/// switched back to autorouting, and updates the Manual field accordingly
+let decideManual (wire: Wire) (sm: Symbol.Model) : Wire =
+    routeRuleList 
+    |> List.map (fun f -> f wire sm)
+    |> List.contains false
+    |> function 
+        | true -> {wire with Manual = false} 
+        | false -> wire
+
+/// Calculates and returns the IDs of wires that must be updated using a  
+/// provided list of symbols that have been updated.
+let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model) 
+    : CommonTypes.ConnectionId list =
+    sIds
+    |> List.collect (fun sId -> Symbol.getPortIds sm sId)
+    |> List.collect (fun pId ->
+        model.WX
+        |> List.filter (fun w ->
+            if pId = w.SourcePortId || pId = w.TargetPortId then 
+                true 
+            else 
+                false
+        )
+    )
+    |> List.map (fun w -> w.Id)
+    |> List.distinct
+
+/// Updates the wires in the model as specified by the provided list
+let updateWires (model: Model) (sm: Symbol.Model) (wIds: CommonTypes.ConnectionId list): Wire list =
+    model.WX
+    |> List.map (fun w -> 
+        if List.contains w.Id wIds then
+            let newWire = decideManual w sm
+            let srcEdge = Symbol.getPortEdge sm newWire.SourcePortId
+            let tgtEdge = Symbol.getPortEdge sm newWire.TargetPortId
+            let startHoriz = 
+                if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
+            let endHoriz = 
+                if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
+            match newWire.Manual with
+            | false -> {newWire with 
+                            Segments = makeWireSegments sm newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
+                            SourcePortEdge = srcEdge
+                            TargetPortEdge = tgtEdge
+                            StartHoriz = startHoriz
+                            EndHoriz = endHoriz}
+            | true -> {newWire with Segments = (manualRoute newWire sm)}
+        else w
+    )
+
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     | Symbol sMsg -> 
         let sm,sCmd = Symbol.update sMsg model.Symbol
-
-        let manualRoute (wire: Wire) =
-            let noOfSegments= List.length wire.Segments
-            let last = noOfSegments - 1
-            let prevSrc= wire.Segments.[0].SourcePos
-            let prevTgt= wire.Segments.[last].TargetPos
-            let src= Symbol.getPortCoords sm wire.SourcePortId
-            let tgt= Symbol.getPortCoords sm wire.TargetPortId
-
-            let vecSrc = {X=src.X-prevSrc.X;Y=src.Y-prevSrc.Y}
-            let vecTgt = {X=tgt.X-prevTgt.X;Y=tgt.Y-prevTgt.Y}
-            let head= List.head wire.Segments
-            let tail = List.last wire.Segments
-
-            let fstLength = 
-                match wire.SourcePortEdge with 
-                |Symbol.Right when head.TargetPos.X<src.X + 9. -> true
-                |Symbol.Left when head.TargetPos.X>src.X - 9. ->true
-                |Symbol.Top when head.TargetPos.Y>src.Y - 9. ->true
-                |Symbol.Bottom when head.TargetPos.Y<src.Y + 9. ->true
-                |_ -> false
-            
-            //if head.TargetPos.X<src.X + 9. then true else false
-            let LstLength = 
-                match wire.TargetPortEdge with 
-                |Symbol.Right when tail.SourcePos.X<tgt.X + 9. -> true
-                |Symbol.Left when tail.SourcePos.X>tgt.X - 9. ->true
-                |Symbol.Top when tail.SourcePos.Y>tgt.Y - 9. ->true
-                |Symbol.Bottom when tail.SourcePos.Y<tgt.Y + 9. ->true
-                |_ -> false
-
-
-            wire.Segments
-            |> List.mapi (fun i seg -> 
-                match i ,wire.StartHoriz ,wire.EndHoriz with
-                |0,true,_ when fstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
-                |1,true,_ when fstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X + vecSrc.X; Y=seg.TargetPos.Y}
-                |2,true,_ when fstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X + vecSrc.X; Y=seg.SourcePos.Y} seg.TargetPos
-
-                |0,false,_ when fstLength ->makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
-                |1,false,_ when fstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X ; Y=seg.TargetPos.Y+vecSrc.Y}
-                |2,false,_ when fstLength ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X ; Y=seg.SourcePos.Y+ vecSrc.Y} seg.TargetPos
-                
-                |x,_,true when x=last && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
-                |x,_,true when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X + vecTgt.X; Y=seg.SourcePos.Y} (Symbol.posAdd seg.TargetPos vecTgt)
-                |x,_,true when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X + vecTgt.X; Y=seg.TargetPos.Y}
-
-                |x,_,false when x=last && LstLength ->makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
-                |x,_,false when x=last - 1 && LstLength ->makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X ; Y=seg.SourcePos.Y + vecTgt.Y} (Symbol.posAdd seg.TargetPos vecTgt)
-                |x,_,false when x=last - 2 && LstLength ->makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X ; Y=seg.TargetPos.Y + vecTgt.Y}
-                
-                |0,true,_ ->makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
-                |1,true,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
-                |x,true,true when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
-                |1,true,true ->makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} {X=seg.SourcePos.X;Y=tgt.Y} 
-                |x,true,true when x=last-> makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=tgt.Y} tgt 
-                |x,true,false when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=tgt.X;Y=seg.SourcePos.Y}
-                |x,true,false when x=last-> makeWireSegment wire.Id wire.Width {X=tgt.X;Y=seg.SourcePos.Y} tgt
-                |0,false,_ ->makeWireSegment wire.Id wire.Width src {X=src.X;Y=seg.TargetPos.Y} 
-                |1,false,_ when noOfSegments>3 ->makeWireSegment wire.Id wire.Width {X=src.X;Y=seg.SourcePos.Y} seg.TargetPos
-                |x,false,false when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=tgt.X;Y=seg.SourcePos.Y}
-                |1,false,false ->makeWireSegment wire.Id wire.Width {X=src.X;Y=seg.SourcePos.Y} {X=tgt.X;Y=seg.SourcePos.Y} 
-                |x,false,false when x=last-> makeWireSegment wire.Id wire.Width {X=tgt.X;Y=seg.SourcePos.Y} tgt 
-                |x,false,true when (x= last - 1 && noOfSegments>3 )-> makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}
-                |x,false,true when x=last-> makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=tgt.Y} tgt
-                |_ -> seg    
-            )
-            |> setIndex
-
-        let checkRouteCaseChange (wire: Wire) : Wire = // Very ugly function, turn it into a rule function list which is mapped
-
-            let newDiff = Symbol.posDiff (Symbol.getPortCoords sm wire.TargetPortId) (Symbol.getPortCoords sm wire.SourcePortId) 
-            let oldDiff = Symbol.posDiff ((List.last wire.Segments).TargetPos) ((List.head wire.Segments).SourcePos)
-            if ((sign(newDiff.X) <> sign(oldDiff.X) || sign(newDiff.Y) <> sign(oldDiff.Y)  || (wire.SourcePortEdge,wire.TargetPortEdge) <> (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId)) || List.length wire.Segments < 3) then
-                {wire with Manual = false}
-            else
-                wire
-           
-
         let wList = 
-            model.WX
-            |> List.map checkRouteCaseChange
-            |> List.map (fun w -> 
-                let srcEdge = Symbol.getPortEdge sm w.SourcePortId
-                let tgtEdge = Symbol.getPortEdge sm w.TargetPortId
-                let startHoriz = not (srcEdge = Symbol.Top || srcEdge = Symbol.Bottom)
-                let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
-                if w.Manual then
-                    {w with Segments = manualRoute w}
-                else
-                    {w with 
-                        Segments = makeWireSegments model w.Id w.SourcePortId w.TargetPortId 
-                        SourcePortEdge = srcEdge
-                        TargetPortEdge = tgtEdge
-                        StartHoriz = startHoriz
-                        EndHoriz = endHoriz}
-            )
+            match sMsg with
+            | Symbol.Move (sIds,_) -> 
+                printfn "BusWire: Move Message Detected"
+                chooseWiresToUpdate sIds model sm
+                |> updateWires  model sm
+            | Symbol.Rotate (sId,_) ->
+                printfn "BusWire: Rotate Message Detected"
+                chooseWiresToUpdate [sId] model sm
+                |> updateWires model sm
+            | Symbol.Scale (sId,_) ->
+                printfn "BusWire: Scale Message Detected"
+                chooseWiresToUpdate [sId] model sm
+                |> updateWires model sm
+            | _ -> model.WX
+            
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
     | AddWire (portId1,portId2) ->
@@ -701,7 +802,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             let last = (List.length w.Segments) - 1
             match idx with
             | 0  -> seg
-            | x when (x=last && seg.Index=last ) -> seg
+            | x when (x=last) -> seg
             | _ when w.Id <> wId -> seg
             | _ when (idx%2=0 && w.StartHoriz) || (idx%2=1 && not w.StartHoriz)  -> 
                 match seg.Index with 
@@ -730,14 +831,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             |_,Symbol.Left when last.SourcePos.X>last.TargetPos.X - 9. ->false
             |_,Symbol.Bottom when last.SourcePos.Y<last.TargetPos.Y + 9. ->false
             |_ -> true
-        (*
-        let validateSegments (segLstLst: WireSegment list list): bool =
-            segLstLst
-            |> List.map (fun segLst ->
-                if (*segLength (List.head segLst) < 10. || segLength (List.last segLst) < 10.*) condition (List.head segLst) then false else true)
-            |> List.contains false
-            |> not
-        *)
 
         let validateWires (wLst: Wire list): bool =
             wLst
