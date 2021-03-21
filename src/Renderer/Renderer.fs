@@ -73,7 +73,7 @@
             invisibleMenu.label <- "Symbol"
             invisibleMenu.visible <- true // visible
             invisibleMenu.submenu <-
-                [| makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.BeginAddingSymbol)
+                [| makeKeyItem "Add" "Alt+A" (fun () -> dispatch KeyboardMsg.SymbolAddBegin)
                    makeKeyItem "Delete"  "delete" (fun () -> dispatch KeyboardMsg.Del)
                    menuSeparator
                    makeKeyItem "Align Horizontally" "Alt+X" (fun () -> dispatch KeyboardMsg.AltX)

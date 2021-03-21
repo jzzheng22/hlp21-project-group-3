@@ -25,7 +25,7 @@ type KeyboardMsg =
     | AltY
     | AltShiftZ
     | Del
-    | BeginAddingSymbol
+    | SymbolAddBegin
     | ZoomCanvasIn 
     | ZoomCanvasOut
     | SymbolClockwise
@@ -43,10 +43,10 @@ type Msg =
     | SelectDragStart of XYPos
     | SelectDragging of XYPos
     | SelectDragEnd
-    | DispatchMove of XYPos
+    | MoveElements of XYPos
     | BeginSizeEdit of CommonTypes.ComponentId
     | EditSize of (CommonTypes.ComponentId * XYPos)
-    | FinishSymbolAddition
+    | SymbolAddFinish
 
 type MouseOps =
     | MouseDown
@@ -160,7 +160,7 @@ let cornersToString startCoord endCoord =
         endCoord.X endCoord.Y
         startCoord.X endCoord.Y
 
-///Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
+/// Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
 let inferWidth (model : Model) = 
     let comps = Symbol.extractComponents model.Wire.Symbol
     let conns = BusWire.extractWires model.Wire 
@@ -274,7 +274,7 @@ let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> Non
 
 let mouseDown model mousePos dispatch =
     if model.AddingSymbol then
-        dispatch <| FinishSymbolAddition
+        dispatch <| SymbolAddFinish
     else
         match Symbol.isPort model.Wire.Symbol mousePos with
         | Some (_, portId) -> 
@@ -314,7 +314,7 @@ let increaseBoundingBox (a, topL, botR) =
 
 let mouseMove model mousePos dispatch mDown = 
     if model.AddingSymbol then 
-        dispatch <| DispatchMove mousePos
+        dispatch <| MoveElements mousePos
         dispatch <| SelectDragging mousePos
     else 
         let symbolIDList =
@@ -332,7 +332,7 @@ let mouseMove model mousePos dispatch mDown =
                 | Some id -> 
                     dispatch <| EditSize (id, mousePos)
                 | _ -> 
-                    dispatch <| DispatchMove mousePos
+                    dispatch <| MoveElements mousePos
 
             dispatch <| SelectDragging mousePos
 
@@ -427,7 +427,7 @@ let moveElements model mousePos =
     else
         { model with SelectingMultiple = true}, Cmd.none
 
-///Scales a symbol according to the mouse position.
+/// Scales a symbol according to the mouse position.
 let changeSymbolSize model id mousePos =
     let topL, botR = Symbol.getBoundingBox model.Wire.Symbol id
     let mouseXOffset = max (abs (mousePos.X - topL.X)) (abs (mousePos.X - botR.X))
@@ -449,7 +449,7 @@ let changeSymbolSize model id mousePos =
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale scaleMsg)) model.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
-///Moves a symbol so that it snaps to grid.
+/// Moves a symbol so that it snaps to grid.
 let snapSymbolToGrid model =
     let transVector =
         Symbol.getBoundingBox model.Wire.Symbol (List.head model.SelectedComponents)
@@ -487,6 +487,19 @@ let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : i
         |> List.map (fun x -> x.Index)
         |> List.max
         |> (+) 1
+
+let addSymbol model =
+    let sModel, sCmd =
+        BusWire.update
+            (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, (getNewSymbolIndex model CommonTypes.ComponentType.Mux2))))
+            model.Wire
+    { model with 
+        Wire = sModel;
+        SelectedComponents = [(List.head sModel.Symbol).Id];
+        AddingSymbol = true;
+        SelectedPort = None, CommonTypes.PortType.Input;
+        SelectingMultiple = false; 
+        EditSizeOf = None}, Cmd.map Wire sCmd 
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -532,23 +545,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               SelectedWireSegments = [] },
         Cmd.batch [ Cmd.map Wire wCmd;
                     Cmd.map Wire sCmd ]
-    | KeyPress BeginAddingSymbol ->
-        let sModel, sCmd =
-            BusWire.update
-                (BusWire.Symbol(Symbol.Add(CommonTypes.ComponentType.Mux2, model.DraggingPos, 2, 1, (getNewSymbolIndex model CommonTypes.ComponentType.Mux2))))
-                model.Wire
-        let newModel = {model with Wire = sModel}
-        let newSymPos = {X = newModel.DraggingPos.X + unzoomedGrid; Y = newModel.DraggingPos.Y + unzoomedGrid}
-        //Find id of new symbol that was not in the old model.
-        let symbolIDList =
-            Symbol.getBoundingBoxes newModel.Wire.Symbol newSymPos
-            |> List.filter (fun a -> not <| List.contains a (Symbol.getBoundingBoxes model.Wire.Symbol newSymPos))
-            |> List.map getSymbolID 
-        { newModel with SelectedComponents = symbolIDList;
-                     AddingSymbol = true;
-                     SelectedPort = None, CommonTypes.PortType.Input;
-                     SelectingMultiple = false; 
-                     EditSizeOf = None}, Cmd.map Wire sCmd 
+    | KeyPress SymbolAddBegin ->
+        addSymbol model
     /// Align along x-axis
     | KeyPress AltX ->
         let leftMost =  List.minBy (fun a -> a.X) (topleftCorners model)
@@ -558,7 +556,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             else 
                 {X = 0.0; Y = 0.0}) (topleftCorners model)
         |> alignComponents model
-    ///Align along y-axis
+    /// Align along y-axis
     | KeyPress AltY ->
         let downMost = List.maxBy (fun a -> a.Y) (topleftCorners model)
         List.map (fun a ->
@@ -587,13 +585,13 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                 EditSizeOf = None}, Cmd.none
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
-    | DispatchMove mousePos ->
+    | MoveElements mousePos ->
         moveElements model mousePos
     | BeginSizeEdit id -> 
         {model with EditSizeOf = Some id}, Cmd.none
     | EditSize (id, mousePos) -> 
         changeSymbolSize model id mousePos
-    | FinishSymbolAddition ->
+    | SymbolAddFinish ->
         {model with SelectedComponents = []; AddingSymbol = false}, Cmd.none
 
 let init () =
