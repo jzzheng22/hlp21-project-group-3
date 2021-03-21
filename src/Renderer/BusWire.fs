@@ -410,7 +410,7 @@ let singleWireView =
         fun (props: WireRenderProps) ->
             
             let colour = if props.HighlightError then "red" elif props.Highlight then "green" elif props.Width = 1 then props.ColorP else "purple"
-            
+            let stroke = if props.Width > 1 then "2px" else props.StrokeWidthP
             let singleSegmentView (seg: WireSegment) =
                 let SrcP = seg.SourcePos
                 let TgtP = seg.TargetPos
@@ -421,7 +421,7 @@ let singleWireView =
                     Y2 TgtP.Y
                     // Qualify these props to avoid name collision with CSSProp
                     SVGAttr.Stroke colour
-                    SVGAttr.StrokeWidth props.StrokeWidthP
+                    SVGAttr.StrokeWidth stroke
                     SVGAttr.StrokeLinecap "round"] []
             let widthAnnotation = 
                 let textPos = Symbol.posAdd props.Segments.Head.SourcePos {X = 8. ; Y = 5.}
