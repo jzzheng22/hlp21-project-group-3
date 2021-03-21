@@ -558,19 +558,21 @@ let alignComponents model vector =
     |> List.zip model.SelectedComponents
     |> List.fold foldFunction (model, Cmd.none)
     
-
-
 let deleteElements model = 
-    let wModel, wCmd = deleteWires model
-    let sModel, sCmd = deleteSymbols model wModel
+    let wModel1, wCmd1 = deleteWires model
+    let sModel1, sCmd1 = deleteSymbols model wModel1
 
-    { model with
-          Wire = sModel
-          SelectedPort = None, CommonTypes.PortType.Input
-          SelectedComponents = []
-          SelectedWireSegments = [] },
-    Cmd.batch [ Cmd.map Wire wCmd;
-                Cmd.map Wire sCmd ]
+    let deleteModel = 
+        { model with
+              Wire = sModel1
+              SelectedPort = None, CommonTypes.PortType.Input
+              SelectedComponents = []
+              SelectedWireSegments = [] 
+        }
+
+    let (wires, newModel, wCmd2) = getWires deleteModel
+    let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) wires))) newModel
+    {deleteModel with Wire = sModel2}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
 
 let handleSelectDragEndMsg model =
     if not (List.isEmpty model.SelectedComponents) then

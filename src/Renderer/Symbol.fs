@@ -616,7 +616,7 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         Id = _id
         Type = compType
         Name = name
-        Highlight = true
+        Highlight = false
         HighlightError = false
         PortHighlight = false
         GenericType = symType
