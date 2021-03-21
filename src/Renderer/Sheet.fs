@@ -46,6 +46,8 @@ type Msg =
     | MoveElements of XYPos
     | BeginSizeEdit of CommonTypes.ComponentId
     | EditSize of (CommonTypes.ComponentId * XYPos)
+    | ErrorMsg of string
+    | UpdateWidths 
     | SymbolAddFinish
 
 type MouseOps =
@@ -100,7 +102,7 @@ let getWireSegmentIDList filter lst =
     |> filter
     |> List.map getWireSegmentID
 
-let dispatchSelection symbolIDList wireSegmentIDList dispatch = 
+let dispatchSelection symbolIDList wireSegmentIDList (dispatch: Dispatch<Msg>) = 
     dispatch <| SelectComponents symbolIDList
     dispatch <| Symbol(Symbol.Highlight symbolIDList)
     dispatch <| SelectWireSegments wireSegmentIDList
@@ -163,32 +165,61 @@ let cornersToString startCoord endCoord =
 /// Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
 let inferWidth (model : Model) = 
     let comps = Symbol.extractComponents model.Wire.Symbol
+    printf"hello\n inferWidth comps:\n %A" comps
     let conns = BusWire.extractWires model.Wire 
+    printf"hello\n inferWidth conns:\n %A" conns
     let canvas = (comps, conns)
     BusWidthInferer.inferConnectionsWidth canvas
 
+let getWires (model : Model) =
+    inferWidth model
+    |> function
+    | Ok x -> //this is a Map<ConnectionId, int Option>
+        let conList = Map.toList x
+        let conns = 
+            conList 
+            |> List.map (fun (x, _) -> x) 
+            |> BusWire.getWires model.Wire
+        printf "hello UpdateWidth %A" conList
+        let wModel, wCmd = BusWire.update (BusWire.UpdateWidth conList) model.Wire
+        (conns, wModel, wCmd)
+    | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
+        let wires = e.ConnectionsAffected
+        printf "hello UpdateWidth Error \n Message: %s \n Connections: \n %A" e.Msg wires
+        let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
+        (wires, wModel, wCmd)
 
-// let updateWidth (model : Model) dispatch =
-//     inferWidth model
-//     |> function
-//     | Ok x -> //this is a Map<ConnectionId, int Option>
-//         x 
-//         |> Map.toList 
-//         |> List.map (
-//             fun (k, v) -> 
-//             match v with 
-//             | Some a -> 
-//                 dispatch <| BusWire.UpdateWidth (k, a)
-//             | None -> 
-//                 dispatch <| BusWire.UpdateWidth (k, (Symbol.getPortWidth k)))
-//     | Error e -> //this is a {Message : string; Connections : ConnectionId list}
-//         e.ConnectionsAffected
-//         |> List.iter (
-//             fun x -> 
-//             dispatch <| BusWire.HighlightError [x]
-//             dispatch <| Symbol(Symbol.HighlightError [x])) //need to find the symbol for the connections for symbol highlight error
-//         dispatch <| displayErrorMessage e.Msg
+/// Sends a highlight error to buswire and symbol for the connection list given
+let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
+    let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
+    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel
+    {model with Wire = sModel}, Cmd.batch [ Cmd.map Wire wCmd; Cmd.map Wire sCmd ]
 
+let drawError (msg : string) : ReactElement list = 
+    let drawBox = 
+        rect[
+            X 0
+            Y 0
+            SVGAttr.Height 30.
+            SVGAttr.Width (String.length msg * 7)
+            SVGAttr.Fill "red"
+            SVGAttr.Stroke "red"
+            SVGAttr.Opacity 0.5
+            SVGAttr.StrokeWidth 1.][]
+
+    let drawText = 
+        text[
+            X 0
+            Y 0
+            Style[
+                TextAnchor "middle"
+                DominantBaseline "middle"
+                FontSize 6.
+                FontWeight "bold"
+                Fill "Black"
+                UserSelect UserSelectOptions.None]][str <| msg] //Prevent highlighting text
+        
+    [drawText; drawBox]
 
 /// This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
@@ -298,10 +329,8 @@ let mouseUp model mousePos dispatch =
     | Some endPort ->
         match model.SelectedPort with
         | (Some startPort, _) when Symbol.getPortType model.Wire.Symbol endPort <> snd model.SelectedPort 
-        /// --------------------------------------- ///
-        /// Here buswidth inferer should be called? ///
-        /// --------------------------------------- ///
             -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
+               dispatch <| UpdateWidths
         | _ -> ()
     | None -> ()
     if model.SelectingMultiple then
@@ -591,6 +620,11 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         {model with EditSizeOf = Some id}, Cmd.none
     | EditSize (id, mousePos) -> 
         changeSymbolSize model id mousePos
+    | UpdateWidths -> 
+        let wires, newModel, wCmd = getWires model
+        let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) newModel
+        {model with Wire = sModel}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
+    | ErrorMsg msg -> model, Cmd.none
     | SymbolAddFinish ->
         {model with SelectedComponents = []; AddingSymbol = false}, Cmd.none
 

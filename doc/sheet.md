@@ -88,9 +88,23 @@ Sheet can also access Symbol directly if needed.
  - Highlights symbols when they are in an error state.
  - Sent from Sheet via BusWire.
 
-**To ISSIE:** 
- - Infer widths (extension)
+`DisplaySlots of sId : ComponentId`
+- Displays all slots a port may be moved to on the component
 
+`Rename of sId : ComponentId * name : string`
+- Changes the label on a component to the name given
+
+## BusWidthInferer interface
+
+`BusWidthInferer.inferConnectionsWidth ((comps,conns) : CanvasState) : Result<ConnectionsWidth, WidthInferError>`
+- Takes in a list of Issie Components and Issie Connections and returns 
+    * Ok x -> Some <Map<ConnectionId, int Option> | None
+    * Error {Msg : string; ConnectionsAffected : ConnectionId list}
+- In the first case where we have Ok x and Some y, we simply tell all the connections to update with the specified width
+- In the second case where we have Ok x and None, we ask Symbol what the width should be.
+    * If both port widths for the connection are equal, update the connection to that width
+    * If the port widths are not equal, then send the error highlight messages for the relavent connections/symbols
+- In the third case where we have Error then send the error highlight messages for the relavent connections/symbols
 
 ## Interface Functions
 
@@ -117,14 +131,11 @@ Sheet can also access Symbol directly if needed.
  - Returns list of ports for a given symbol ID.
  - Used to find wires connected to a symbol.
 
-*Optional interface functions:*
-Called by jzzheng22's Sheet and implemented by JEMerrick's Symbol:
 `Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
  - Returns the ComponentID which the PortID belongs to.
 
 `Symbol.getBoundingBox symModel symID`
  - Returns the bounding box for a given Symbol ID
- - Called in jzzheng22's Sheet
 
 ## Bounding Box
  - Each buswire and symbol owns its bounding box. 

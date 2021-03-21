@@ -62,6 +62,26 @@ Wires should be selectable: should do autorouting initially but be selectable an
 `BusWire.getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list`
  - Takes a list of PortIds as input and returns the IDs of all the wires connected to the supplied ports.
 
+`BusWire.connectToWire (wModel : Model) (connect : CommonTypes.ConnectionId) : Wire`
+ - Takes a connectionId and returns the wire object associated with it
+
+`BusWire.connectToPort (wModel : Model) (connect : CommonTypes.ConnectionId) : (CommonTypes.PortId * CommonTypes.PortId)`
+- Takes a ConnectionId and returns the (source port, target port) associated with that connection
+
+`connectedSymbols (wModel : Model) (connect : CommonTypes.ConnectionId) : CommonTypes.ComponentId list`
+- Takes a ConnectionId and returns the Symbol IDs connected to that connection
+
+## Issie Interface functions
+
+`segToVert (wSegs : WireSegment list) : (float * float) list`
+- Converts a wire segment list into a list of distinct vertices
+    
+`wireToIssie (wire : Wire) (wModel : Model) : CommonTypes.Connection`
+- Converts the Wire type into the Issie Connection type
+
+`extractWires (wModel: Model) : CommonTypes.Connection list`
+- Converts the wire model from a Wire list to an Issie Connection list
+
 ## Interface Functions (called by BusWire)
 
 `Symbol.getPortCoords (symbolModel : Model) (portID: CommonTypes.PortId)`
@@ -71,9 +91,6 @@ Wires should be selectable: should do autorouting initially but be selectable an
 `Symbol.getPortType (symbolModel : Model) (portID: CommonTypes.PortId)`
  - Returns if port is input or output.
 
-*Optional interface functions:*
-
-These are called by BusWire and implemented in JEMerrick's Symbol:
 `Symbol.getPortWidth (model : Model) (pId : CommonTypes.PortId) : int`
  - Returns width of specified port.
 
@@ -82,6 +99,10 @@ These are called by BusWire and implemented in JEMerrick's Symbol:
 
  `Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge'
  - Returns the edge of the symbol that the port is on
+
+ `Symbol.getPort (model : Model) (pId : PortId) : Port`
+ - Returns the CommonTypes.Port object of a given pId
+ - Used by buswire to convert to Issie datatypes
 
 ## BusWire needs to be able to receive these:
  - Add connections (from Sheet and ISSIE)
