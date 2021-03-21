@@ -367,10 +367,8 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
     let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
     let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
     let newSegments = makeWireSegments model.Symbol wId 1 srcPortId tgtPortId
-    let startHoriz = 
-        if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
-    let endHoriz = 
-        if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
+    let startHoriz = not (srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
+    let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
             
     {
         Id = wId
@@ -671,24 +669,18 @@ let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) : bool =
     let newVertexCount = 
         routeWire sm wire.SourcePortId wire.TargetPortId
         |> List.length
-    if currentSegmentCount <> newVertexCount - 1 then
-        false
-    else 
-        true
+    currentSegmentCount = newVertexCount - 1 
+
 
 /// Rule that states that the wire must switch back to autorouting after symbol rotation
 let routeRuleAfterRotation (wire: Wire) (sm: Symbol.Model) : bool =
-    if (wire.SourcePortEdge,wire.TargetPortEdge) <> (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId) then
-        false
-    else 
-        true
+    (wire.SourcePortEdge,wire.TargetPortEdge) = (Symbol.getPortEdge sm wire.SourcePortId,Symbol.getPortEdge sm wire.TargetPortId) 
+
 
 /// Rule stating two segment wires may not be autorouted
 let routeRuleTwoSegment (wire: Wire) (sm: Symbol.Model) : bool =
-    if List.length wire.Segments < 3 then
-        false
-    else
-        true
+    not(List.length wire.Segments < 3)
+
         
 let routeRuleList =
     [
@@ -702,10 +694,11 @@ let routeRuleList =
 let decideManual (wire: Wire) (sm: Symbol.Model) : Wire =
     routeRuleList 
     |> List.map (fun f -> f wire sm)
-    |> List.contains false
-    |> function 
-        | true -> {wire with Manual = false} 
-        | false -> wire
+    |> fun x ->
+        if List.contains false x then
+            {wire with Manual = false} 
+        else 
+            wire
 
 /// Calculates and returns the IDs of wires that must be updated using a  
 /// provided list of symbols that have been updated.
@@ -733,10 +726,9 @@ let updateWires (model: Model) (sm: Symbol.Model) (wIds: CommonTypes.ConnectionI
             let newWire = decideManual w sm
             let srcEdge = Symbol.getPortEdge sm newWire.SourcePortId
             let tgtEdge = Symbol.getPortEdge sm newWire.TargetPortId
-            let startHoriz = 
-                if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
-            let endHoriz = 
-                if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
+            let startHoriz = not(srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
+            let endHoriz = not(tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
+                
             match newWire.Manual with
             | false -> {newWire with 
                             Segments = makeWireSegments sm newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
@@ -755,15 +747,12 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wList = 
             match sMsg with
             | Symbol.Move (sIds,_) -> 
-                printfn "BusWire: Move Message Detected"
                 chooseWiresToUpdate sIds model sm
                 |> updateWires  model sm
             | Symbol.Rotate (sId,_) ->
-                printfn "BusWire: Rotate Message Detected"
                 chooseWiresToUpdate [sId] model sm
                 |> updateWires model sm
             | Symbol.Scale (sId,_) ->
-                printfn "BusWire: Scale Message Detected"
                 chooseWiresToUpdate [sId] model sm
                 |> updateWires model sm
             | _ -> model.WX
