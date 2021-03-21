@@ -845,6 +845,7 @@ let connectedSymbols (wModel : Model) (connect : CommonTypes.ConnectionId) : Com
     let sym2 = Symbol.getHostId wModel.Symbol p2
     [sym1; sym2]
 
+/// Takes a connectionId list and returns the connections in the model not in that list
 let getWires (wModel : Model) (cIdList : CommonTypes.ConnectionId list) : CommonTypes.ConnectionId list =
     wModel.WX
     |> List.map (fun x -> x.Id)
