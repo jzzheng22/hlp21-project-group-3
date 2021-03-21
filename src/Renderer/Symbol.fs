@@ -929,6 +929,7 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     | _ -> None
 
 let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (XYPos * PortId) Option =
+    printf "hello"
     model
     |> List.tryFind (fun sym -> sym.Id = sId)
     |> function

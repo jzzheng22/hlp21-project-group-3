@@ -18,7 +18,8 @@ type Model =
       EditSizeOf: CommonTypes.ComponentId option
       AddingSymbol: bool
       DragStartPos: XYPos
-      DraggingPos: XYPos }
+      DraggingPos: XYPos
+      SelectedLabel: (XYPos * CommonTypes.PortId) Option}
 
 type KeyboardMsg =
     | AltX
@@ -49,6 +50,7 @@ type Msg =
     | ErrorMsg of string
     | UpdateWidths 
     | SymbolAddFinish
+    | SelectLabel of (XYPos * CommonTypes.PortId) Option
 
 type MouseOps =
     | MouseDown
@@ -161,6 +163,9 @@ let cornersToString startCoord endCoord =
         endCoord.X startCoord.Y
         endCoord.X endCoord.Y
         startCoord.X endCoord.Y
+
+let validLabel (model : Model) = 
+    Symbol.isLabel model.Wire.Symbol model.DraggingPos model.SelectedComponents.[0]
 
 /// Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
 let inferWidth (model : Model) = 
@@ -307,6 +312,7 @@ let mouseDown model mousePos dispatch =
     if model.AddingSymbol then
         dispatch <| SymbolAddFinish
     else
+        
         match Symbol.isPort model.Wire.Symbol mousePos with
         | Some (_, portId) -> 
             dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
@@ -352,8 +358,8 @@ let mouseMove model mousePos dispatch mDown =
             |> getSymbolIDList (List.filter (removeSymbolID inBoundingBox mousePos))
 
         dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
-
-        if mDown then // Drag
+        if mDown = 2. then ()
+        elif mDown <> 0. then // Drag
             match model.SelectedPort with
             | (Some _, _) -> ()
             | _ ->
@@ -366,7 +372,7 @@ let mouseMove model mousePos dispatch mDown =
             dispatch <| SelectDragging mousePos
 
 
-let mDown (ev: Types.MouseEvent) = ev.buttons <> 0.
+let mDown (ev: Types.MouseEvent) = ev.buttons
 
 let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (dispatch: Dispatch<Msg>) =
     let coordX = ev.clientX 
@@ -636,6 +642,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | ErrorMsg msg -> model, Cmd.none
     | SymbolAddFinish ->
         {model with SelectedComponents = []; AddingSymbol = false}, Cmd.none
+    | SelectLabel x -> { model with SelectedLabel = x }, Cmd.none
+    
 
 let init () =
     let model, cmds = (BusWire.init 400) ()
@@ -649,5 +657,6 @@ let init () =
       EditSizeOf = None
       AddingSymbol = false
       DragStartPos = origin
-      DraggingPos = origin },
+      DraggingPos = origin 
+      SelectedLabel = None},
     Cmd.map Wire cmds
