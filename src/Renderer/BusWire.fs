@@ -702,7 +702,8 @@ let decideManual (wire: Wire) (sm: Symbol.Model) : Wire =
         | true -> {wire with Manual = false} 
         | false -> wire
 
-let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model) : Wire list =
+let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model) 
+    : CommonTypes.ConnectionId list =
     sIds
     |> List.collect (fun sId -> Symbol.getPortIds sm sId)
     |> List.collect (fun pId ->
@@ -714,45 +715,56 @@ let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm:
                 false
         )
     )
-    |> List.distinctBy (fun w -> w.Id)
+    |> List.map (fun w -> w.Id)
+    |> List.distinct
 
-let updateWires (wList: Wire list) (model: Model) (sm: Symbol.Model) : Wire list =
-    wList
-    |> List.map (fun w -> 
-        decideManual w sm)
-    |> List.map (fun w -> 
-        let srcEdge = Symbol.getPortEdge sm w.SourcePortId
-        let tgtEdge = Symbol.getPortEdge sm w.TargetPortId
-        let startHoriz = 
-            if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
-        let endHoriz = 
-            if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
-        match w.Manual with
-        | false -> {w with 
-                        Segments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId 
-                        SourcePortEdge = srcEdge
-                        TargetPortEdge = tgtEdge
-                        StartHoriz = startHoriz
-                        EndHoriz = endHoriz}
-        | true -> {w with Segments = (manualRoute w sm)}
-    )
+let updateWires (wIdList: CommonTypes.ConnectionId list) (model: Model) (sm: Symbol.Model) : Wire list =
+    model.WX
+    |> List.map (fun w ->
+        if List.contains w.Id wIdList then 
+            let newWire = decideManual w sm
+            let srcEdge = Symbol.getPortEdge sm newWire.SourcePortId
+            let tgtEdge = Symbol.getPortEdge sm newWire.TargetPortId
+            let startHoriz = 
+                if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
+            let endHoriz = 
+                if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
+            match newWire.Manual with
+            | false -> {newWire with 
+                            Segments = makeWireSegments model newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
+                            SourcePortEdge = srcEdge
+                            TargetPortEdge = tgtEdge
+                            StartHoriz = startHoriz
+                            EndHoriz = endHoriz}
+            | true -> {newWire with Segments = (manualRoute newWire sm)}
+        else w
+        )
+        
+    
+    
 
 
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
     | Symbol sMsg -> 
-        match sMsg with 
-        | Symbol.Move(sIds,_) ->
-            let sm,sCmd = Symbol.update sMsg model.Symbol
-            let wList = updateWires (chooseWiresToUpdate sIds model sm) model sm
-            {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
-        | Symbol.Rotate (sId,_) | Symbol.Scale (sId,_) ->
-            let sm,sCmd = Symbol.update sMsg model.Symbol
-            let wList = updateWires (chooseWiresToUpdate [sId] model sm) model sm
-            {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
-        | _ -> 
-            let sm,sCmd = Symbol.update sMsg model.Symbol
-            {model with Symbol=sm}, Cmd.map Symbol sCmd
+        let sm,sCmd = Symbol.update sMsg model.Symbol
+        let wList = 
+            match sMsg with
+            | Symbol.Move (sIds,_) -> 
+                printfn "BusWire Move Message Detected"
+                let w2u = chooseWiresToUpdate sIds model sm  
+                updateWires w2u model sm
+            | Symbol.Rotate (sId,_) ->
+                printfn "BusWire Rotate Message Detected"
+                let w2u = chooseWiresToUpdate [sId] model sm
+                updateWires w2u model sm
+            | Symbol.Scale (sId,_) ->
+                printfn "BusWire Scale Message Detected"
+                let w2u = chooseWiresToUpdate [sId] model sm
+                updateWires w2u model sm
+            | _ -> updateWires (List.map (fun w -> w.Id) model.WX) model sm
+            
+        {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
     | AddWire (portId1,portId2) ->
         let unverifiedWire =
