@@ -621,6 +621,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             let wires = e.ConnectionsAffected
             let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
             let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel
+            printf "hello UpdateWidth Error \n Message: %s \n Connections: \n %A" e.Msg wires
             {model with Wire = sModel}, Cmd.batch [ Cmd.map Wire wCmd; Cmd.map Wire sCmd ]
     | ErrorMsg msg -> model, Cmd.none
 
