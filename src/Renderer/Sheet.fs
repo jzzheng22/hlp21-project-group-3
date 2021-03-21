@@ -175,16 +175,19 @@ let getWires (model : Model) =
     inferWidth model
     |> function
     | Ok x -> //this is a Map<ConnectionId, int Option>
-        let conList = x |> Map.toList 
-        let conns = conList |> List.map (fun (x, _) -> x) |> BusWire.getWires model.Wire
+        let conList = Map.toList x
+        let conns = 
+            conList 
+            |> List.map (fun (x, _) -> x) 
+            |> BusWire.getWires model.Wire
         printf "hello UpdateWidth %A" conList
-        let wModel2, wCmd2 = BusWire.update (BusWire.UpdateWidth conList) model.Wire
-        (conns, wModel2, wCmd2)
+        let wModel, wCmd = BusWire.update (BusWire.UpdateWidth conList) model.Wire
+        (conns, wModel, wCmd)
     | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
         let wires = e.ConnectionsAffected
         printf "hello UpdateWidth Error \n Message: %s \n Connections: \n %A" e.Msg wires
-        let wModel2, wCmd2 = BusWire.update (BusWire.HighlightError wires) model.Wire
-        (wires, wModel2, wCmd2)
+        let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
+        (wires, wModel, wCmd)
 
 /// Sends a highlight error to buswire and symbol for the connection list given
 let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
@@ -628,7 +631,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | EditSize (id, mousePos) -> 
         changeSymbolSize model id mousePos
     | UpdateWidths -> 
-        let (wires, newModel, wCmd) = getWires model
+        let wires, newModel, wCmd = getWires model
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) newModel
         {model with Wire = sModel}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
     | ErrorMsg msg -> model, Cmd.none

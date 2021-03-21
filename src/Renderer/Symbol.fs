@@ -549,7 +549,11 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
     //Getting type info for symbol/port construction
     let (_, name, wIn, _, symType) = typeToInfo compType
     let len = String.length(name) |> float
-    let inSize = ports |> List.concat |> List.map (fun (x, y, z) -> y) |> List.filter (fun y -> y = PortType.Input) |> List.length
+    let inSize = 
+        List.concat ports
+        |> List.map (fun (_, y, _) -> y) 
+        |> List.filter (fun y -> y = PortType.Input) 
+        |> List.length
     
     let portInfos = List.map (List.mapi (fun i (name, pType, inv) -> createPortInfo (portIndex symType i inSize name)  pType _id name inv wIn)) ports
     let (leftPort, rightPort, botPort, topPort) = (portInfos.[0], portInfos.[1], portInfos.[2], portInfos.[3])
