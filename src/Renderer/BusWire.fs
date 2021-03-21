@@ -7,11 +7,9 @@ open Elmish
 open Elmish.React
 open Helpers
 
-
 //------------------------------------------------------------------------//
 //------------------------------BusWire Types-----------------------------//
 //------------------------------------------------------------------------//
-
 
 type WireSegment = {
     wId: CommonTypes.ConnectionId
@@ -165,7 +163,6 @@ let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: C
             let endPosSeg0 = {sourcePos with X = sourcePos.X - xOffset}
             let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
             [sourcePos;endPosSeg0;endPosSeg1;targetPos]
-        
         else 
             let endPosSeg0 = {sourcePos with X = sourcePos.X + diff.X - xOffset}
             let endPosSeg1 = {endPosSeg0 with Y = targetPos.Y }
@@ -355,7 +352,7 @@ let setIndex (lst: WireSegment list) =
     |> List.mapi (fun i seg-> {seg with Index= i})
 
 /// Calculates and creates all wire segments
-let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) (width: int) 
+let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) 
     (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : WireSegment list =
 
     (routeWire model sourcePortId targetPortId)
@@ -365,16 +362,13 @@ let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) (width: int)
 
 
 /// Creates a new wire 
-let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: CommonTypes.PortId) (width: int): Wire = 
+let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: CommonTypes.PortId): Wire = 
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
     let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
     let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
-    let newSegments = makeWireSegments model wId width srcPortId tgtPortId
-    let startHoriz = 
-        if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
-    let endHoriz = 
-        if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
-            
+    let newSegments = makeWireSegments model wId srcPortId tgtPortId
+    let startHoriz = not (srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
+    let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
     {
         Id = wId
         SourcePortId = srcPortId
@@ -382,7 +376,7 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
         TargetPortId = tgtPortId
         TargetPortEdge = tgtEdge
         Segments = newSegments
-        Width = width
+        Width = 1
         Highlight = false
         HighlightError = false
         Manual = false
@@ -408,7 +402,6 @@ type WireRenderProps = {
 let singleWireView =        
     FunctionComponent.Of(
         fun (props: WireRenderProps) ->
-            
             let colour = if props.HighlightError then "red" elif props.Highlight then "green" elif props.Width = 1 then props.ColorP else "purple"
             let stroke = if props.Width > 1 then "2px" else props.StrokeWidthP
             let singleSegmentView (seg: WireSegment) =
@@ -438,8 +431,7 @@ let singleWireView =
                     ]
                 ] [str <| sprintf "%i" props.Width]   
             let highlightCircles =
-                    
-                    if props.Highlight = false then
+                    if not props.Highlight then
                         []
                     else
                         let srcHighlightPos = 
@@ -564,13 +556,15 @@ let verifyWire (model: Model) (wire: Wire): Wire option =
     wireRuleList 
     |> List.map (fun f -> f model wire)
     |> List.contains false
-    |> function true -> None | false -> Some wire
+    |> fun x ->
+        if x then None
+        else Some wire
 
 /// Returns the absolute length of a wire segment
 let segLength (seg: WireSegment): float =
     (seg.TargetPos,seg.SourcePos)
     ||> Symbol.posDiff
-    |> (fun diff -> (sqrt diff.X**2. + diff.Y**2.))
+    |> (fun diff -> (sqrt diff.X ** 2. + diff.Y ** 2.))
 
 let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     match msg with
@@ -661,27 +655,26 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             |> List.map (fun w -> 
                 let srcEdge = Symbol.getPortEdge sm w.SourcePortId
                 let tgtEdge = Symbol.getPortEdge sm w.TargetPortId
-                let startHoriz = 
-                    if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
-                let endHoriz = 
-                    if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
-                match w.Manual with
-                | false -> {w with 
-                                Segments = makeWireSegments model w.Id w.Width w.SourcePortId w.TargetPortId 
-                                SourcePortEdge = srcEdge
-                                TargetPortEdge = tgtEdge
-                                StartHoriz = startHoriz
-                                EndHoriz = endHoriz}
-                | true -> {w with Segments = manualRoute w}
+                let startHoriz = not (srcEdge = Symbol.Top || srcEdge = Symbol.Bottom)
+                let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
+                if w.Manual then
+                    {w with Segments = manualRoute w}
+                else
+                    {w with 
+                        Segments = makeWireSegments model w.Id w.SourcePortId w.TargetPortId 
+                        SourcePortEdge = srcEdge
+                        TargetPortEdge = tgtEdge
+                        StartHoriz = startHoriz
+                        EndHoriz = endHoriz}
             )
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
     | AddWire (portId1,portId2) ->
         let unverifiedWire =
             match Symbol.getPortType model.Symbol portId1 , Symbol.getPortType model.Symbol portId2 with
-            | CommonTypes.Output , CommonTypes.Input -> makeNewWire model portId1 portId2 1 // Wire was drawn from Output to Input
-            | CommonTypes.Input , CommonTypes.Output -> makeNewWire model portId2 portId1 1 // Wire was drawn from Input to Output
-            | _ , _ -> makeNewWire model portId1 portId2 1 // Invalid port combination, will be caught by verifyWire
+            | CommonTypes.Output , CommonTypes.Input -> makeNewWire model portId1 portId2 // Wire was drawn from Output to Input
+            | CommonTypes.Input , CommonTypes.Output -> makeNewWire model portId2 portId1 // Wire was drawn from Input to Output
+            | _ , _ -> makeNewWire model portId1 portId2 // Invalid port combination, will be caught by verifyWire
              
         match verifyWire model unverifiedWire with
         | Some w -> {model with WX = w::model.WX}, Cmd.none
@@ -697,10 +690,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wList =
             model.WX
             |> List.map (fun w ->
-                if List.contains w.Id wIdList then
-                    {w with Highlight = true}
-                else 
-                    {w with Highlight = false}
+                {w with Highlight = List.contains w.Id wIdList}
             )
         {model with WX = wList}, Cmd.none
 
@@ -758,7 +748,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 
 
         let segLstLst =
-
             model.WX
             |> List.map (fun w ->
                 List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
