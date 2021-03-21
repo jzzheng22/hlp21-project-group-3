@@ -177,63 +177,6 @@ let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
     let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel
     {model with Wire = sModel}, Cmd.batch [ Cmd.map Wire wCmd; Cmd.map Wire sCmd ]
 
-
-// let moveElements model mousePos =
-//     let transVector =
-//         { X = (mousePos.X - model.DraggingPos.X)
-//           Y = (mousePos.Y - model.DraggingPos.Y) }
-//     let newModel = {model with DraggingPos = mousePos}
-//     if not (List.isEmpty model.SelectedComponents) then
-//         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) newModel.Wire
-//         {model with Wire = sModel}, Cmd.map Wire sCmd
-
-//     else if not (List.isEmpty model.SelectedWireSegments) then
-//         let wireSegment = List.head model.SelectedWireSegments
-//         let wModel, wCmd = BusWire.update (BusWire.MoveWires(fst wireSegment, snd wireSegment, transVector)) newModel.Wire
-//         {model with Wire = wModel}, Cmd.map Wire wCmd
-
-//     else
-//         { model with SelectingMultiple = true}, Cmd.none
-
-//BusWire.update (BusWire.DeleteWires wiresToDelete) model.Wire
-//BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
-
-/// Update width will call inferWidth, which sets up the variables and calls the BusWidthInferer module
-/// This will either return Ok x, which may be Some - in which case we update the connection width
-/// If Ok x is None, we ask Symbol what the width should be, if the two port widths on either end of the connection don't match, we dispatch the error highlighting
-/// If the BusWidthInferer returns Error, then we dispatch the error highlight messages, (TODO: and a message to display a popup on screen)
-// let updateWidth (model : Model)  =
-//     inferWidth model
-//     |> function
-//     | Ok x -> //this is a Map<ConnectionId, int Option>
-//         x 
-//         |> Map.toList 
-//         |> List.iter (
-//             fun (k, v) -> 
-//             match v with 
-//             | Some a -> 
-//                 let wModel, wCmd = BusWire.update (BusWire.UpdateWidth (k, a)) model.Wire
-//                 {model with Wire = wModel}, Cmd.map Wire wCmd
-
-//             | None -> 
-//                 let w = checkWidth model k
-//                 if w = -1 then 
-//                     dispatchError model [k]
-//                 else 
-//                     let wModel, wCmd = BusWire.update (BusWire.UpdateWidth (k, w)) model.Wire
-//                     {model with Wire = wModel}, Cmd.map Wire wCmd
-
-//     | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
-//         // e.ConnectionsAffected
-//         // |> dispatchError model
-//         let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
-//         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) e.ConnectionsAffected))) wModel
-//         {model with Wire = sModel}, Cmd.batch [ Cmd.map Wire wCmd; Cmd.map Wire sCmd ]
-
-//let deleteSymbols model wModel =
-//BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
-//BusWire.update (BusWire.DeleteWires wiresToDelete) model.Wire
-
 let drawError (msg : string) : ReactElement list = 
     let drawBox = 
         rect[
@@ -369,7 +312,7 @@ let mouseUp model mousePos dispatch =
         /// Here buswidth inferer should be called? ///
         /// --------------------------------------- ///
             -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
-               
+               dispatch <| UpdateWidths
         | _ -> ()
     | None -> ()
     if model.SelectingMultiple then
@@ -667,21 +610,19 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | EditSize (id, mousePos) -> 
         changeSymbolSize model id mousePos
     | UpdateWidths -> 
-        // updateWidth model
         inferWidth model
         |> function
         | Ok x -> //this is a Map<ConnectionId, int Option>
+            
             let conList = x |> Map.toList 
+            printf "hello UpdateWidth %A" conList
             let wModel, wCmd = BusWire.update (BusWire.UpdateWidth conList) model.Wire
             {model with Wire = wModel}, Cmd.map Wire wCmd
         | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
-            // e.ConnectionsAffected
-            // |> dispatchError model
             let wires = e.ConnectionsAffected
             let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
             let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel
             {model with Wire = sModel}, Cmd.batch [ Cmd.map Wire wCmd; Cmd.map Wire sCmd ]
-        // updateWidth model dispatch, Cmd.none
     | ErrorMsg msg -> model, Cmd.none
 
 let init () =
