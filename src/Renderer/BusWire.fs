@@ -76,13 +76,13 @@ type Msg =
 
 /// Takes Source and Target ports of a wire and returns the 
 /// vertices of the path it should follow
-let routeWire (model: Model) (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : XYPos list =
-    let sourcePos = Symbol.getPortCoords model.Symbol sourcePortId
-    let targetPos = Symbol.getPortCoords model.Symbol targetPortId
+let routeWire (model: Symbol.Model) (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : XYPos list =
+    let sourcePos = Symbol.getPortCoords model sourcePortId
+    let targetPos = Symbol.getPortCoords model targetPortId
     let diff = Symbol.posDiff targetPos sourcePos
     let xOffset = 10. // Length of Horizontal line coming out of/going into port
     let yOffset = 10. // Length of Vertical line coming out of/going into port
-    match Symbol.getPortEdge model.Symbol sourcePortId, Symbol.getPortEdge model.Symbol targetPortId with 
+    match Symbol.getPortEdge model sourcePortId, Symbol.getPortEdge model targetPortId with 
     | Symbol.Right,Symbol.Left -> 
         if diff.X >= 0. then // Three Segement Case
             let endPosSeg0 = {sourcePos with X = sourcePos.X + (diff.X/2.)}
@@ -358,7 +358,7 @@ let setIndex (lst: WireSegment list) =
 let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) (width: int) 
     (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : WireSegment list =
 
-    (routeWire model sourcePortId targetPortId)
+    (routeWire model.Symbol sourcePortId targetPortId)
     |> List.pairwise
     |> List.map (fun (src,tgt) -> makeWireSegment wId 1 src tgt)
     |> setIndex
@@ -666,11 +666,13 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
 // Must have signature Wire -> Symbol.Model -> bool
 
 let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) : bool =
-    let newDiff = Symbol.posDiff (Symbol.getPortCoords sm wire.TargetPortId) (Symbol.getPortCoords sm wire.SourcePortId) 
-    let oldDiff = Symbol.posDiff ((List.last wire.Segments).TargetPos) ((List.head wire.Segments).SourcePos)
-    if sign(newDiff.X) <> sign(oldDiff.X) || sign(newDiff.Y) <> sign(oldDiff.Y) then
+    let currentSegmentCount = wire.Segments.Length
+    let newVertexCount = 
+        routeWire sm wire.SourcePortId wire.TargetPortId
+        |> List.length
+    if currentSegmentCount <> newVertexCount - 1 then
         false
-    else
+    else 
         true
 
 let routeRuleAfterRotation (wire: Wire) (sm: Symbol.Model) : bool =
