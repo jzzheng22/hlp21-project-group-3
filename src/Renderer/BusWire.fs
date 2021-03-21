@@ -776,21 +776,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         //{model with WX = wList}, Cmd.none
 
     | SetColor c -> {model with Color = c}, Cmd.none
-    | UpdateWidth lst ->
-    // | UpdateWidth (cId, w) ->
-        //{model with
-        //    WX = model.WX
-        //        |> List.map (fun wire ->
-        //            if wire.Id = cId then
-        //                { wire with
-        //                    Width = w
-        //                    Segments = List.map (fun x -> {x with Width = w}) wire.Segments
-        //                }
-        //            else
-        //                wire
-        //        )
-        //}
-        
+    | UpdateWidth lst ->        
          {model with
              WX = model.WX
                  |> List.map (fun wire ->

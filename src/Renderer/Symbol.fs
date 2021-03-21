@@ -114,8 +114,8 @@ let typeToInfo (compType : ComponentType) : (string * string * int * int * Symbo
     | ComponentType.AsyncROM x -> ("AROM", "AROM", x.AddressWidth, x.WordWidth, LogMem)
     | ComponentType.ROM x -> ("ROM", "ROM", x.AddressWidth, x.WordWidth, FF)
     | ComponentType.RAM x -> ("RAM", "RAM", x.AddressWidth, x.WordWidth, RAM)
-    | ComponentType.Input x -> ("", (sprintf "In<%d:0>" (x - 1)), x, x, IO) 
-    | ComponentType.Output x -> ("", (sprintf "Out<%d:0>" (x - 1)), x, x, IO) 
+    | ComponentType.Input x -> ((sprintf "In<%d:0>" (x - 1)), "" , x, x, IO) 
+    | ComponentType.Output x -> ((sprintf "Out<%d:0>" (x - 1)), "" , x, x, IO) 
     | ComponentType.IOLabel -> ("", "", 0, 0, IO) //Check generic type WHAT IS THIS?? 
     | ComponentType.BusSelection (x, y) -> ("", "", x, y, Wires)
     | ComponentType.MergeWires -> ("", "", 0, 0, Wires)
@@ -495,10 +495,12 @@ let findPortList (numIn : int) (numOut : int) (compType : ComponentType) : (stri
     [List.concat[ins; l]; List.concat[outs; r]; b; []]
 
 let getSymLabel (comp : ComponentType) (i : int) : string = 
-    let (a, _, _, _, _) = typeToInfo comp
-    match a with 
+    let (name, _, _, _, symType) = typeToInfo comp
+    match name with 
     | "" -> ""
-    | _ -> sprintf "%s%i" a i
+    | _ -> match symType with
+           | IO | Wires -> name
+           | _ -> sprintf "%s%i" name i
 
 let getDisplace (k : PortInfo Option) = 
     if getPortName k = "Clk" then -7. else -3.
@@ -611,16 +613,16 @@ let init () =
     let custom = {
         CustomComponentType.Name = "reallyLongComponentName"
         // Tuples with (label * connection width).
-        CustomComponentType.InputLabels = [("myIn1", 0); ("myIn2", 1)] // (string * int) list
-        CustomComponentType.OutputLabels = [("myOut1", 0); ("myOut2", 1)]  //(string * int) list 
+        CustomComponentType.InputLabels = [("myIn1", 1); ("myIn2", 1)] // (string * int) list
+        CustomComponentType.OutputLabels = [("myOut1", 1); ("myOut2", 1)]  //(string * int) list 
     }
     [
         (createSymbol (ComponentType.And) [[("IN0", PortType.Input, false); ("IN1", PortType.Input, false)]; [("OUT1", PortType.Output, true)]; []; [("OUT2", PortType.Output, true); ("reallyreallyreallylonglabelname", PortType.Output, true); ("OUT4", PortType.Output, true)]] {X = 250.; Y = 150.} 0 (getSymLabel ComponentType.And 0))
-        (createSymbol (ComponentType.SplitWire 1) (findPortList 1 2 ComponentType.MergeWires) {X = 50.; Y = 100.} 0 (getSymLabel ComponentType.MergeWires 0))
+        (createSymbol (ComponentType.SplitWire 1) (findPortList 1 2 (ComponentType.SplitWire 1)) {X = 50.; Y = 100.} 0 (getSymLabel (ComponentType.SplitWire 1)0))
         (createSymbol (ComponentType.Nand) (findPortList 2 1 ComponentType.Nand) {X = 200.; Y = 50.} 0 (getSymLabel ComponentType.Nand 0))
         (createSymbol (ComponentType.Mux2) (findPortList 2 1 ComponentType.Mux2) {X = 300.; Y = 50.} 0 (getSymLabel ComponentType.Mux2 0))
         (createSymbol (ComponentType.Demux2) (findPortList 1 2 ComponentType.Demux2) {X = 400.; Y = 50.} 0 (getSymLabel ComponentType.Demux2 0))
-        (createSymbol (ComponentType.Input 2) (findPortList 0 1 (ComponentType.Input 1)) {X = 200.; Y = 200.} 0 (getSymLabel (ComponentType.Input 1) 0))
+        (createSymbol (ComponentType.Input 2) (findPortList 0 1 (ComponentType.Input 2)) {X = 200.; Y = 200.} 0 (getSymLabel (ComponentType.Input 2) 0))
         (createSymbol (ComponentType.Decode4) (findPortList 2 4 ComponentType.Decode4) {X = 250.; Y = 250.} 0 (getSymLabel ComponentType.Decode4 0))
         (createSymbol (ComponentType.Register 1) (findPortList 1 1 (ComponentType.Register 1)) {X = 500.; Y = 100.} 0 (getSymLabel (ComponentType.Register 1) 0))
         (createSymbol (ComponentType.DFFE) (findPortList 1 1 ComponentType.DFFE) {X = 500.; Y = 200.} 0 (getSymLabel ComponentType.DFFE 0))
