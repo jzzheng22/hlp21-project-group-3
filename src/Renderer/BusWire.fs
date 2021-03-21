@@ -355,10 +355,10 @@ let setIndex (lst: WireSegment list) =
     |> List.mapi (fun i seg-> {seg with Index= i})
 
 /// Calculates and creates all wire segments
-let makeWireSegments (model: Model) (wId: CommonTypes.ConnectionId) (width: int) 
+let makeWireSegments (sm: Symbol.Model) (wId: CommonTypes.ConnectionId) (width: int) 
     (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : WireSegment list =
 
-    (routeWire model.Symbol sourcePortId targetPortId)
+    (routeWire sm sourcePortId targetPortId)
     |> List.pairwise
     |> List.map (fun (src,tgt) -> makeWireSegment wId 1 src tgt)
     |> setIndex
@@ -369,7 +369,7 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
     let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
     let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
-    let newSegments = makeWireSegments model wId width srcPortId tgtPortId
+    let newSegments = makeWireSegments model.Symbol wId width srcPortId tgtPortId
     let startHoriz = 
         if srcEdge=Symbol.Top || srcEdge=Symbol.Bottom then false else true
     let endHoriz = 
@@ -704,7 +704,7 @@ let decideManual (wire: Wire) (sm: Symbol.Model) : Wire =
         | true -> {wire with Manual = false} 
         | false -> wire
 
-let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model) 
+(*let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model) 
     : CommonTypes.ConnectionId list =
     sIds
     |> List.collect (fun sId -> Symbol.getPortIds sm sId)
@@ -718,12 +718,11 @@ let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm:
         )
     )
     |> List.map (fun w -> w.Id)
-    |> List.distinct
+    |> List.distinct*)
 
-let updateWires (wIdList: CommonTypes.ConnectionId list) (model: Model) (sm: Symbol.Model) : Wire list =
+let updateWires (model: Model) (sm: Symbol.Model) : Wire list =
     model.WX
-    |> List.map (fun w ->
-        if List.contains w.Id wIdList then 
+    |> List.map (fun w -> 
             let newWire = decideManual w sm
             let srcEdge = Symbol.getPortEdge sm newWire.SourcePortId
             let tgtEdge = Symbol.getPortEdge sm newWire.TargetPortId
@@ -733,13 +732,12 @@ let updateWires (wIdList: CommonTypes.ConnectionId list) (model: Model) (sm: Sym
                 if tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom then false else true
             match newWire.Manual with
             | false -> {newWire with 
-                            Segments = makeWireSegments model newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
+                            Segments = makeWireSegments sm newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
                             SourcePortEdge = srcEdge
                             TargetPortEdge = tgtEdge
                             StartHoriz = startHoriz
                             EndHoriz = endHoriz}
             | true -> {newWire with Segments = (manualRoute newWire sm)}
-        else w
         )
         
     
@@ -753,18 +751,17 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wList = 
             match sMsg with
             | Symbol.Move (sIds,_) -> 
-                printfn "BusWire Move Message Detected"
-                let w2u = chooseWiresToUpdate sIds model sm  
-                updateWires w2u model sm
+                printfn "BusWire: Move Message Detected"
+                updateWires  model sm
             | Symbol.Rotate (sId,_) ->
-                printfn "BusWire Rotate Message Detected"
-                let w2u = chooseWiresToUpdate [sId] model sm
-                updateWires w2u model sm
+                printfn "BusWire: Rotate Message Detected"
+                updateWires model sm
             | Symbol.Scale (sId,_) ->
-                printfn "BusWire Scale Message Detected"
-                let w2u = chooseWiresToUpdate [sId] model sm
-                updateWires w2u model sm
-            | _ -> updateWires (List.map (fun w -> w.Id) model.WX) model sm
+                printfn "BusWire: Scale Message Detected"
+                updateWires model sm
+
+            | _ -> model.WX
+                //updateWires model sm
             
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
 
