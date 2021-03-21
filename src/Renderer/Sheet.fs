@@ -308,9 +308,6 @@ let mouseUp model mousePos dispatch =
     | Some endPort ->
         match model.SelectedPort with
         | (Some startPort, _) when Symbol.getPortType model.Wire.Symbol endPort <> snd model.SelectedPort 
-        /// --------------------------------------- ///
-        /// Here buswidth inferer should be called? ///
-        /// --------------------------------------- ///
             -> dispatch <| Wire(BusWire.AddWire(startPort, endPort))
                dispatch <| UpdateWidths
         | _ -> ()
