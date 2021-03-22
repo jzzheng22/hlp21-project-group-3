@@ -505,7 +505,7 @@ let alignComponents model vector =
     |> List.zip model.SelectedComponents
     |> List.fold foldFunction (model, Cmd.none)
     
-
+///Deletes selected symbols and wires, updating the widthInferrer.
 let deleteElements model = 
     let wModel1, wCmd1 = deleteWires model
     let sModel1, sCmd1 = deleteSymbols model wModel1
@@ -575,7 +575,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                     BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 0.8; Y = 0.8}))) model.Wire
                 | _ -> 
                     failwithf "Unexpected input in symbol transformation."
-            { model with Wire = sModel }, Cmd.map Wire sCmd
+            let snapModel, snapCmd = snapSymbolToGrid {model with Wire = sModel}
+            snapModel, Cmd.batch [ Cmd.map Wire sCmd; snapCmd]
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
     | KeyPress ZoomCanvasOut -> 
@@ -617,10 +618,18 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         if not (List.isEmpty model.SelectedComponents) then
             snapSymbolToGrid model
         else
-            { model with 
-                SelectedPort = None, CommonTypes.PortType.Input;
-                SelectingMultiple = false 
-                EditSizeOf = None}, Cmd.none
+            match model.EditSizeOf with 
+            | Some id ->
+                let previousComponents = model.SelectedComponents
+                let snapModel, cmd = snapSymbolToGrid {model with SelectedComponents = [id]}
+                { snapModel with 
+                    SelectedComponents = previousComponents
+                    EditSizeOf = None}, cmd
+            | None -> 
+                { model with 
+                    SelectedPort = None, CommonTypes.PortType.Input;
+                    SelectingMultiple = false 
+                    EditSizeOf = None}, Cmd.none
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
     | MoveElements mousePos ->
@@ -635,7 +644,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         {model with Wire = sModel}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
     | ErrorMsg msg -> model, Cmd.none
     | SymbolAddFinish ->
-        {model with SelectedComponents = []; AddingSymbol = false}, Cmd.none
+        let snapModel, cmd = snapSymbolToGrid model
+        {snapModel with SelectedComponents = []; AddingSymbol = false}, cmd
 
 let init () =
     let model, cmds = (BusWire.init 400) ()
