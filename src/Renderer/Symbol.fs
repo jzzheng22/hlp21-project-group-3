@@ -141,8 +141,8 @@ let posDiff (a : XYPos) (b : XYPos) = {X=a.X-b.X; Y=a.Y-b.Y}
 let posAdd (a : XYPos) (b : XYPos) = {X=a.X+b.X; Y=a.Y+b.Y}
 let absDiff a b = 
     let diff = (posDiff a b)
-    diff.X + diff.Y
-
+    (abs diff.X) + (abs diff.Y)
+    //diff.X + diff.Y
 /// displace will move a port position _away_ from the box by n pixels.
 /// 
 /// For inverters call with positive n.
@@ -391,12 +391,12 @@ let swapPort portMap k1 k2 v1 v2 =
     |> Map.change k2 (fun _ -> Some v1)
 
 //Finds the port with position closest to a coordinate, and swap the map values of that port with a given port
-let swapMap (sym : Symbol) (coord : XYPos) port = 
+let swapMap (sym : Symbol) (coord : XYPos) (port : (XYPos * PortInfo Option)) = 
     genMapList sym.PortMap (List.map (fun (v, k) -> (absDiff coord v, (v, k))))
     |> List.minBy fst
     |> snd
     |> function
-    | (k, x) -> swapPort sym.PortMap k (fst port) x (snd port)  
+    | (k, x) -> swapPort sym.PortMap k (fst port) x (snd port)
                 
 let drawText (x : float) (y : float) (size : string) (anchor : string, baseline : string) =
     text[
