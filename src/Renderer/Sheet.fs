@@ -346,7 +346,6 @@ let mouseUp model mousePos dispatch =
         dragSelectElements model boxInSelectedArea outerBoxCoords dispatch
     match model.SelectedLabel with
     | Some (sId, _, pId) -> 
-        printf "hello in mouseUp, Dragport message being sent!"
         dispatch <| Symbol(Symbol.DragPort (sId, pId, mousePos))
         dispatch <| SelectLabel None
     | None -> ()
@@ -382,9 +381,6 @@ let mouseMove model mousePos dispatch mDown =
                     dispatch <| EditSize (id, mousePos)
                 | _ -> 
                     dispatch <| MoveElements mousePos
-            printf "hello in mousemove selected label: %A" model.SelectedLabel
-            
-
             dispatch <| SelectDragging mousePos
 
 
