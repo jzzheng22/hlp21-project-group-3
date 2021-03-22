@@ -84,8 +84,8 @@ type Msg =
     | HighlightError of sIdList: ComponentId list
     | HighlightPorts of sIdList : ComponentId list
     | DragPort of sId : ComponentId * pId : PortId * pagePos: XYPos
-    | Rotate of sId : ComponentId * rot : int
-    | Scale of sId : ComponentId * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
+    | Rotate of sIdList : ComponentId list * rot : int
+    | Scale of sIdList : ComponentId list * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
     | DisplaySlots of sId : ComponentId
     | Rename of sId : ComponentId * name : string
     | UpdateSymbolModelWithComponent of Component // Issie interface
@@ -141,7 +141,7 @@ let posDiff (a : XYPos) (b : XYPos) = {X=a.X-b.X; Y=a.Y-b.Y}
 let posAdd (a : XYPos) (b : XYPos) = {X=a.X+b.X; Y=a.Y+b.Y}
 let absDiff a b = 
     let diff = (posDiff a b)
-    diff.X + diff.Y
+    (abs diff.X) + (abs diff.Y)
 
 /// displace will move a port position _away_ from the box by n pixels.
 /// 
@@ -160,7 +160,7 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : XYPos =
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
-    let box = (addXYVal portPos -6., addXYVal portPos 6.);
+    let box = (addXYVal portPos -8., addXYVal portPos 8.);
     let topL = fst box
     let botR = snd box
     topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
@@ -169,8 +169,8 @@ let testBox (portPos : XYPos) (coord : XYPos) : bool =
 /// i = int indicating the index of the port on a side
 /// n = int indicating the total number of ports on a side
 let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos = 
-    let h = getHW botR topL |> fst
-    let w = getHW botR topL |> snd
+    let h = fst (getHW botR topL)
+    let w = snd (getHW botR topL)
     let x = topL.X + (w * float(i + 1) / float(n + 1))
     let y = topL.Y + (h * float(i + 1) / float(n + 1))
     {X = x; Y = y}
@@ -391,12 +391,12 @@ let swapPort portMap k1 k2 v1 v2 =
     |> Map.change k2 (fun _ -> Some v1)
 
 //Finds the port with position closest to a coordinate, and swap the map values of that port with a given port
-let swapMap (sym : Symbol) (coord : XYPos) port = 
+let swapMap (sym : Symbol) (coord : XYPos) (port : (XYPos * PortInfo Option)) = 
     genMapList sym.PortMap (List.map (fun (v, k) -> (absDiff coord v, (v, k))))
     |> List.minBy fst
     |> snd
     |> function
-    | (k, x) -> swapPort sym.PortMap k (fst port) x (snd port)  
+    | (k, x) -> swapPort sym.PortMap k (fst port) x (snd port)
                 
 let drawText (x : float) (y : float) (size : string) (anchor : string, baseline : string) =
     text[
@@ -714,29 +714,29 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         )
         , Cmd.none
 
-    | Rotate (sId, rot) ->
+    | Rotate (sIdList, rot) ->
         model
         |> List.map (fun sym ->
-            if sId <> sym.Id then
-                sym
-            else
+            if List.contains sym.Id sIdList then
                 let newSym = trans rotateCoords sym rot
                 { newSym with
                     Rotation = updateRot rot sym.Rotation     
                 }
+            else
+                sym
         )
         , Cmd.none
 
-    | Scale (sId, scale) ->
+    | Scale (sIdList, scale) ->
         model
         |> List.map (fun sym ->
-            if sId <> sym.Id then
-                sym
-            else
+            if List.contains sym.Id sIdList then
                 let newSym = trans scaleCoords sym scale
                 { newSym with
                     Scale = {X = sym.Scale.X * scale.X; Y = sym.Scale.Y * scale.Y }
                 }
+            else
+                sym
         )
         , Cmd.none
 
@@ -928,15 +928,21 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     | Some(v, Some k) -> Some(v, (PortId (k.Port.Id)))
     | _ -> None
 
-let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (XYPos * PortId) Option =
+let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (ComponentId * XYPos * PortId) Option =
     model
     |> List.tryFind (fun sym -> sym.Id = sId)
     |> function
-    | Some sym -> Some (genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -9. x sym) pos))) 
-                        |> List.filter (fun (x, y, z) -> z)
-                        |> List.map (fun (x, y, z) -> (x, getPortId y))
-                        |> List.item 0)
-    | None -> None
+    | Some sym -> 
+        let findLabel = 
+            genMapList sym.PortMap (List.map (fun (x, pInfo) -> (x, pInfo, testBox (displace -8. x sym) pos))) 
+            |> List.filter (fun (_, _, isInside) -> isInside)
+        if List.isEmpty findLabel then None 
+        else 
+            findLabel
+            |> List.map (fun (pos, pInfo, _) -> (sId, pos, getPortId pInfo))
+            |> List.head
+            |> Some
+    | _ -> None
     
 
 //Returns a list of Port Ids for a given symbol

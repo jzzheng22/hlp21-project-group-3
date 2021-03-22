@@ -18,7 +18,8 @@ type Model =
       EditSizeOf: CommonTypes.ComponentId option
       AddingSymbol: bool
       DragStartPos: XYPos
-      DraggingPos: XYPos }
+      DraggingPos: XYPos
+      SelectedLabel: (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option}
 
 type KeyboardMsg =
     | AltX
@@ -49,6 +50,7 @@ type Msg =
     | ErrorMsg of string
     | UpdateWidths 
     | SymbolAddFinish
+    | SelectLabel of (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option
 
 type MouseOps =
     | MouseDown
@@ -191,6 +193,9 @@ let dirtyHack (comps : CommonTypes.Component list, conns : CommonTypes.Connectio
         CommonTypes.WidthInferError.Msg = msgList
         CommonTypes.WidthInferError.ConnectionsAffected = conList
     }
+
+let validLabel (model : Model) = 
+    Symbol.isLabel model.Wire.Symbol model.DraggingPos (List.head model.SelectedComponents)
 
 /// Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
 let inferWidth (model : Model) = 
@@ -338,9 +343,12 @@ let highlightCorners model box =
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
-let mouseDown model mousePos dispatch =
+let mouseDown model mousePos dispatch mDown =
     if model.AddingSymbol then
         dispatch <| SymbolAddFinish
+    elif mDown = 2. && not (List.isEmpty model.SelectedComponents) then    
+        dispatch <| SelectLabel (validLabel model)
+        dispatch <| SelectDragStart mousePos
     else
         match Symbol.isPort model.Wire.Symbol mousePos with
         | Some (_, portId) -> 
@@ -371,6 +379,11 @@ let mouseUp model mousePos dispatch =
     if model.SelectingMultiple then
         let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
         dragSelectElements model boxInSelectedArea outerBoxCoords dispatch
+    match model.SelectedLabel with
+    | Some (sId, _, pId) -> 
+        dispatch <| Symbol(Symbol.DragPort (sId, pId, mousePos))
+        dispatch <| SelectLabel None
+    | None -> ()
     dispatch <| SelectDragEnd
 
 let increaseBoundingBox (a, topL, botR) = 
@@ -385,10 +398,16 @@ let mouseMove model mousePos dispatch mDown =
             Symbol.getBoundingBoxes model.Wire.Symbol mousePos
             |> List.map increaseBoundingBox
             |> getSymbolIDList (List.filter (removeSymbolID inBoundingBox mousePos))
-
+        
         dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
 
-        if mDown then // Drag
+        match model.SelectedLabel with 
+        | Some (cId, pos, pId) -> 
+            dispatch <| Symbol(Symbol.DisplaySlots cId)
+        | _ -> 
+            dispatch <| Symbol(Symbol.DisplaySlots (CommonTypes.ComponentId ""))
+
+        if mDown = 1. then // Drag
             match model.SelectedPort with
             | (Some _, _) -> ()
             | _ ->
@@ -397,11 +416,10 @@ let mouseMove model mousePos dispatch mDown =
                     dispatch <| EditSize (id, mousePos)
                 | _ -> 
                     dispatch <| MoveElements mousePos
-
             dispatch <| SelectDragging mousePos
 
 
-let mDown (ev: Types.MouseEvent) = ev.buttons <> 0.
+let mDown (ev: Types.MouseEvent) = ev.buttons
 
 let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (dispatch: Dispatch<Msg>) =
     let coordX = ev.clientX 
@@ -414,7 +432,7 @@ let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (di
             0., 0.
     let mousePos = { X = (coordX - offsetX) / model.Zoom; Y = (coordY - offsetY) / model.Zoom }
     match mouseOp with
-    | MouseDown -> mouseDown model mousePos dispatch
+    | MouseDown -> mouseDown model mousePos dispatch (mDown ev)
     | MouseUp -> mouseUp model mousePos dispatch
     | MouseMove -> mouseMove model mousePos dispatch (mDown ev)
 
@@ -509,7 +527,7 @@ let changeSymbolSize model id mousePos =
     if ((condition currentBoxWidth snapX) || (condition currentBoxHeight snapY)) then
         model, Cmd.none
     else 
-        let scaleMsg = id, {X = snapX / currentBoxWidth; Y = snapY / currentBoxHeight}
+        let scaleMsg = [id], {X = snapX / currentBoxWidth; Y = snapY / currentBoxHeight}
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale scaleMsg)) model.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
@@ -540,7 +558,7 @@ let alignComponents model vector =
     |> List.zip model.SelectedComponents
     |> List.fold foldFunction (model, Cmd.none)
     
-
+/// Deletes selected symbols and wires and updates the widthInferrer.
 let deleteElements model = 
     let wModel1, wCmd1 = deleteWires model
     let sModel1, sCmd1 = deleteSymbols model wModel1
@@ -597,7 +615,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         if List.isEmpty model.SelectedComponents then 
             model, Cmd.none
         else 
-            let symid = List.head model.SelectedComponents
+            let symid = model.SelectedComponents
             let sModel, sCmd = 
                 match msg with 
                 | KeyPress SymbolClockwise -> 
@@ -610,7 +628,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                     BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 0.8; Y = 0.8}))) model.Wire
                 | _ -> 
                     failwithf "Unexpected input in symbol transformation."
-            { model with Wire = sModel }, Cmd.map Wire sCmd
+            let snapModel, snapCmd = snapSymbolToGrid {model with Wire = sModel}
+            snapModel, Cmd.batch [ Cmd.map Wire sCmd; snapCmd]
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
     | KeyPress ZoomCanvasOut -> 
@@ -652,10 +671,18 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         if not (List.isEmpty model.SelectedComponents) then
             snapSymbolToGrid model
         else
-            { model with 
-                SelectedPort = None, CommonTypes.PortType.Input;
-                SelectingMultiple = false 
-                EditSizeOf = None}, Cmd.none
+            match model.EditSizeOf with 
+            | Some id ->
+                let previousComponents = model.SelectedComponents
+                let snapModel, cmd = snapSymbolToGrid {model with SelectedComponents = [id]}
+                { snapModel with 
+                    SelectedComponents = previousComponents
+                    EditSizeOf = None}, cmd
+            | None -> 
+                { model with 
+                    SelectedPort = None, CommonTypes.PortType.Input;
+                    SelectingMultiple = false 
+                    EditSizeOf = None}, Cmd.none
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
     | MoveElements mousePos ->
@@ -670,7 +697,10 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         {model with Wire = sModel}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
     | ErrorMsg msg -> model, Cmd.none
     | SymbolAddFinish ->
-        {model with SelectedComponents = []; AddingSymbol = false}, Cmd.none
+        let snapModel, cmd = snapSymbolToGrid model
+        {snapModel with SelectedComponents = []; AddingSymbol = false}, cmd
+    | SelectLabel x -> 
+        { model with SelectedLabel = x }, Cmd.none
 
 let init () =
     let model, cmds = (BusWire.init 400) ()
@@ -684,5 +714,6 @@ let init () =
       EditSizeOf = None
       AddingSymbol = false
       DragStartPos = origin
-      DraggingPos = origin },
+      DraggingPos = origin 
+      SelectedLabel = None},
     Cmd.map Wire cmds
