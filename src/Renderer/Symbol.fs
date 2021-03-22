@@ -929,19 +929,20 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     | _ -> None
 
 let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (ComponentId * XYPos * PortId) Option =
-         
-        let sym = model |> List.find (fun x -> x.Id = sId)
-        
-        let testLabel = 
-            genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -10. x sym) pos))) 
-            |> List.filter (fun (x, y, z) -> z)
-        
-        if List.isEmpty testLabel then None
-        else
-            testLabel
-            |> List.map (fun (x, y, z) -> (sId, x, getPortId y))
-            |> List.head
-            |> Some
+    model
+    |> List.tryFind (fun sym -> sym.Id = sId)
+    |> function
+    | Some sym -> 
+                let findLabel = 
+                    genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -9. x sym) pos))) 
+                    |> List.filter (fun (x, y, z) -> z)
+                if List.isEmpty findLabel then None 
+                else 
+                    findLabel
+                    |> List.map (fun (x, y, z) -> (sId, x, getPortId y))
+                    |> List.head
+                    |> Some
+    | _ -> None
     
 
 //Returns a list of Port Ids for a given symbol
