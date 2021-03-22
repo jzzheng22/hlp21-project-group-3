@@ -162,14 +162,49 @@ let cornersToString startCoord endCoord =
         endCoord.X endCoord.Y
         startCoord.X endCoord.Y
 
+let filterResult x =
+    match x with
+    | Ok _ -> false
+    | Error _ -> true
+
+let dirtyHack (comps : CommonTypes.Component list, conns : CommonTypes.Connection list) =
+
+    let errorList =
+        conns
+        |> List.map (fun x -> (comps, [x]))
+        |> List.map BusWidthInferer.inferConnectionsWidth
+        |> List.collect (fun x -> 
+            match x with 
+            | Ok _ -> []
+            | Error e -> [e])
+    
+    let msgList = 
+        errorList
+        |> List.map (fun x -> x.Msg)
+        |> String.concat "\n"
+
+    let conList =
+        errorList
+        |> List.collect (fun x -> x.ConnectionsAffected)
+
+    Error {
+        CommonTypes.WidthInferError.Msg = msgList
+        CommonTypes.WidthInferError.ConnectionsAffected = conList
+    }
+
 /// Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
 let inferWidth (model : Model) = 
     let comps = Symbol.extractComponents model.Wire.Symbol
     printf"hello\n inferWidth comps:\n %A" comps
-    let conns = BusWire.extractWires model.Wire 
+    let conns = BusWire.extractWires model.Wire
     printf"hello\n inferWidth conns:\n %A" conns
+    
+    /// ----- Dirty fix for bug ----- ///
     let canvas = (comps, conns)
-    BusWidthInferer.inferConnectionsWidth canvas
+    let test = BusWidthInferer.inferConnectionsWidth canvas
+    match test with 
+    | Ok x -> test
+    | Error e -> dirtyHack (comps, conns)
 
 let getWires (model : Model) =
     inferWidth model
