@@ -505,7 +505,7 @@ let alignComponents model vector =
     |> List.zip model.SelectedComponents
     |> List.fold foldFunction (model, Cmd.none)
     
-///Deletes selected symbols and wires, updating the widthInferrer.
+/// Deletes selected symbols and wires and updates the widthInferrer.
 let deleteElements model = 
     let wModel1, wCmd1 = deleteWires model
     let sModel1, sCmd1 = deleteSymbols model wModel1
