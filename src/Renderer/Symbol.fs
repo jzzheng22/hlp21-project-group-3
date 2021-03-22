@@ -169,8 +169,8 @@ let testBox (portPos : XYPos) (coord : XYPos) : bool =
 /// i = int indicating the index of the port on a side
 /// n = int indicating the total number of ports on a side
 let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos = 
-    let h = getHW botR topL |> fst
-    let w = getHW botR topL |> snd
+    let h = fst (getHW botR topL)
+    let w = snd (getHW botR topL)
     let x = topL.X + (w * float(i + 1) / float(n + 1))
     let y = topL.Y + (h * float(i + 1) / float(n + 1))
     {X = x; Y = y}

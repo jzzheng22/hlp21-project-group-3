@@ -311,11 +311,9 @@ let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> Non
 let mouseDown model mousePos dispatch mDown =
     if model.AddingSymbol then
         dispatch <| SymbolAddFinish
-    elif mDown = 2. then    
-        if List.isEmpty model.SelectedComponents then ()
-        else
-            dispatch <| SelectLabel (validLabel model)
-            dispatch <| SelectDragStart mousePos
+    elif mDown = 2. && not (List.isEmpty model.SelectedComponents) then    
+        dispatch <| SelectLabel (validLabel model)
+        dispatch <| SelectDragStart mousePos
     else
         match Symbol.isPort model.Wire.Symbol mousePos with
         | Some (_, portId) -> 
@@ -667,7 +665,6 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         let snapModel, cmd = snapSymbolToGrid model
         {snapModel with SelectedComponents = []; AddingSymbol = false}, cmd
     | SelectLabel x -> 
-        printf"hello in SelectLabel, Label found: %A" x
         { model with SelectedLabel = x }, Cmd.none
 
 let init () =
