@@ -955,10 +955,6 @@ let wireToIssie (wire : Wire) (wModel : Model) : CommonTypes.Connection =
 let extractWires (wModel: Model) : CommonTypes.Connection list = 
     wModel.WX
     |> List.map (fun x -> wireToIssie x wModel)
-    
-
-let extractWiress (wModel: Model) : CommonTypes.Component list = 
-    failwithf "Not implemented"
 
 /// Update the symbol with matching componentId to comp, or add a new symbol based on comp.
 let updateSymbolModelWithComponent (symModel: Model) (comp:CommonTypes.Component) =
