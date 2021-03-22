@@ -718,9 +718,9 @@ let decideManual (wire: Wire) (sm: Symbol.Model) : Wire =
 
 /// Calculates and returns the IDs of wires that must be updated using a  
 /// provided list of symbols that have been updated.
-let chooseWiresToUpdate (sIds: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model) 
+let chooseWiresToUpdate (sIdList: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model) 
     : CommonTypes.ConnectionId list =
-    sIds
+    sIdList
     |> List.collect (fun sId -> Symbol.getPortIds sm sId)
     |> List.collect (fun pId ->
         model.WX
@@ -757,14 +757,14 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let sm,sCmd = Symbol.update sMsg model.Symbol
         let wList = 
             match sMsg with
-            | Symbol.Move (sIds,_) -> 
-                chooseWiresToUpdate sIds model sm
+            | Symbol.Move (sIdList,_) -> 
+                chooseWiresToUpdate sIdList model sm
                 |> updateWires  model sm
-            | Symbol.Rotate (sId,_) ->
-                chooseWiresToUpdate [sId] model sm
+            | Symbol.Rotate (sIdList,_) ->
+                chooseWiresToUpdate sIdList model sm
                 |> updateWires model sm
-            | Symbol.Scale (sId,_) ->
-                chooseWiresToUpdate [sId] model sm
+            | Symbol.Scale (sIdList,_) ->
+                chooseWiresToUpdate sIdList model sm
                 |> updateWires model sm
             | _ -> model.WX
             
