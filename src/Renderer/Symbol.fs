@@ -934,12 +934,12 @@ let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (ComponentId * X
     |> function
     | Some sym -> 
                 let findLabel = 
-                    genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -9. x sym) pos))) 
-                    |> List.filter (fun (x, y, z) -> z)
+                    genMapList sym.PortMap (List.map (fun (pos, pInfo) -> (pos, pInfo, testBox (displace -9. pos sym) pos))) 
+                    |> List.filter (fun (_, _, isInside) -> isInside)
                 if List.isEmpty findLabel then None 
                 else 
                     findLabel
-                    |> List.map (fun (x, y, z) -> (sId, x, getPortId y))
+                    |> List.map (fun (pos, pInfo, _) -> (sId, pos, getPortId pInfo))
                     |> List.head
                     |> Some
     | _ -> None
