@@ -142,7 +142,7 @@ let posAdd (a : XYPos) (b : XYPos) = {X=a.X+b.X; Y=a.Y+b.Y}
 let absDiff a b = 
     let diff = (posDiff a b)
     (abs diff.X) + (abs diff.Y)
-    //diff.X + diff.Y
+
 /// displace will move a port position _away_ from the box by n pixels.
 /// 
 /// For inverters call with positive n.
@@ -931,28 +931,21 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
 let testBB (box : (XYPos * XYPos)) (point : XYPos) : bool = 
     point.X >= (fst box).X && point.X <= (snd box).X && point.Y >= (fst box).Y && point.Y <= (snd box).Y
     
-
-let testBBs (bbList : (ComponentId * XYPos * XYPos) list) (pos : XYPos) : (ComponentId * XYPos * XYPos) =
-    bbList
-    |> List.filter (fun (_, topL, botR) -> testBB (topL, botR) pos)
-    |> List.head
-
 let isLabel (model : Model) (pos : XYPos) : (ComponentId * XYPos * PortId) Option =
-    printf "hello in isLabel"
     
-    let BBtest = 
+    let findsId = 
         getBoundingBoxes model {X = 0.; Y = 0.}
         |> List.filter (fun (_, topL, botR) -> testBB (topL, botR) pos)
 
 
-    if List.isEmpty BBtest then None
+    if List.isEmpty findsId then None
     else 
-        let cId = 
-            BBtest
-            |> List.map (fun (cId, _, _) -> cId)
+        let sId = 
+            findsId
+            |> List.map (fun (sId, _, _) -> sId)
             |> List.head
          
-        let sym = model |> List.find (fun x -> x.Id = cId)
+        let sym = model |> List.find (fun x -> x.Id = sId)
         
         let testLabel = 
             genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -10. x sym) pos))) 
@@ -961,7 +954,7 @@ let isLabel (model : Model) (pos : XYPos) : (ComponentId * XYPos * PortId) Optio
         if List.isEmpty testLabel then None
         else
             testLabel
-            |> List.map (fun (x, y, z) -> (cId, x, getPortId y))
+            |> List.map (fun (x, y, z) -> (sId, x, getPortId y))
             |> List.head
             |> Some
     
