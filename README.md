@@ -4,19 +4,19 @@
 
 This code may be run by running the command `npm run dev` in this root directory.
 
-Code written by the group members for their individual modules may be found by navigating to the `indiv_code` branch and entering these directories:
+Code written by the group members for their individual modules may be found by navigating to the `indiv_code` branch (link [here](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code)) and entering these directories:
 
 **Symbol**
-- [SY_JEMErrick](SY_JEMerrick) - Joanna Merrick
-- [SY_shafir360](SY_shafir360) - Shafir Rahman
+- [SY_JEMErrick](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/SY_JEMErrick) - Joanna Merrick
+- [SY_shafir360](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/SY_shafir360) - Shafir Rahman
 
 **BusWire**
-- [BW_adidesh20](BW_adidesh20) - Aditya Deshpande
-- [BW_gauthamravichandran](BW_gauthamravichandran) - Gautham Ravichandran
+- [BW_adidesh20](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/BW_adidesh20) - Aditya Deshpande
+- [BW_gauthamravichandran](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/BW_gauthamravichandran) - Gautham Ravichandran
 
 **Sheet**
-- [SH_aamanrebello](SH_aamanrebello) - Aaman Rebello
-- [SH_jzzheng22](SH_jzzheng22) - Jason Zheng
+- [SH_aamanrebello](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/SH_aamanrebello) - Aaman Rebello
+- [SH_jzzheng22](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/SH_jzzheng22) - Jason Zheng
 
 To run code for any group member, cd into the relevant directory and run the code with that directory as build root. The demo schedules for each group member may be found in the README files in each of the above directories.
 
