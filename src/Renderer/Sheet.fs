@@ -373,7 +373,7 @@ let mouseMove model mousePos dispatch mDown =
         | _ -> 
             dispatch <| Symbol(Symbol.DisplaySlots (CommonTypes.ComponentId ""))
 
-        if mDown <> 0. then // Drag
+        if mDown = 1. then // Drag
             match model.SelectedPort with
             | (Some _, _) -> ()
             | _ ->
