@@ -165,7 +165,7 @@ let cornersToString startCoord endCoord =
         startCoord.X endCoord.Y
 
 let validLabel (model : Model) = 
-    Symbol.isLabel model.Wire.Symbol model.DraggingPos
+    Symbol.isLabel model.Wire.Symbol model.DraggingPos (List.head model.SelectedComponents)
 
 /// Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
 let inferWidth (model : Model) = 
@@ -312,8 +312,10 @@ let mouseDown model mousePos dispatch mDown =
     if model.AddingSymbol then
         dispatch <| SymbolAddFinish
     elif mDown = 2. then    
-        dispatch <| SelectLabel (validLabel model)
-        dispatch <| SelectDragStart mousePos
+        if List.isEmpty model.SelectedComponents then ()
+        else
+            dispatch <| SelectLabel (validLabel model)
+            dispatch <| SelectDragStart mousePos
     else
         match Symbol.isPort model.Wire.Symbol mousePos with
         | Some (_, portId) -> 

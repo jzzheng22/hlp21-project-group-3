@@ -928,22 +928,7 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     | Some(v, Some k) -> Some(v, (PortId (k.Port.Id)))
     | _ -> None
 
-let testBB (box : (XYPos * XYPos)) (point : XYPos) : bool = 
-    point.X >= (fst box).X && point.X <= (snd box).X && point.Y >= (fst box).Y && point.Y <= (snd box).Y
-    
-let isLabel (model : Model) (pos : XYPos) : (ComponentId * XYPos * PortId) Option =
-    
-    let findsId = 
-        getBoundingBoxes model {X = 0.; Y = 0.}
-        |> List.filter (fun (_, topL, botR) -> testBB (topL, botR) pos)
-
-
-    if List.isEmpty findsId then None
-    else 
-        let sId = 
-            findsId
-            |> List.map (fun (sId, _, _) -> sId)
-            |> List.head
+let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (ComponentId * XYPos * PortId) Option =
          
         let sym = model |> List.find (fun x -> x.Id = sId)
         
