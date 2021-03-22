@@ -348,7 +348,6 @@ let mouseUp model mousePos dispatch =
     | Some (sId, _, pId) -> 
         printf "hello in mouseUp, Dragport message being sent!"
         dispatch <| Symbol(Symbol.DragPort (sId, pId, mousePos))
-        dispatch <| Symbol(Symbol.DisplaySlots (CommonTypes.ComponentId ""))
         dispatch <| SelectLabel None
     | None -> ()
     dispatch <| SelectDragEnd
@@ -365,13 +364,14 @@ let mouseMove model mousePos dispatch mDown =
             Symbol.getBoundingBoxes model.Wire.Symbol mousePos
             |> List.map increaseBoundingBox
             |> getSymbolIDList (List.filter (removeSymbolID inBoundingBox mousePos))
-
+        
         dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
 
         match model.SelectedLabel with 
         | Some (cId, pos, pId) -> 
             dispatch <| Symbol(Symbol.DisplaySlots cId)
-        | _ -> ()
+        | _ -> 
+            dispatch <| Symbol(Symbol.DisplaySlots (CommonTypes.ComponentId ""))
 
         if mDown <> 0. then // Drag
             match model.SelectedPort with
