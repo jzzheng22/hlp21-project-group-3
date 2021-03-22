@@ -928,16 +928,42 @@ let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     | Some(v, Some k) -> Some(v, (PortId (k.Port.Id)))
     | _ -> None
 
-let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (XYPos * PortId) Option =
-    printf "hello"
-    model
-    |> List.tryFind (fun sym -> sym.Id = sId)
-    |> function
-    | Some sym -> Some (genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -9. x sym) pos))) 
-                        |> List.filter (fun (x, y, z) -> z)
-                        |> List.map (fun (x, y, z) -> (x, getPortId y))
-                        |> List.item 0)
-    | None -> None
+let testBB (box : (XYPos * XYPos)) (point : XYPos) : bool = 
+    point.X >= (fst box).X && point.X <= (snd box).X && point.Y >= (fst box).Y && point.Y <= (snd box).Y
+    
+
+let testBBs (bbList : (ComponentId * XYPos * XYPos) list) (pos : XYPos) : (ComponentId * XYPos * XYPos) =
+    bbList
+    |> List.filter (fun (_, topL, botR) -> testBB (topL, botR) pos)
+    |> List.head
+
+let isLabel (model : Model) (pos : XYPos) : (ComponentId * XYPos * PortId) Option =
+    printf "hello in isLabel"
+    
+    let BBtest = 
+        getBoundingBoxes model {X = 0.; Y = 0.}
+        |> List.filter (fun (_, topL, botR) -> testBB (topL, botR) pos)
+
+
+    if List.isEmpty BBtest then None
+    else 
+        let cId = 
+            BBtest
+            |> List.map (fun (cId, _, _) -> cId)
+            |> List.head
+         
+        let sym = model |> List.find (fun x -> x.Id = cId)
+        
+        let testLabel = 
+            genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -9. x sym) pos))) 
+            |> List.filter (fun (x, y, z) -> z)
+        
+        if List.isEmpty testLabel then None
+        else
+            testLabel
+            |> List.map (fun (x, y, z) -> (cId, x, getPortId y))
+            |> List.head
+            |> Some
     
 
 //Returns a list of Port Ids for a given symbol

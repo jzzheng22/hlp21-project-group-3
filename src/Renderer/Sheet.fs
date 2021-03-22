@@ -19,7 +19,7 @@ type Model =
       AddingSymbol: bool
       DragStartPos: XYPos
       DraggingPos: XYPos
-      SelectedLabel: (XYPos * CommonTypes.PortId) Option}
+      SelectedLabel: (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option}
 
 type KeyboardMsg =
     | AltX
@@ -50,7 +50,7 @@ type Msg =
     | ErrorMsg of string
     | UpdateWidths 
     | SymbolAddFinish
-    | SelectLabel of (XYPos * CommonTypes.PortId) Option
+    | SelectLabel of (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option
 
 type MouseOps =
     | MouseDown
@@ -165,7 +165,7 @@ let cornersToString startCoord endCoord =
         startCoord.X endCoord.Y
 
 let validLabel (model : Model) = 
-    Symbol.isLabel model.Wire.Symbol model.DraggingPos model.SelectedComponents.[0]
+    Symbol.isLabel model.Wire.Symbol model.DraggingPos
 
 /// Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
 let inferWidth (model : Model) = 
@@ -308,11 +308,13 @@ let highlightCorners model box =
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
-let mouseDown model mousePos dispatch =
+let mouseDown model mousePos dispatch mDown =
     if model.AddingSymbol then
         dispatch <| SymbolAddFinish
+    elif mDown = 2. then    
+        dispatch <| SelectLabel (validLabel model)
+        dispatch <| SelectDragStart mousePos
     else
-        
         match Symbol.isPort model.Wire.Symbol mousePos with
         | Some (_, portId) -> 
             dispatch <| SelectPort (portId, Symbol.getPortType model.Wire.Symbol portId)
@@ -342,6 +344,11 @@ let mouseUp model mousePos dispatch =
     if model.SelectingMultiple then
         let outerBoxCoords = (model.DragStartPos, model.DraggingPos)
         dragSelectElements model boxInSelectedArea outerBoxCoords dispatch
+    match model.SelectedLabel with
+    | Some (sId, _, pId) -> 
+        printf "hello in mouseUp, Dragport message being sent!"
+        dispatch <| Symbol(Symbol.DragPort (sId, pId, mousePos))
+    | None -> ()
     dispatch <| SelectDragEnd
 
 let increaseBoundingBox (a, topL, botR) = 
@@ -358,8 +365,8 @@ let mouseMove model mousePos dispatch mDown =
             |> getSymbolIDList (List.filter (removeSymbolID inBoundingBox mousePos))
 
         dispatch <| Symbol(Symbol.HighlightPorts symbolIDList)
-        if mDown = 2. then ()
-        elif mDown <> 0. then // Drag
+
+        if mDown <> 0. then // Drag
             match model.SelectedPort with
             | (Some _, _) -> ()
             | _ ->
@@ -368,6 +375,11 @@ let mouseMove model mousePos dispatch mDown =
                     dispatch <| EditSize (id, mousePos)
                 | _ -> 
                     dispatch <| MoveElements mousePos
+            printf "hello in mousemove selected label: %A" model.SelectedLabel
+            match model.SelectedLabel with 
+            | Some (cId, pos, pId) -> 
+                dispatch <| Symbol(Symbol.DisplaySlots cId)
+            | _ -> ()
 
             dispatch <| SelectDragging mousePos
 
@@ -385,7 +397,7 @@ let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (di
             0., 0.
     let mousePos = { X = (coordX - offsetX) / model.Zoom; Y = (coordY - offsetY) / model.Zoom }
     match mouseOp with
-    | MouseDown -> mouseDown model mousePos dispatch
+    | MouseDown -> mouseDown model mousePos dispatch (mDown ev)
     | MouseUp -> mouseUp model mousePos dispatch
     | MouseMove -> mouseMove model mousePos dispatch (mDown ev)
 
@@ -642,7 +654,16 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | ErrorMsg msg -> model, Cmd.none
     | SymbolAddFinish ->
         {model with SelectedComponents = []; AddingSymbol = false}, Cmd.none
-    | SelectLabel x -> { model with SelectedLabel = x }, Cmd.none
+    | SelectLabel x -> 
+        printf"hello in SelectLabel, Label found: %A" x
+        //match x with 
+        //| Some (cId, pos, pId) -> 
+        //    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightPorts [cId])) model.Wire
+        //    { model with Wire = sModel; SelectedLabel = x }, Cmd.batch [Cmd.map Wire sCmd]
+        //| None -> 
+        //    { model with SelectedLabel = x }, Cmd.none
+        { model with SelectedLabel = x }, Cmd.none
+        
     
 
 let init () =
