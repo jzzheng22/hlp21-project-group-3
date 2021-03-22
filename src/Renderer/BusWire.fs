@@ -760,11 +760,11 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             | Symbol.Move (sIds,_) -> 
                 chooseWiresToUpdate sIds model sm
                 |> updateWires  model sm
-            | Symbol.Rotate (sId,_) ->
-                chooseWiresToUpdate [sId] model sm
+            | Symbol.Rotate (sIds,_) ->
+                chooseWiresToUpdate sIds model sm
                 |> updateWires model sm
-            | Symbol.Scale (sId,_) ->
-                chooseWiresToUpdate [sId] model sm
+            | Symbol.Scale (sIds,_) ->
+                chooseWiresToUpdate sIds model sm
                 |> updateWires model sm
             | _ -> model.WX
             

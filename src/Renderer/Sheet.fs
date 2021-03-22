@@ -474,7 +474,7 @@ let changeSymbolSize model id mousePos =
     if ((condition currentBoxWidth snapX) || (condition currentBoxHeight snapY)) then
         model, Cmd.none
     else 
-        let scaleMsg = id, {X = snapX / currentBoxWidth; Y = snapY / currentBoxHeight}
+        let scaleMsg = [id], {X = snapX / currentBoxWidth; Y = snapY / currentBoxHeight}
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale scaleMsg)) model.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
@@ -562,7 +562,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         if List.isEmpty model.SelectedComponents then 
             model, Cmd.none
         else 
-            let symid = List.head model.SelectedComponents
+            let symid = model.SelectedComponents
             let sModel, sCmd = 
                 match msg with 
                 | KeyPress SymbolClockwise -> 

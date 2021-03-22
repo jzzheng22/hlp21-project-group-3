@@ -84,8 +84,8 @@ type Msg =
     | HighlightError of sIdList: ComponentId list
     | HighlightPorts of sIdList : ComponentId list
     | DragPort of sId : ComponentId * pId : PortId * pagePos: XYPos
-    | Rotate of sId : ComponentId * rot : int
-    | Scale of sId : ComponentId * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
+    | Rotate of sIdList : ComponentId list * rot : int
+    | Scale of sIdList : ComponentId list * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
     | DisplaySlots of sId : ComponentId
     | Rename of sId : ComponentId * name : string
     | UpdateSymbolModelWithComponent of Component // Issie interface
@@ -714,29 +714,29 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         )
         , Cmd.none
 
-    | Rotate (sId, rot) ->
+    | Rotate (sIdList, rot) ->
         model
         |> List.map (fun sym ->
-            if sId <> sym.Id then
-                sym
-            else
+            if List.contains sym.Id sIdList then
                 let newSym = trans rotateCoords sym rot
                 { newSym with
                     Rotation = updateRot rot sym.Rotation     
                 }
+            else
+                sym
         )
         , Cmd.none
 
-    | Scale (sId, scale) ->
+    | Scale (sIdList, scale) ->
         model
         |> List.map (fun sym ->
-            if sId <> sym.Id then
-                sym
-            else
+            if List.contains sym.Id sIdList then
                 let newSym = trans scaleCoords sym scale
                 { newSym with
                     Scale = {X = sym.Scale.X * scale.X; Y = sym.Scale.Y * scale.Y }
                 }
+            else
+                sym
         )
         , Cmd.none
 
