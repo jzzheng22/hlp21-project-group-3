@@ -343,12 +343,6 @@ let clkCoords (pos : XYPos) =
     let p3 = {X = pos.X ; Y = pos.Y + (radius)}
     sprintf "%f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y
 
-/// Returns the rotation for SVG transformations
-let rotString (sym : Symbol) (pos : XYPos) = 
-    sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
-
-let rotStringObj (sym : Symbol) = rotString sym (midSym sym)
-
 /// Converts a scale and a centre and returns the matrix for svg scaling about that central point
 let scaleString (scale : XYPos) (centre : XYPos) : string = 
     let (cx, cy) = centre.X, centre.Y
@@ -438,6 +432,22 @@ let getPosEdge (sym : Symbol) (pos : XYPos) =
     elif pos.Y = sym.TopL.Y then Top
     elif pos.Y = sym.BotR.Y then Bottom
     else Left
+
+/// Returns the rotation for SVG transformations for shapes inside labels (e.g. clock symbol)
+let rotSide (sym : Symbol) (pos : XYPos) : string = 
+    let rot  = 
+        match getPosEdge sym pos with
+        | Left -> "0"
+        | Right -> "180"
+        | Top -> "90"
+        | Bottom -> "270"
+    sprintf "rotate (%s, %f, %f)" rot pos.X pos.Y
+
+/// Returns the rotation for SVG transformations
+let rotString (sym : Symbol) (pos : XYPos) : string = 
+    sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
+
+let rotStringObj (sym : Symbol) = rotString sym (midSym sym)
 
 let getTextAttr (sym : Symbol) (pos : XYPos) : (string * string) =
     match getPosEdge sym pos with
@@ -801,7 +811,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.collect (fun (i, k) ->
                     if getPortName k = "Clk" then
-                        [(drawPolygon (clkCoords i) "black" color 1. (rotString sym i))[]]
+                        [(drawPolygon (clkCoords i) "black" color 1. (rotSide sym i))[]]
                     else [])
                 
             let labels : ReactElement list = 
@@ -850,6 +860,7 @@ let private renderObj =
                 if sym.PortHighlight then
                     sym
                     |> mapSetup
+                    |> List.filter (fun (_, port) -> getPortName port <> "Clk")
                     |> List.map(fun (i, _) -> drawCircle sym i "deepskyblue" "deepskyblue" 0.4 1.[])
                 else []
 
@@ -923,6 +934,7 @@ let getPortType (symModel: Model) (pId : PortId) : PortType =
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     symModel
     |>initPortSearch
+    |> List.filter (fun (_, port) -> getPortName port <> "Clk")
     |> List.tryFind (fun (v, _) -> testBox v pos)
     |> function
     | Some(v, Some k) -> Some(v, (PortId (k.Port.Id)))
