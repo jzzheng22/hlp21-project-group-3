@@ -164,6 +164,37 @@ let cornersToString startCoord endCoord =
         endCoord.X endCoord.Y
         startCoord.X endCoord.Y
 
+/// This function will put each connection into the width inferer one by one
+/// It discards any Ok outputs
+/// For each error, it will concatenate the message and effected component lists produced
+/// And return one single Error e
+let collectWidthErrors (comps : CommonTypes.Component list, conns : CommonTypes.Connection list) =
+    
+    //errorList is the inferer output for each connection, with all Ok's discarded
+    let errorList =
+        conns
+        |> List.map (BusWidthInferer.inferConnectionsWidth << (fun x -> (comps, [x])))
+        |> List.collect (fun x -> 
+            match x with 
+            | Ok _ -> [] //discard any Ok output from inferer
+            | Error e -> [e])
+    
+    //Concatenate the message list and connection list
+    let msgList = 
+        errorList
+        |> List.map (fun x -> x.Msg)
+        |> String.concat "\n"
+
+    let conList =
+        errorList
+        |> List.collect (fun x -> x.ConnectionsAffected)
+
+    //Output the single error of concatenated messages and connections
+    Error {
+        CommonTypes.WidthInferError.Msg = msgList
+        CommonTypes.WidthInferError.ConnectionsAffected = conList
+    }
+
 let validLabel (model : Model) = 
     Symbol.isLabel model.Wire.Symbol model.DraggingPos (List.head model.SelectedComponents)
 
@@ -171,10 +202,15 @@ let validLabel (model : Model) =
 let inferWidth (model : Model) = 
     let comps = Symbol.extractComponents model.Wire.Symbol
     printf"hello\n inferWidth comps:\n %A" comps
-    let conns = BusWire.extractWires model.Wire 
+    let conns = BusWire.extractWires model.Wire
     printf"hello\n inferWidth conns:\n %A" conns
+    
+    /// ----- Dirty fix for bug ----- ///
     let canvas = (comps, conns)
-    BusWidthInferer.inferConnectionsWidth canvas
+    let test = BusWidthInferer.inferConnectionsWidth canvas
+    match test with 
+    | Ok x -> test
+    | Error e -> collectWidthErrors (comps, conns)
 
 let getWires (model : Model) =
     inferWidth model
