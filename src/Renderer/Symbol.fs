@@ -12,7 +12,7 @@ open CommonTypes
 //------------------------------------------------------------------------//
 
 //Static variables
-let stdHeight = 35.
+let stdHeight = 40.
 let ratioHW = 0.9
 let radius = 3.
 let labelSize = 6
@@ -323,9 +323,9 @@ let tagCoords (sym : Symbol) : string =
     (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" 
         (midX - 20. + (i + (a * 5.))) (midY - 10.) 
         (midX - 20. + (i + (a * 5.))) (midY + 10.) 
-        (midX - ((i/7.) + (a * 5.))) (midY + 10.) 
-        (midX + 20. - ((i * 1.2) + (a * 5.))) midY 
-        (midX - ((i/7.) + (a * 5.))) (midY - 10.))
+        (midX - ((i/7.) + (a * 10.))) (midY + 10.) 
+        (midX + 40. - ((i * 1.2) + (a * 5.))) midY 
+        (midX - ((i/7.) + (a * 10.))) (midY - 10.))
 
 let cornerCoords (sym : Symbol) (i : XYPos) : XYPos = 
     match sym.Rotation with
@@ -563,6 +563,9 @@ let portIndex (symType : SymbolType) (i : int) (len : int) (name : string) : int
     | Mux when name = "S0" -> len - 1
     | _ -> i
     
+let roundtoTen (n : float) : float = 
+    n + abs ((n % 10.) - 10.)
+
 /// Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) list list) (pos : XYPos) (index : int) (label : string) : Symbol =
     
@@ -595,12 +598,14 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
     let nBot = if bot > 0 || top > 0 then max bot top else (int (ratioHW * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
     let h = 
         if left = 1 && right = 1 then 2. 
-        else n 
+        else n + 1. 
         |> (*) (stdHeight)
     let w = 
         if bot <= 0 && top <= 0 then
             max (ratioHW * h) test //Width is standard
-        else max ((float nBot) * stdHeight * 1.7) test //Or width based on number of ports on the bottom
+        else max ((float nBot) * stdHeight * 2.) test //Or width based on number of ports on the bottom
+        |> (+) 10.
+        |> roundtoTen
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
     // ---- Making portMap ---- //
