@@ -164,22 +164,22 @@ let cornersToString startCoord endCoord =
         endCoord.X endCoord.Y
         startCoord.X endCoord.Y
 
-let filterResult x =
-    match x with
-    | Ok _ -> false
-    | Error _ -> true
-
-let dirtyHack (comps : CommonTypes.Component list, conns : CommonTypes.Connection list) =
-
+/// This function will put each connection into the width inferer one by one
+/// It discards any Ok outputs
+/// For each error, it will concatenate the message and effected component lists produced
+/// And return one single Error e
+let collectWidthErrors (comps : CommonTypes.Component list, conns : CommonTypes.Connection list) =
+    
+    //errorList is the inferer output for each connection, with all Ok's discarded
     let errorList =
         conns
-        |> List.map (fun x -> (comps, [x]))
-        |> List.map BusWidthInferer.inferConnectionsWidth
+        |> List.map (BusWidthInferer.inferConnectionsWidth << (fun x -> (comps, [x])))
         |> List.collect (fun x -> 
             match x with 
-            | Ok _ -> []
+            | Ok _ -> [] //discard any Ok output from inferer
             | Error e -> [e])
     
+    //Concatenate the message list and connection list
     let msgList = 
         errorList
         |> List.map (fun x -> x.Msg)
@@ -189,6 +189,7 @@ let dirtyHack (comps : CommonTypes.Component list, conns : CommonTypes.Connectio
         errorList
         |> List.collect (fun x -> x.ConnectionsAffected)
 
+    //Output the single error of concatenated messages and connections
     Error {
         CommonTypes.WidthInferError.Msg = msgList
         CommonTypes.WidthInferError.ConnectionsAffected = conList
@@ -209,7 +210,7 @@ let inferWidth (model : Model) =
     let test = BusWidthInferer.inferConnectionsWidth canvas
     match test with 
     | Ok x -> test
-    | Error e -> dirtyHack (comps, conns)
+    | Error e -> collectWidthErrors (comps, conns)
 
 let getWires (model : Model) =
     inferWidth model
