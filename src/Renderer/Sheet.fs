@@ -176,6 +176,7 @@ let inferWidth (model : Model) =
     let canvas = (comps, conns)
     BusWidthInferer.inferConnectionsWidth canvas
 
+///Updates model based on whether inferWidth detects a bus width error.
 let getWires (model : Model) =
     inferWidth model
     |> function
@@ -308,12 +309,20 @@ let highlightCorners model box =
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
+///Handles left/right/middle click.
 let mouseDown model mousePos dispatch mDown =
     if model.AddingSymbol then
         dispatch <| SymbolAddFinish
-    elif mDown = 2. && not (List.isEmpty model.SelectedComponents) then    
-        dispatch <| SelectLabel (validLabel model)
-        dispatch <| SelectDragStart mousePos
+    elif mDown = 2. && not (List.isEmpty model.SelectedComponents) then 
+        let wireSegmentIds = 
+            BusWire.getBoundingBoxes model.Wire mousePos
+            |> getWireSegmentIDList (List.filter (removeWireSegmentID inBoundingBox mousePos))
+        if List.isEmpty wireSegmentIds then 
+            dispatch <| SelectLabel (validLabel model)
+            dispatch <| SelectDragStart mousePos
+        else 
+            let id, index = List.head wireSegmentIds
+            dispatch <| BusWire.AddSegment (id, index, mousePos)
     else
         match Symbol.isPort model.Wire.Symbol mousePos with
         | Some (_, portId) -> 
@@ -332,6 +341,7 @@ let mouseDown model mousePos dispatch mDown =
         dispatch <| SelectDragStart mousePos
     
 
+///Handles release of left/right click.
 let mouseUp model mousePos dispatch = 
     match validConnection model with
     | Some endPort ->
@@ -354,6 +364,7 @@ let mouseUp model mousePos dispatch =
 let increaseBoundingBox (a, topL, botR) = 
     a, {X = topL.X - 10.; Y = topL.Y - 10.}, {X = botR.X + 10.; Y = botR.Y + 10.}
 
+///Handles mouse movement.
 let mouseMove model mousePos dispatch mDown = 
     if model.AddingSymbol then 
         dispatch <| MoveElements mousePos
@@ -440,7 +451,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let wireSvg = BusWire.view model.Wire wDispatch
     displaySvgWithZoom model wireSvg dispatch
 
-
+///Deletes selected wires and those connected to deleted symbols.
 let deleteWires model =
     let connectedWires =
         model.SelectedComponents
@@ -457,6 +468,7 @@ let deleteWires model =
 let deleteSymbols model wModel =
     BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
 
+///Updates positions of moved symbols/wire segments.
 let moveElements model mousePos =
     let transVector =
         { X = (mousePos.X - model.DraggingPos.X)
@@ -509,7 +521,7 @@ let snapSymbolToGrid model =
         SelectedPort = None, CommonTypes.PortType.Input;
         SelectingMultiple = false }, Cmd.map Wire sCmd
 
-
+///Top left corners of all symbols.
 let topleftCorners model =
     model.SelectedComponents
     |> List.map (Symbol.getBoundingBox model.Wire.Symbol >> fst)
@@ -552,6 +564,7 @@ let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : i
         |> List.max
         |> (+) 1
 
+///Updates model with added symbol.
 let addSymbol model =
     let sModel, sCmd =
         BusWire.update
