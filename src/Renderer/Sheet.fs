@@ -75,16 +75,14 @@ let pointNearBoxCorner point box =
     let yClose p1 p2 = (abs (p1.Y - p2.Y)) < threshold
     ( (xClose point (fst box)) || (xClose point (snd box)) ) && ( (yClose point (fst box)) || (yClose point (snd box)) )
 
-/// Takes in two coordinates and a bounding box
-/// Tests to see if box is between those two coordinates
+/// Takes in two coordinates and a bounding box. Tests to see if box is between those two coordinates.
 let boxInSelectedArea outerBox innerBox = 
     let outerTopL = {X = min (fst outerBox).X (snd outerBox).X; Y = min (fst outerBox).Y (snd outerBox).Y}
     let outerBotR = {X = max (fst outerBox).X (snd outerBox).X; Y = max (fst outerBox).Y (snd outerBox).Y}
     let outerBox = outerTopL, outerBotR
     inBoundingBox (fst innerBox) outerBox && inBoundingBox (snd innerBox) outerBox
 
-/// Takes in a point and returns translation vector 
-/// required to move to nearest square
+/// Takes in a point and returns translation vector required to move to nearest square.
 let snapGridVector (point: XYPos) = 
     let newXSquare = round (point.X / unzoomedGrid)
     let newYSquare = round (point.Y / unzoomedGrid)
@@ -164,10 +162,8 @@ let cornersToString startCoord endCoord =
         endCoord.X endCoord.Y
         startCoord.X endCoord.Y
 
-/// This function will put each connection into the width inferer one by one
-/// It discards any Ok outputs
-/// For each error, it will concatenate the message and effected component lists produced
-/// And return one single Error e
+/// Feeds each connection into the width inferer one by one. Returns a Result type where the Error case encapsulates
+/// all affected connections.
 let collectWidthErrors (comps : CommonTypes.Component list, conns : CommonTypes.Connection list) =
     
     //errorList is the inferer output for each connection, with all Ok's discarded
@@ -176,10 +172,9 @@ let collectWidthErrors (comps : CommonTypes.Component list, conns : CommonTypes.
         |> List.map (BusWidthInferer.inferConnectionsWidth << (fun x -> (comps, [x])))
         |> List.collect (fun x -> 
             match x with 
-            | Ok _ -> [] //discard any Ok output from inferer
+            | Ok _ -> [] 
             | Error e -> [e])
     
-    //Concatenate the message list and connection list
     let msgList = 
         errorList
         |> List.map (fun x -> x.Msg)
@@ -189,7 +184,6 @@ let collectWidthErrors (comps : CommonTypes.Component list, conns : CommonTypes.
         errorList
         |> List.collect (fun x -> x.ConnectionsAffected)
 
-    //Output the single error of concatenated messages and connections
     Error {
         CommonTypes.WidthInferError.Msg = msgList
         CommonTypes.WidthInferError.ConnectionsAffected = conList
@@ -212,6 +206,7 @@ let inferWidth (model : Model) =
     | Ok x -> test
     | Error e -> collectWidthErrors (comps, conns)
 
+///Updates widths/dispatches error highlighting message based on output of inferwidth.
 let getWires (model : Model) =
     inferWidth model
     |> function
@@ -230,7 +225,7 @@ let getWires (model : Model) =
         let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
         (wires, wModel, wCmd)
 
-/// Sends a highlight error to buswire and symbol for the connection list given
+/// Sends a highlight error to buswire and symbol for the connection list given.
 let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
     let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
     let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel
@@ -322,6 +317,7 @@ let drawPortConnectionLine model =
                        StrokeDasharray "5,5"
                    FillOpacity 0.1 ] ] []
 
+///Renders red circles on corners of symbol bounding box.
 let highlightCorners model box = 
     let circleGen centre =  
         circle [
@@ -344,6 +340,7 @@ let highlightCorners model box =
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
+///Handles down-press of mouse buttons.
 let mouseDown model mousePos dispatch mDown =
     if model.AddingSymbol then
         dispatch <| SymbolAddFinish
@@ -367,7 +364,7 @@ let mouseDown model mousePos dispatch mDown =
                     selectElements model mousePos dispatch
         dispatch <| SelectDragStart mousePos
     
-
+///Handles release of mouse buttons.
 let mouseUp model mousePos dispatch = 
     match validConnection model with
     | Some endPort ->
@@ -390,6 +387,7 @@ let mouseUp model mousePos dispatch =
 let increaseBoundingBox (a, topL, botR) = 
     a, {X = topL.X - 10.; Y = topL.Y - 10.}, {X = botR.X + 10.; Y = botR.Y + 10.}
 
+///Handles movement of mouse position.
 let mouseMove model mousePos dispatch mDown = 
     if model.AddingSymbol then 
         dispatch <| MoveElements mousePos
@@ -476,7 +474,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let wireSvg = BusWire.view model.Wire wDispatch
     displaySvgWithZoom model wireSvg dispatch
 
-
+///Removes selected wires as well as wires connected to selected symbol(s).
 let deleteWires model =
     let connectedWires =
         model.SelectedComponents
@@ -493,6 +491,7 @@ let deleteWires model =
 let deleteSymbols model wModel =
     BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
 
+///Updates model with new positions of moved elements.
 let moveElements model mousePos =
     let transVector =
         { X = (mousePos.X - model.DraggingPos.X)
@@ -576,7 +575,7 @@ let deleteElements model =
     let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) wires))) newModel
     {deleteModel with Wire = sModel2}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
 
-/// Finds the highest index for a Symbol type and increments that number
+/// Finds the highest index for a Symbol type and increments that number.
 let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : int = 
     let symbolList = 
         model.Wire.Symbol 
@@ -588,6 +587,7 @@ let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : i
         |> List.max
         |> (+) 1
 
+///Updates model with new symbol.
 let addSymbol model =
     let sModel, sCmd =
         BusWire.update
@@ -610,23 +610,40 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         let sModel, sCmd = BusWire.update (BusWire.Symbol sMsg) model.Wire
         { model with Wire = sModel }, Cmd.map Wire sCmd
     | KeyPress AltShiftZ ->
-        printStats () // print and reset the performance statistics in dev tools window
-        model, Cmd.none // do nothing else and return model unchanged
+        printStats () 
+        model, Cmd.none 
     | KeyPress SymbolClockwise | KeyPress SymbolAntiClock | KeyPress SymbolMagnify | KeyPress SymbolShrink -> 
         if List.isEmpty model.SelectedComponents then 
             model, Cmd.none
         else 
-            let symid = model.SelectedComponents
+            let symids = model.SelectedComponents
             let sModel, sCmd = 
                 match msg with 
                 | KeyPress SymbolClockwise -> 
-                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symid, 90))) model.Wire
+                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symids, 90))) model.Wire
                 | KeyPress SymbolAntiClock ->
-                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symid, 270))) model.Wire
-                | KeyPress SymbolMagnify ->
-                    BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 1.25; Y = 1.25}))) model.Wire
-                | KeyPress SymbolShrink -> 
-                    BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 0.8; Y = 0.8}))) model.Wire
+                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symids, 270))) model.Wire
+                | KeyPress k when k = SymbolMagnify || k = SymbolShrink->
+                    
+                    let getWidthHeight id = 
+                        let c1, c2 = Symbol.getBoundingBox model.Wire.Symbol id 
+                        (abs (c1.X - c2.X), abs (c1.Y - c2.Y))
+
+                    let filteredList = 
+                        let predicate id = 
+                            let w, h = getWidthHeight id
+                            (w > unzoomedGrid) && (h > unzoomedGrid)
+                        if k = SymbolShrink then List.filter predicate symids else symids 
+
+                    let scalef value = if k = SymbolShrink then (1.0 - unzoomedGrid/value) else (1.0 + unzoomedGrid/value)  
+                
+                    let scalingFolder (inmodel: BusWire.Model, cmd: Cmd<BusWire.Msg>) (id: CommonTypes.ComponentId) =
+                        let w, h = getWidthHeight id  
+                        let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Scale ([id], {X = scalef w; Y = scalef h}))) inmodel
+                        sModel, Cmd.batch [ sCmd; cmd ]
+
+                    List.fold scalingFolder (model.Wire, Cmd.none) filteredList
+                    
                 | _ -> 
                     failwithf "Unexpected input in symbol transformation."
             let snapModel, snapCmd = snapSymbolToGrid {model with Wire = sModel}
