@@ -69,6 +69,7 @@ type Msg =
     | MouseMsg of MouseT
     | UpdateWidth of (CommonTypes.ConnectionId * int Option) list
     | HighlightError of CommonTypes.ConnectionId list
+    | AddSegment  of CommonTypes.ConnectionId * int * XYPos
 
 //-------------------Helpers for functions------------------------//
 
@@ -562,7 +563,7 @@ let checkLastSegmentLength (wire:Wire) (sm: Symbol.Model) =
     | Symbol.Top when tail.SourcePos.Y>tgt.Y - 9. ->true
     | Symbol.Bottom when tail.SourcePos.Y<tgt.Y + 9. ->true
     | _ -> false
-let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
+let manualRoute (wire: Wire) (sm: Symbol.Model)  (multipleMove:bool) : WireSegment list =
     let noOfSegments= List.length wire.Segments
     let last = noOfSegments - 1
     let prevSrc= wire.Segments.[0].SourcePos
@@ -585,6 +586,7 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
     wire.Segments
     |> List.mapi (fun i seg -> 
         match i ,wire.StartHoriz ,wire.EndHoriz with
+        | _ when multipleMove -> makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) (Symbol.posAdd seg.TargetPos vecSrc) 
         | 0,true,_ when fstLength ->
             makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
 
@@ -667,6 +669,12 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
     )
     |> setIndex
 
+let moveWire (w:Wire) (vec:XYPos)=
+    
+    w.Segments
+    |> List.map (fun seg -> {seg with SourcePos= Symbol.posAdd seg.SourcePos vec
+                                      ;TargetPos=Symbol.posAdd seg.TargetPos vec})
+    
 // RULES FOR DECIDING WIRE ROUTING METHOD: 
 // Name must be of format routeRuleXXX
 // Must have signature Wire -> Symbol.Model -> bool
@@ -730,7 +738,8 @@ let chooseWiresToUpdate (sIdList: CommonTypes.ComponentId list) (model: Model) (
     |> List.distinct
 
 /// Updates the wires in the model as specified by the provided list
-let updateWires (model: Model) (sm: Symbol.Model) (wIds: CommonTypes.ConnectionId list): Wire list =
+let updateWires (model: Model) (sm: Symbol.Model) (multipleMove:bool) (wIds: CommonTypes.ConnectionId list)  : Wire list =
+
     model.WX
     |> List.map (fun w -> 
         if List.contains w.Id wIds then
@@ -740,7 +749,8 @@ let updateWires (model: Model) (sm: Symbol.Model) (wIds: CommonTypes.ConnectionI
             let startHoriz = not (srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
             let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
             if newWire.Manual then
-                {newWire with Segments = (manualRoute newWire sm)}
+
+                {newWire with Segments = (manualRoute newWire sm multipleMove)}
             else
                 {newWire with 
                     Segments = makeWireSegments sm newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
@@ -758,14 +768,17 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wList = 
             match sMsg with
             | Symbol.Move (sIdList,_) -> 
+                let multMove= List.length sIdList >1
                 chooseWiresToUpdate sIdList model sm
-                |> updateWires  model sm
+                |>updateWires  model sm multMove 
             | Symbol.Rotate (sIdList,_) ->
+                
                 chooseWiresToUpdate sIdList model sm
-                |> updateWires model sm
+                |>updateWires model sm false
             | Symbol.Scale (sIdList,_) ->
+                
                 chooseWiresToUpdate sIdList model sm
-                |> updateWires model sm
+                |>updateWires model sm false 
             | _ -> model.WX
             
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
@@ -886,6 +899,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         }
         , Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
+    | AddSegment (id, index, mousePos) -> failwithf "not impl"
 
 //---------------Other interface functions--------------------//
 

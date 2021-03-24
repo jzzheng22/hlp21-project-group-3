@@ -322,7 +322,7 @@ let mouseDown model mousePos dispatch mDown =
             dispatch <| SelectDragStart mousePos
         else 
             let id, index = List.head wireSegmentIds
-            dispatch <| BusWire.AddSegment (id, index, mousePos)
+            dispatch <| Wire(BusWire.AddSegment (id, index, mousePos))
     else
         match Symbol.isPort model.Wire.Symbol mousePos with
         | Some (_, portId) -> 
