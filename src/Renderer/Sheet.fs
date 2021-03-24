@@ -15,6 +15,7 @@ type Model =
       SelectedComponents: CommonTypes.ComponentId list
       SelectedWireSegments: (CommonTypes.ConnectionId * int) list
       SelectingMultiple: bool
+      TogglingSelection: bool
       EditSizeOf: CommonTypes.ComponentId option
       AddingSymbol: bool
       DragStartPos: XYPos
@@ -51,6 +52,10 @@ type Msg =
     | UpdateWidths 
     | SymbolAddFinish
     | SelectLabel of (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option
+    | ToggleSelectionOpen
+    | ToggleSelectionClose
+    | ToggleSymbols of CommonTypes.ComponentId list 
+    | ToggleWires of (CommonTypes.ConnectionId*int) list
 
 type MouseOps =
     | MouseDown
@@ -102,11 +107,15 @@ let getWireSegmentIDList filter lst =
     |> filter
     |> List.map getWireSegmentID
 
-let dispatchSelection symbolIDList wireSegmentIDList (dispatch: Dispatch<Msg>) = 
-    dispatch <| SelectComponents symbolIDList
-    dispatch <| Symbol(Symbol.Highlight symbolIDList)
-    dispatch <| SelectWireSegments wireSegmentIDList
-    dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
+let dispatchSelection toggle symbolIDList wireSegmentIDList (dispatch: Dispatch<Msg>) =
+    if toggle then
+        dispatch <| ToggleSymbols symbolIDList
+        dispatch <| ToggleWires wireSegmentIDList
+    else 
+        dispatch <| SelectComponents symbolIDList
+        dispatch <| Symbol(Symbol.Highlight symbolIDList)
+        dispatch <| SelectWireSegments wireSegmentIDList
+        dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
 
 /// Removes ID from Symbol tuple. Used for testing where IDs are not necessary 
 let removeSymbolID predicate coords (_, a, b) = predicate coords (a, b)
@@ -132,7 +141,7 @@ let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>)
         |> getWireSegmentIDList (List.filter (removeWireSegmentID predicate coords))
         |> filterBySelectingMultiple model.SelectingMultiple
 
-    dispatchSelection symbolIDList wireSegmentIDList dispatch
+    dispatchSelection model.TogglingSelection symbolIDList wireSegmentIDList dispatch
 
 /// Selects elements where mousePos is inside bounding box
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
@@ -343,7 +352,7 @@ let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> Non
 ///Handles down-press of mouse buttons.
 let mouseDown model mousePos dispatch mDown =
     if model.AddingSymbol then
-        dispatch <| SymbolAddFinish
+        dispatch <| SymbolAddFinish     
     elif mDown = 2. && not (List.isEmpty model.SelectedComponents) then    
         dispatch <| SelectLabel (validLabel model)
         dispatch <| SelectDragStart mousePos
@@ -360,7 +369,7 @@ let mouseDown model mousePos dispatch mDown =
                     model.SelectedComponents
                     |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
                     |> List.filter (inBoundingBox mousePos) 
-                if List.isEmpty overlappingComponentList then
+                if List.isEmpty overlappingComponentList || model.TogglingSelection then
                     selectElements model mousePos dispatch
         dispatch <| SelectDragStart mousePos
     
@@ -419,6 +428,8 @@ let mouseMove model mousePos dispatch mDown =
 
 
 let mDown (ev: Types.MouseEvent) = ev.buttons
+
+let kDown (ev: Types.KeyboardEvent) = ev.key
 
 let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (dispatch: Dispatch<Msg>) =
     let coordX = ev.clientX 
@@ -497,11 +508,11 @@ let moveElements model mousePos =
         { X = (mousePos.X - model.DraggingPos.X)
           Y = (mousePos.Y - model.DraggingPos.Y) }
     let newModel = {model with DraggingPos = mousePos}
-    if not (List.isEmpty model.SelectedComponents) then
+    if not (List.isEmpty model.SelectedComponents) && not model.TogglingSelection then
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) newModel.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
-    else if not (List.isEmpty model.SelectedWireSegments) then
+    else if not (List.isEmpty model.SelectedWireSegments) && not model.TogglingSelection then
         let wireSegment = List.head model.SelectedWireSegments
         let wModel, wCmd = BusWire.update (BusWire.MoveWires(fst wireSegment, snd wireSegment, transVector)) newModel.Wire
         {model with Wire = wModel}, Cmd.map Wire wCmd
@@ -600,6 +611,12 @@ let addSymbol model =
         SelectedPort = None, CommonTypes.PortType.Input;
         SelectingMultiple = false; 
         EditSizeOf = None}, Cmd.map Wire sCmd 
+
+///Finds symmetric difference of 2 lists that are treated as sets i.e. (A - B) U (B - A)
+let symmetricDifference list1 list2 = 
+    let set1 = Set.ofList list1
+    let set2 = Set.ofList list2
+    Set.toList (Set.union (Set.difference set1 set2) (Set.difference set2 set1))
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -719,6 +736,21 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         {snapModel with SelectedComponents = []; AddingSymbol = false}, cmd
     | SelectLabel x -> 
         { model with SelectedLabel = x }, Cmd.none
+    | ToggleSelectionOpen ->
+        if List.isEmpty model.SelectedComponents && List.isEmpty model.SelectedWireSegments then  
+            model, Cmd.none
+        else 
+            {model with TogglingSelection = true}, Cmd.none
+    | ToggleSelectionClose -> {model with TogglingSelection = false}, Cmd.none
+    | ToggleSymbols symbolIdList ->
+        let selectedSymbols = symmetricDifference symbolIdList model.SelectedComponents
+        let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Highlight selectedSymbols)) model.Wire 
+        {model with Wire = sModel; SelectedComponents = selectedSymbols}, Cmd.map Wire sCmd
+    | ToggleWires wireSegmentIdList -> 
+        let selectedSegments = symmetricDifference wireSegmentIdList model.SelectedWireSegments
+        let wModel, wCmd = BusWire.update(BusWire.HighlightWires (List.map fst selectedSegments)) model.Wire
+        {model with Wire = wModel; SelectedWireSegments = selectedSegments}, Cmd.none 
+        
 
 let init () =
     let model, cmds = (BusWire.init 400) ()
@@ -729,6 +761,7 @@ let init () =
       SelectedComponents = []
       SelectedWireSegments = []
       SelectingMultiple = false
+      TogglingSelection = false
       EditSizeOf = None
       AddingSymbol = false
       DragStartPos = origin
