@@ -18,8 +18,9 @@
 
 ### Transforming Symbols
 - **Rotation** - Can be done for selected symbol via drop-down menu or via shortcuts: Ctrl-E for clockwise and Ctrl-Q for anticlockwise rotation. Wire routing automatically adjusts.
-- **Scaling** - Interactive scaling by dragging from corner of selected/non-delected symbol. Selected symbol(s) can also be scaled up/down by 1.25 via drop down menu or shortcuts: ALt-M (maginfy), ALt-D (diminish).
-- *All transformed symbols automatically snap to grid*.
+- **Scaling** - Interactive scaling by dragging from corner of selected/non-selected symbol. Selected symbol(s) can also be increased/decreased in side length by 1 grid square length at a time via drop down menu or shortcuts: ALt-M (magnify), ALt-D (diminish).
+- *All transformed symbols automatically snap to grid*. 
+- Shrinking below a side length of one grid square length is not allowed.
 
 ### Aligning Selected Symbol Groups
 - May be done via drop-down menu or shortcuts: *Alt-X* for alignment along X-direction (horizontal); *Alt-Y* along Y-direction (vertical). Horizontally aligned symbols cannot be vertically aligned and vice versa.
@@ -49,6 +50,10 @@
 
 ### Zooming canvas
 - Via drop down menu or shortcuts: Ctrl-Z (zoom in) and Ctrl-Y (zoom out). Zooming is in steps of 1.25.
+
+### Toggling Selection of Symbols
+- On holding down control, the app enters a "toggling" state. In this state, any unselected element that is selected (via click or drag) will become selected and highlighted, while selected elements will unselect and unhighlight. This is a feature similar to Windows OS.
+- This does not conflict with keyboard shortcuts.
 
 ### Copy-Paste
 - INSERT EXPLANATION
