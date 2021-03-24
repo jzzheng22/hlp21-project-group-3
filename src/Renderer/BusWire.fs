@@ -683,25 +683,27 @@ let moveWire (w:Wire) (vec:XYPos)=
 /// routing the wire to its new position, as this indicates a need to 
 /// switch back to autorouting.
 /// 
-let routeRuleShortEnds (wire: Wire) (sm: Symbol.Model) : bool =
+let routeRuleShortEnds (wire: Wire) (sm: Symbol.Model) (model:Model) : bool =
     not (checkFirstSegmentLength wire sm && checkLastSegmentLength wire sm) 
 
 
-let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) : bool =
-    let currentSegmentCount = wire.Segments.Length
+let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) (model:Model) : bool =
+    let currentSegmentCount = //wire.Segments.Length
+        routeWire model.Symbol wire.SourcePortId wire.TargetPortId
+        |> List.length
     let newVertexCount = 
         routeWire sm wire.SourcePortId wire.TargetPortId
         |> List.length
-    currentSegmentCount = newVertexCount - 1 
+    currentSegmentCount = newVertexCount (*-1*) 
 
 
 /// Rule that states that the wire must switch back to autorouting after symbol rotation
-let routeRuleAfterRotation (wire: Wire) (sm: Symbol.Model) : bool =
+let routeRuleAfterRotation (wire: Wire) (sm: Symbol.Model) (model:Model) : bool =
     (wire.SourcePortEdge, wire.TargetPortEdge) = (Symbol.getPortEdge sm wire.SourcePortId, Symbol.getPortEdge sm wire.TargetPortId) 
 
 
 /// Rule stating two segment wires may not be autorouted
-let routeRuleTwoSegment (wire: Wire) (sm: Symbol.Model) : bool =
+let routeRuleTwoSegment (wire: Wire) (sm: Symbol.Model) (model:Model): bool =
     not (List.length wire.Segments < 3)
 
         
@@ -715,9 +717,9 @@ let routeRuleList =
 
 /// Decides whether a wire ought to continue being manually routed or be
 /// switched back to autorouting, and updates the Manual field accordingly
-let decideManual (wire: Wire) (sm: Symbol.Model) : Wire =
+let decideManual (wire: Wire) (sm: Symbol.Model) (model:Model): Wire =
     routeRuleList 
-    |> List.map (fun f -> f wire sm)
+    |> List.map (fun f -> f wire sm model)
     |> fun x ->
         if List.contains false x then
             {wire with Manual = false} 
@@ -743,7 +745,7 @@ let updateWires (model: Model) (sm: Symbol.Model) (multipleMove:bool) (wIds: Com
     model.WX
     |> List.map (fun w -> 
         if List.contains w.Id wIds then
-            let newWire = decideManual w sm
+            let newWire = decideManual w sm model
             let srcEdge = Symbol.getPortEdge sm newWire.SourcePortId
             let tgtEdge = Symbol.getPortEdge sm newWire.TargetPortId
             let startHoriz = not (srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
@@ -898,8 +900,63 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |> List.map (fun wire -> {wire with HighlightError = List.contains wire.Id cIdList})
         }
         , Cmd.none
+    | AddSegment (id, index, mousePos) -> 
+        let isHoriz (seg:WireSegment)= seg.SourcePos.Y=seg.TargetPos.Y
+        let addHumpVertices (seg:WireSegment)=
+            if isHoriz seg 
+                then 
+                let pos1= {X=seg.SourcePos.X;Y=seg.SourcePos.Y}
+                let pos2= {X=mousePos.X - 10.;Y=seg.SourcePos.Y}
+                let pos3= {X=mousePos.X - 10.;Y=seg.SourcePos.Y - 20.}
+                let pos4= {X=mousePos.X + 10.;Y=seg.SourcePos.Y - 20.}
+                let pos5= {X=mousePos.X + 10.;Y=seg.SourcePos.Y}
+                let pos6= {X=seg.TargetPos.X;Y=seg.TargetPos.Y}
+                [pos1;pos2;pos3;pos4;pos5;pos6]
+            else
+                let pos1= {X=seg.SourcePos.X;Y=seg.SourcePos.Y}
+                let pos2= {Y=mousePos.Y - 10.;X=seg.SourcePos.X}
+                let pos3= {Y=mousePos.Y - 10.;X=seg.SourcePos.X + 20.}
+                let pos4= {Y=mousePos.Y + 10.;X=seg.SourcePos.X + 20.}
+                let pos5= {Y=mousePos.Y + 10.;X=seg.SourcePos.X}
+                let pos6= {X=seg.TargetPos.X;Y=seg.TargetPos.Y}
+                [pos1;pos2;pos3;pos4;pos5;pos6]
+        let humpSegments (seg:WireSegment)=
+            addHumpVertices seg
+            |> List.pairwise
+            |> List.map (fun (src,tgt) -> makeWireSegment id 1 src tgt)
+            //|> setIndex
+        let transformSeg(seg:WireSegment) =
+            match seg.Index with 
+            |x when x=index -> humpSegments seg
+            |_ -> [seg]
+            | _ -> failwithf "wagwan sexi"
+
+        let segments (w:Wire)=
+            w.Segments
+            |> List.collect transformSeg
+            |> setIndex
+        let wList=    
+            model.WX
+            |> List.map (fun w -> 
+                if w.Id = id then
+                    {w with Segments=segments w;
+                            Manual= true}
+                else 
+                    w
+            )
+
+        {model with WX = wList}, Cmd.none
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
-    | AddSegment (id, index, mousePos) -> failwithf "not impl"
+
+        
+   
+
+        
+
+
+
+                
+
 
 //---------------Other interface functions--------------------//
 
