@@ -671,6 +671,9 @@ let init () =
         (createSymbol (ComponentType.Custom custom) (findPortList (List.length custom.InputLabels) (List.length custom.OutputLabels) (ComponentType.Custom custom)) {X = 20.; Y = 300.} 0 (getSymLabel (ComponentType.Custom custom) 0))
         (createSymbol (ComponentType.Constant (2,3) ) (findPortList 0 1 (ComponentType.Constant (2,3)) ) {X = 600.; Y = 300.} 0 (getSymLabel (ComponentType.Constant (2,3)) 22) )
         (createSymbol (ComponentType.Constant (2, -2147483648) ) (findPortList 0 1 (ComponentType.Constant (2, -2147483648)) ) {X = 600.; Y = 300.} 0 (getSymLabel (ComponentType.Constant (2, -2147483648)) 522) )
+        (createSymbol (ComponentType.BusSelection (2,2) ) (findPortList 1 1 (ComponentType.BusSelection (2,2)) ) {X = 700.; Y = 300.} 0 (getSymLabel (ComponentType.BusSelection (2,2)) 522) )
+        (createSymbol (ComponentType.IOLabel ) (findPortList 1 1 (ComponentType.IOLabel) ) {X = 800.; Y = 300.} 0 (getSymLabel (ComponentType.IOLabel) 522) )
+
     ]
     , Cmd.none
 
@@ -897,9 +900,8 @@ let private renderObj =
                     |> List.map(fun (i, _) -> drawCircle sym (displace -5. i sym) "purple" "purple" 0.4 1.[])
                 else []
             
-            let drawconst: ReactElement = 
+            let nonRotatedSymbolCoords =
                 let middle = midSym sym
-
                 ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical flipped
                 let length = match sym.Rotation with
                                 |R0 ->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
@@ -907,6 +909,20 @@ let private renderObj =
                                 |_->{X =  sym.BotR.Y - sym.TopL.Y;Y= sym.BotR.X - sym.TopL.X; }                             
                 let TL = {X= middle.X - length.X/2. ; Y= middle.Y - length.Y/2. }
                 let BR = {X= middle.X + length.X/2. ; Y= middle.Y + length.Y/2. }
+                (TL,BR,middle,length)
+
+            let drawconst: ReactElement = 
+                (*
+                let middle = midSym sym
+                ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical flipped
+                let length = match sym.Rotation with
+                                |R0 ->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
+                                |R180->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
+                                |_->{X =  sym.BotR.Y - sym.TopL.Y;Y= sym.BotR.X - sym.TopL.X; }                             
+                let TL = {X= middle.X - length.X/2. ; Y= middle.Y - length.Y/2. }
+                let BR = {X= middle.X + length.X/2. ; Y= middle.Y + length.Y/2. }
+                *)
+                let TL,BR,middle,length = nonRotatedSymbolCoords
                 let p1 = {X = TL.X ; Y = TL.Y}
                 let p2 = {X = TL.X + ( (2./3.)*length.X ); Y = TL.Y + length.Y/2. }
                 let p3 = {X = BR.X ; Y = TL.Y + length.Y/2. }
@@ -915,6 +931,18 @@ let private renderObj =
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
+            let drawBusSelect =
+                let TL,BR,middle,length = nonRotatedSymbolCoords
+                let p1 = TL
+                let p2 = {X=TL.X + length.X/2.;Y=TL.Y}
+                let p3 = {X =BR.X - length.X/4.;Y=TL.Y +length.Y/4. }
+                let p4 = {X=BR.X;Y= TL.Y +length.Y/4.}
+                let p5 = {X=BR.X;Y=BR.Y - length.Y/4.}
+                let p6 = {X =BR.X - length.X/4.;Y=BR.Y-length/4.}
+                let p7 = {X=TL.X + length.X/2.;Y=BR.Y}
+                let p8 = {X= TL.X; Y=BR.Y}
+                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y p7.X p7.Y p8.X p8.Y
+                drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
             let symDraw = 
                 match sym.GenericType with
