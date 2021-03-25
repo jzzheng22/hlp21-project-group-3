@@ -98,10 +98,31 @@ let printMsg (msg:Msg) =
     | x -> sprintf "Other:%A" x
 
 let traceFn (msg:Msg) model = printfn "Msg=%A\n\n" (printMsg msg)
+
+let mutable firstPress = true
+
+///Used to listen for pressing down of Ctrl for selection toggle
+let keyPressListener initial = 
+    let subDown dispatch =
+        document.addEventListener("keydown", fun e ->
+                                                let ke: KeyboardEvent = downcast e
+                                                if ke.ctrlKey && firstPress then 
+                                                    firstPress <- false 
+                                                    dispatch Sheet.ToggleSelectionOpen
+                                                else 
+                                                    ())
+    let subUp dispatch = 
+        document.addEventListener("keyup", fun e -> 
+                                                    firstPress <- true
+                                                    dispatch Sheet.ToggleSelectionClose)
+    Cmd.batch [Cmd.ofSub subDown; Cmd.ofSub subUp] 
+    
+
 // App
 Program.mkProgram Sheet.init update' view'
 |> Program.withReactBatched "app"
 |> Program.withSubscription attachMenusAndKeyShortcuts
+|> Program.withSubscription keyPressListener
 |> Program.withTrace traceFn
 //|> Program.withConsoleTrace
 |> Program.run

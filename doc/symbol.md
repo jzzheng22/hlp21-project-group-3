@@ -94,12 +94,12 @@ Each Symbol owns its ports.
 `HighlightPorts of CommonTypes.ComponentId list`
  - Highlights all ports of symbols in list.
 
-`Rotate of sId : CommonTypes.ComponentId * rot : int`
- - Rotates a single symbol clockwise by `rot` degrees.
+`Rotate of sId : CommonTypes.ComponentId list * rot : int`
+ - Rotates a list of symbols clockwise by `rot` degrees.
  - Sent from Sheet via BusWire.
 
-`Scale of sId : CommonTypes.ComponentId * scale : XYPos`
- - Scales a symbol by specified factor in X and Y directions.
+`Scale of sId : CommonTypes.ComponentId list * scale : XYPos`
+ - Scales a list of symbols by specified factor in X and Y directions.
  - Used to magnify, shrink, stretch and distort symbols.
  - Sent from Sheet via BusWire.
 

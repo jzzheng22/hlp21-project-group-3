@@ -76,12 +76,12 @@ Sheet can also access Symbol directly if needed.
 - Highlight all ports of symbols in list.
 
 *Optional messages implemented in JEMerrick's Symbol:*
-`Rotate of sId : CommonTypes.ComponentId * rot : int`
- - Rotates a symbol clockwise by `rot` degrees.
+`Rotate of sId : CommonTypes.ComponentId list * rot : int`
+ - Rotates a list of symbols clockwise by `rot` degrees.
  - Unit of rotation is degrees, and limited to ints.
 
-`Scale of CommonTypes.ComponentId * XYPos`
- - Scales a symbol by specified factor in X and Y directions.
+`Scale of CommonTypes.ComponentId list * XYPos`
+ - Scales a list of symbols by specified factor in X and Y directions.
  - Used to magnify, shrink, stretch and distort symbols.
 
 `HighlightError of sIdList: CommonTypes.ComponentId list`

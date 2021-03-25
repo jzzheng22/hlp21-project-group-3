@@ -12,8 +12,8 @@ open CommonTypes
 //------------------------------------------------------------------------//
 
 //Static variables
-let stdHeight = 35.
-let ratioHW = 0.9
+let stdHeight = 30.
+let ratioHW = 0.8
 let radius = 3.
 let labelSize = 6
 
@@ -93,8 +93,8 @@ type Msg =
     | HighlightError of sIdList: ComponentId list
     | HighlightPorts of sIdList : ComponentId list
     | DragPort of sId : ComponentId * pId : PortId * pagePos: XYPos
-    | Rotate of sId : ComponentId * rot : int
-    | Scale of sId : ComponentId * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
+    | Rotate of sIdList : ComponentId list * rot : int
+    | Scale of sIdList : ComponentId list * scale : XYPos //can make this a tuple of (x, y) or a mouse coordinate instead quite easily
     | DisplaySlots of sId : ComponentId
     | Rename of sId : ComponentId * name : string
     | UpdateSymbolModelWithComponent of Component // Issie interface
@@ -150,7 +150,7 @@ let posDiff (a : XYPos) (b : XYPos) = {X=a.X-b.X; Y=a.Y-b.Y}
 let posAdd (a : XYPos) (b : XYPos) = {X=a.X+b.X; Y=a.Y+b.Y}
 let absDiff a b = 
     let diff = (posDiff a b)
-    diff.X + diff.Y
+    (abs diff.X) + (abs diff.Y)
 
 /// displace will move a port position _away_ from the box by n pixels.
 /// 
@@ -169,7 +169,7 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : XYPos =
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
-    let box = (addXYVal portPos -6., addXYVal portPos 6.);
+    let box = (addXYVal portPos -8., addXYVal portPos 8.);
     let topL = fst box
     let botR = snd box
     topL.X <= coord.X && topL.Y <= coord.Y && botR.X >= coord.X && botR.Y >= coord.Y
@@ -178,8 +178,8 @@ let testBox (portPos : XYPos) (coord : XYPos) : bool =
 /// i = int indicating the index of the port on a side
 /// n = int indicating the total number of ports on a side
 let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos = 
-    let h = getHW botR topL |> fst
-    let w = getHW botR topL |> snd
+    let h = fst (getHW botR topL)
+    let w = snd (getHW botR topL)
     let x = topL.X + (w * float(i + 1) / float(n + 1))
     let y = topL.Y + (h * float(i + 1) / float(n + 1))
     {X = x; Y = y}
@@ -332,9 +332,9 @@ let tagCoords (sym : Symbol) : string =
     (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" 
         (midX - 20. + (i + (a * 5.))) (midY - 10.) 
         (midX - 20. + (i + (a * 5.))) (midY + 10.) 
-        (midX - ((i/7.) + (a * 5.))) (midY + 10.) 
-        (midX + 20. - ((i * 1.2) + (a * 5.))) midY 
-        (midX - ((i/7.) + (a * 5.))) (midY - 10.))
+        (midX - ((i/7.) + (a * 10.))) (midY + 10.) 
+        (midX + 40. - ((i * 1.2) + (a * 5.))) midY 
+        (midX - ((i/7.) + (a * 10.))) (midY - 10.))
 
 let cornerCoords (sym : Symbol) (i : XYPos) : XYPos = 
     match sym.Rotation with
@@ -351,12 +351,6 @@ let clkCoords (pos : XYPos) =
     let p2 = {X = pos.X + (2. * radius); Y = pos.Y }
     let p3 = {X = pos.X ; Y = pos.Y + (radius)}
     sprintf "%f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y
-
-/// Returns the rotation for SVG transformations
-let rotString (sym : Symbol) (pos : XYPos) = 
-    sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
-
-let rotStringObj (sym : Symbol) = rotString sym (midSym sym)
 
 /// Converts a scale and a centre and returns the matrix for svg scaling about that central point
 let scaleString (scale : XYPos) (centre : XYPos) : string = 
@@ -400,12 +394,12 @@ let swapPort portMap k1 k2 v1 v2 =
     |> Map.change k2 (fun _ -> Some v1)
 
 //Finds the port with position closest to a coordinate, and swap the map values of that port with a given port
-let swapMap (sym : Symbol) (coord : XYPos) port = 
+let swapMap (sym : Symbol) (coord : XYPos) (port : (XYPos * PortInfo Option)) = 
     genMapList sym.PortMap (List.map (fun (v, k) -> (absDiff coord v, (v, k))))
     |> List.minBy fst
     |> snd
     |> function
-    | (k, x) -> swapPort sym.PortMap k (fst port) x (snd port)  
+    | (k, x) -> swapPort sym.PortMap k (fst port) x (snd port)
                 
 let drawText (x : float) (y : float) (size : string) (anchor : string, baseline : string) =
     text[
@@ -447,6 +441,22 @@ let getPosEdge (sym : Symbol) (pos : XYPos) =
     elif pos.Y = sym.TopL.Y then Top
     elif pos.Y = sym.BotR.Y then Bottom
     else Left
+
+/// Returns the rotation for SVG transformations for shapes inside labels (e.g. clock symbol)
+let rotSide (sym : Symbol) (pos : XYPos) : string = 
+    let rot  = 
+        match getPosEdge sym pos with
+        | Left -> "0"
+        | Right -> "180"
+        | Top -> "90"
+        | Bottom -> "270"
+    sprintf "rotate (%s, %f, %f)" rot pos.X pos.Y
+
+/// Returns the rotation for SVG transformations
+let rotString (sym : Symbol) (pos : XYPos) : string = 
+    sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
+
+let rotStringObj (sym : Symbol) = rotString sym (midSym sym)
 
 let getTextAttr (sym : Symbol) (pos : XYPos) : (string * string) =
     match getPosEdge sym pos with
@@ -562,6 +572,9 @@ let portIndex (symType : SymbolType) (i : int) (len : int) (name : string) : int
     | Mux when name = "S0" -> len - 1
     | _ -> i
     
+let roundtoTen (n : float) : float = 
+    n + abs ((n % 10.) - 10.)
+
 /// Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) list list) (pos : XYPos) (index : int) (label : string) : Symbol =
     
@@ -594,12 +607,14 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
     let nBot = if bot > 0 || top > 0 then max bot top else (int (ratioHW * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
     let h = 
         if left = 1 && right = 1 then 2. 
-        else n 
+        else n + 1. 
         |> (*) (stdHeight)
     let w = 
         if bot <= 0 && top <= 0 then
             max (ratioHW * h) test //Width is standard
-        else max ((float nBot) * stdHeight * 1.7) test //Or width based on number of ports on the bottom
+        else max ((float nBot) * stdHeight * 2.) test //Or width based on number of ports on the bottom
+        |> (+) 10.
+        |> roundtoTen
     let botR = {X = pos.X + w; Y = pos.Y + h}
     
     // ---- Making portMap ---- //
@@ -724,29 +739,29 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         )
         , Cmd.none
 
-    | Rotate (sId, rot) ->
+    | Rotate (sIdList, rot) ->
         model
         |> List.map (fun sym ->
-            if sId <> sym.Id then
-                sym
-            else
+            if List.contains sym.Id sIdList then
                 let newSym = trans rotateCoords sym rot
                 { newSym with
                     Rotation = updateRot rot sym.Rotation     
                 }
+            else
+                sym
         )
         , Cmd.none
 
-    | Scale (sId, scale) ->
+    | Scale (sIdList, scale) ->
         model
         |> List.map (fun sym ->
-            if sId <> sym.Id then
-                sym
-            else
+            if List.contains sym.Id sIdList then
                 let newSym = trans scaleCoords sym scale
                 { newSym with
                     Scale = {X = sym.Scale.X * scale.X; Y = sym.Scale.Y * scale.Y }
                 }
+            else
+                sym
         )
         , Cmd.none
 
@@ -811,7 +826,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.collect (fun (i, k) ->
                     if getPortName k = "Clk" then
-                        [(drawPolygon (clkCoords i) "black" color 1. (rotString sym i))[]]
+                        [(drawPolygon (clkCoords i) "black" color 1. (rotSide sym i))[]]
                     else [])
                 
             let labels : ReactElement list = 
@@ -860,6 +875,7 @@ let private renderObj =
                 if sym.PortHighlight then
                     sym
                     |> mapSetup
+                    |> List.filter (fun (_, port) -> getPortName port <> "Clk")
                     |> List.map(fun (i, _) -> drawCircle sym i "deepskyblue" "deepskyblue" 0.4 1.[])
                 else []
 
@@ -933,20 +949,27 @@ let getPortType (symModel: Model) (pId : PortId) : PortType =
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     symModel
     |>initPortSearch
+    |> List.filter (fun (_, port) -> getPortName port <> "Clk")
     |> List.tryFind (fun (v, _) -> testBox v pos)
     |> function
     | Some(v, Some k) -> Some(v, (PortId (k.Port.Id)))
     | _ -> None
 
-let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (XYPos * PortId) Option =
+let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (ComponentId * XYPos * PortId) Option =
     model
     |> List.tryFind (fun sym -> sym.Id = sId)
     |> function
-    | Some sym -> Some (genMapList sym.PortMap (List.map (fun (x, y) -> (x, y, testBox (displace -9. x sym) pos))) 
-                        |> List.filter (fun (x, y, z) -> z)
-                        |> List.map (fun (x, y, z) -> (x, getPortId y))
-                        |> List.item 0)
-    | None -> None
+    | Some sym -> 
+        let findLabel = 
+            genMapList sym.PortMap (List.map (fun (x, pInfo) -> (x, pInfo, testBox (displace -8. x sym) pos))) 
+            |> List.filter (fun (_, _, isInside) -> isInside)
+        if List.isEmpty findLabel then None 
+        else 
+            findLabel
+            |> List.map (fun (pos, pInfo, _) -> (sId, pos, getPortId pInfo))
+            |> List.head
+            |> Some
+    | _ -> None
     
 
 let getSymbol (model : Model) (sId : ComponentId) : Symbol = 
