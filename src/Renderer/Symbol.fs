@@ -12,8 +12,8 @@ open CommonTypes
 //------------------------------------------------------------------------//
 
 //Static variables
-let stdHeight = 40.
-let ratioHW = 0.9
+let stdHeight = 30.
+let ratioHW = 0.8
 let radius = 3.
 let labelSize = 6
 
