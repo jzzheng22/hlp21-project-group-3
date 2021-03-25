@@ -805,7 +805,9 @@ type private RenderObjProps =
 let private renderObj =
     FunctionComponent.Of(
         fun (props : RenderObjProps) ->
+            
             let sym = props.Obj //for ease of use
+            
             let strokeColour = if sym.PortHighlight then "green" else "black"
             let color =
                 match sym.GenericType with
@@ -862,11 +864,20 @@ let private renderObj =
                     SVGAttr.StrokeWidth 0.5][]
 
             let title = 
+                let mid = {X=midSymX sym; Y = midSymY sym}
+               
                 let xLength = sym.BotR.X - sym.TopL.X
-                match sym.GenericType with
-                |Const -> drawText (sym.TopL.X + (xLength/4.) ) (midSymY sym) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
-                |_ -> drawText (midSymX sym) (midSymY sym) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
             
+                let yLength =  sym.BotR.Y - sym.TopL.Y
+                let pos =
+                    match sym.GenericType with
+                    |Const ->match sym.Rotation with
+                                |R0-> {X= sym.TopL.X + (xLength/4.);Y = mid.Y }
+                                |R90->{X= mid.X;Y = sym.TopL.Y + (yLength/4.) }
+                                |R180->{X= sym.BotR.X - (xLength/4.);Y = mid.Y }
+                                |R270-> {X= mid.X;Y = sym.BotR.Y - (yLength/4.) }
+                    |_ -> mid
+                drawText pos.X pos.Y "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
             
             let symLabel = drawText (midSymX sym) (sym.TopL.Y - 10.) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Label]
             
@@ -889,10 +900,14 @@ let private renderObj =
                 else []
             
             let drawconst: ReactElement = 
-                let yLength =  sym.BotR.Y - sym.TopL.Y
-                let xLength = sym.BotR.X - sym.TopL.X
-                let middle = {X= sym.TopL.X + xLength/2.; Y= sym.TopL.Y + yLength/2.}
-                
+                let middle = midSym sym
+
+                let length = match sym.Rotation with
+                                |R0 ->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
+                                |R180->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
+                                |_->{X =  sym.BotR.Y - sym.TopL.Y;Y= sym.BotR.X - sym.TopL.X; }
+                let xLength = length.X
+                let yLength = length.Y                
                 let TL = {X= middle.X - xLength/2. ; Y= middle.Y - yLength/2. }
                 let BR = {X= middle.X + xLength/2. ; Y= middle.Y + yLength/2. }
                 
