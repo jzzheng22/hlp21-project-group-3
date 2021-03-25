@@ -903,7 +903,7 @@ let private renderObj =
             
             let nonRotatedSymbolCoords =
                 let middle = midSym sym
-                ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical flipped
+                ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical swapped
                 let length = match sym.Rotation with
                                 |R0 ->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
                                 |R180->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
@@ -913,16 +913,6 @@ let private renderObj =
                 (TL,BR,middle,length)
 
             let drawconst: ReactElement = 
-                (*
-                let middle = midSym sym
-                ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical flipped
-                let length = match sym.Rotation with
-                                |R0 ->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
-                                |R180->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
-                                |_->{X =  sym.BotR.Y - sym.TopL.Y;Y= sym.BotR.X - sym.TopL.X; }                             
-                let TL = {X= middle.X - length.X/2. ; Y= middle.Y - length.Y/2. }
-                let BR = {X= middle.X + length.X/2. ; Y= middle.Y + length.Y/2. }
-                *)
                 let TL,BR,middle,length = nonRotatedSymbolCoords
                 let p1 = {X = TL.X ; Y = TL.Y}
                 let p2 = {X = TL.X + ( (2./3.)*length.X ); Y = TL.Y + length.Y/2. }
