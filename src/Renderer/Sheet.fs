@@ -215,7 +215,7 @@ let inferWidth (model : Model) =
     | Ok x -> test
     | Error e -> collectWidthErrors (comps, conns)
 
-///Updates widths/dispatches error highlighting message based on output of inferwidth.
+/// Updates widths and dispatches error highlighting message based on output of inferwidth.
 let getWires (model : Model) =
     inferWidth model
     |> function
@@ -326,7 +326,7 @@ let drawPortConnectionLine model =
                        StrokeDasharray "5,5"
                    FillOpacity 0.1 ] ] []
 
-///Renders red circles on corners of symbol bounding box.
+/// Draws red circles on the corners of a Symbol's bounding box.
 let highlightCorners model box = 
     let circleGen centre =  
         circle [
@@ -349,7 +349,7 @@ let highlightCorners model box =
 /// This will be set when the canvas is first created and then provide info about how the canvas is scrolled.
 let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> None) // svgClientRect() will contain the canvas bounding box
 
-///Handles down-press of mouse buttons.
+/// Handles down-press of mouse buttons.
 let mouseDown model mousePos dispatch mDown =
     if model.AddingSymbol then
         dispatch <| SymbolAddFinish     
@@ -373,7 +373,7 @@ let mouseDown model mousePos dispatch mDown =
                     selectElements model mousePos dispatch
         dispatch <| SelectDragStart mousePos
     
-///Handles release of mouse buttons.
+/// Handles release of mouse buttons.
 let mouseUp model mousePos dispatch = 
     match validConnection model with
     | Some endPort ->
@@ -396,7 +396,7 @@ let mouseUp model mousePos dispatch =
 let increaseBoundingBox (a, topL, botR) = 
     a, {X = topL.X - 10.; Y = topL.Y - 10.}, {X = botR.X + 10.; Y = botR.Y + 10.}
 
-///Handles movement of mouse position.
+/// Handles movement of mouse position.
 let mouseMove model mousePos dispatch mDown = 
     if model.AddingSymbol then 
         dispatch <| MoveElements mousePos
@@ -485,7 +485,6 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let wireSvg = BusWire.view model.Wire wDispatch
     displaySvgWithZoom model wireSvg dispatch
 
-///Removes selected wires as well as wires connected to selected symbol(s).
 let deleteWires model =
     let connectedWires =
         model.SelectedComponents
@@ -502,7 +501,7 @@ let deleteWires model =
 let deleteSymbols model wModel =
     BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
 
-///Updates model with new positions of moved elements.
+/// Updates model with new positions of moved elements.
 let moveElements model mousePos =
     let transVector =
         { X = (mousePos.X - model.DraggingPos.X)
@@ -598,7 +597,6 @@ let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : i
         |> List.max
         |> (+) 1
 
-///Updates model with new symbol.
 let addSymbol model =
     let sModel, sCmd =
         BusWire.update
@@ -612,11 +610,10 @@ let addSymbol model =
         SelectingMultiple = false; 
         EditSizeOf = None}, Cmd.map Wire sCmd 
 
-///Finds symmetric difference of 2 lists that are treated as sets i.e. (A - B) U (B - A)
+///Finds symmetric difference of 2 lists i.e. (A - B) U (B - A)
 let symmetricDifference list1 list2 = 
-    let set1 = Set.ofList list1
-    let set2 = Set.ofList list2
-    Set.toList (Set.union (Set.difference set1 set2) (Set.difference set2 set1))
+    List.append list1 list2
+    |> List.distinct
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -633,13 +630,13 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         if List.isEmpty model.SelectedComponents then 
             model, Cmd.none
         else 
-            let symids = model.SelectedComponents
+            let symIdList = model.SelectedComponents
             let sModel, sCmd = 
                 match msg with 
                 | KeyPress SymbolClockwise -> 
-                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symids, 90))) model.Wire
+                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symIdList, 90))) model.Wire
                 | KeyPress SymbolAntiClock ->
-                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symids, 270))) model.Wire
+                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symIdList, 270))) model.Wire
                 | KeyPress k when k = SymbolMagnify || k = SymbolShrink->
                     
                     let getWidthHeight id = 
@@ -650,7 +647,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                         let predicate id = 
                             let w, h = getWidthHeight id
                             (w > unzoomedGrid) && (h > unzoomedGrid)
-                        if k = SymbolShrink then List.filter predicate symids else symids 
+                        if k = SymbolShrink then List.filter predicate symIdList else symIdList 
 
                     let scalef value = if k = SymbolShrink then (1.0 - unzoomedGrid/value) else (1.0 + unzoomedGrid/value)  
                 
@@ -668,7 +665,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
     | KeyPress ZoomCanvasOut -> 
-        ({model with Zoom = model.Zoom/1.25}, Cmd.none)
+        ({model with Zoom = model.Zoom / 1.25}, Cmd.none)
     | KeyPress Del ->
         deleteElements model
 
@@ -749,7 +746,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | ToggleWires wireSegmentIdList -> 
         let selectedSegments = symmetricDifference wireSegmentIdList model.SelectedWireSegments
         let wModel, wCmd = BusWire.update(BusWire.HighlightWires (List.map fst selectedSegments)) model.Wire
-        {model with Wire = wModel; SelectedWireSegments = selectedSegments}, Cmd.none 
+        {model with Wire = wModel; SelectedWireSegments = selectedSegments}, Cmd.map Wire wCmd
         
 
 let init () =
