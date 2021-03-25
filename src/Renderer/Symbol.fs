@@ -889,18 +889,20 @@ let private renderObj =
                 else []
             
             let drawconst: ReactElement = 
-                let TL = sym.TopL
-                let BR = sym.BotR
-                let yLength =  BR.Y - TL.Y
-                let xLength = BR.X - TL.X
-                let middle = {X= TL.X + xLength/2.; Y= TL.Y + yLength/2.}
+                let yLength =  sym.BotR.Y - sym.TopL.Y
+                let xLength = sym.BotR.X - sym.TopL.X
+                let middle = {X= sym.TopL.X + xLength/2.; Y= sym.TopL.Y + yLength/2.}
+                
+                let TL = {X= middle.X - xLength/2. ; Y= middle.Y - yLength/2. }
+                let BR = {X= middle.X + xLength/2. ; Y= middle.Y + yLength/2. }
+                
                 let p1 = {X = TL.X ; Y = TL.Y}
                 let p2 = {X = TL.X + ( (2./3.)*xLength ); Y = TL.Y + yLength/2. }
                 let p3 = {X = BR.X ; Y = TL.Y + yLength/2. }
                 let p4 = {X = TL.X + ( (2./3.)*xLength ); Y = TL.Y + yLength/2. }
                 let p5 = {X= TL.X; Y= BR.Y}
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y
-                drawPolygon stringPoints strokeColour color 1. (rotSide sym middle) []
+                drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
             let symDraw = 
                 match sym.GenericType with
