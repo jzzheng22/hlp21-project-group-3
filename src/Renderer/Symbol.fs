@@ -498,7 +498,7 @@ let createLabelName (genPort : GenericPort) (portType : PortType) (compType : Co
                 | PortType.Output -> sprintf "%s" (fst(List.item i y.OutputLabels))
             | ComponentType.Constant _| ComponentType.IOLabel | ComponentType.BusSelection _->
                 match portType with
-                |_-> sprintf ""
+                |_ -> sprintf ""
             | _ ->
                 match portType with 
                 | PortType.Input -> sprintf "IN%d" i
@@ -875,11 +875,11 @@ let private renderObj =
                 let yLength =  sym.BotR.Y - sym.TopL.Y
                 let pos =
                     match sym.GenericType with
-                    |Const ->match sym.Rotation with
-                                |R0 -> {X= sym.TopL.X + (xLength/4.);Y = mid.Y }
-                                |R90 -> { X = mid.X; Y = sym.TopL.Y + (yLength/4.) }
-                                |R180 -> {X = sym.BotR.X - (xLength/4.); Y = mid.Y }
-                                |R270 -> {X = mid.X; Y = sym.BotR.Y - (yLength/4.) }
+                    |Const -> match sym.Rotation with
+                              |R0 -> {X = sym.TopL.X + (xLength/4.);Y = mid.Y }
+                              |R90 -> { X = mid.X; Y = sym.TopL.Y + (yLength/4.) }
+                              |R180 -> { X = sym.BotR.X - (xLength/4.); Y = mid.Y }
+                              |R270 -> { X = mid.X; Y = sym.BotR.Y - (yLength/4.) }
                     |_ -> mid
                 drawText pos.X pos.Y "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
             
@@ -907,9 +907,9 @@ let private renderObj =
                 let middle = midSym sym
                 ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical swapped
                 let length = match sym.Rotation with
-                                |R0 -> {X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
-                                |R180 -> {X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
-                                |_ -> {X =  sym.BotR.Y - sym.TopL.Y; Y = sym.BotR.X - sym.TopL.X }                             
+                             |R0 -> {X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
+                             |R180 -> {X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
+                             |_ -> {X =  sym.BotR.Y - sym.TopL.Y; Y = sym.BotR.X - sym.TopL.X }                             
                 let tL = {X = middle.X - length.X/2. ; Y = middle.Y - length.Y/2. }
                 let bR = {X = middle.X + length.X/2. ; Y = middle.Y + length.Y/2. }
                 (tL,bR,middle,length)
