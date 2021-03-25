@@ -36,6 +36,7 @@ type SymbolType =
     | FFE
     | RAM
     | Const
+    | BusSelect
 
 type GenericPort =
     | InOut
@@ -118,7 +119,7 @@ let typeToInfo (compType : ComponentType) : (string * string * int * int * Symbo
     | ComponentType.Input x -> ((sprintf "In<%d:0>" (x - 1)), "" , x, x, IO) 
     | ComponentType.Output x -> ((sprintf "Out<%d:0>" (x - 1)), "" , x, x, IO) 
     | ComponentType.IOLabel -> ("", "", 0, 0, IO) //Check generic type WHAT IS THIS?? 
-    | ComponentType.BusSelection (x, y) -> ("", "", x, y, Wires)
+    | ComponentType.BusSelection (x, y) -> ("", "", x, y, BusSelect)
     | ComponentType.MergeWires -> ("", "", 0, 0, Wires)
     | ComponentType.SplitWire x -> ("", "", x, 1, Wires)
 
@@ -935,10 +936,10 @@ let private renderObj =
                 let TL,BR,middle,length = nonRotatedSymbolCoords
                 let p1 = TL
                 let p2 = {X=TL.X + length.X/2.;Y=TL.Y}
-                let p3 = {X =BR.X - length.X/4.;Y=TL.Y +length.Y/4. }
-                let p4 = {X=BR.X;Y= TL.Y +length.Y/4.}
+                let p3 = {X =BR.X - length.X/4.; Y = TL.Y + length.Y/4. }
+                let p4 = {X=BR.X;Y= TL.Y + length.Y/4.}
                 let p5 = {X=BR.X;Y=BR.Y - length.Y/4.}
-                let p6 = {X =BR.X - length.X/4.;Y=BR.Y-length/4.}
+                let p6 = {X =BR.X - length.X/4.;Y=BR.Y - length.Y/4. }
                 let p7 = {X=TL.X + length.X/2.;Y=BR.Y}
                 let p8 = {X= TL.X; Y=BR.Y}
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y p7.X p7.Y p8.X p8.Y
@@ -949,6 +950,7 @@ let private renderObj =
                 | Wires -> List.concat [wires; triangles]
                 | IO -> [io]
                 | Const -> [drawconst]
+                | BusSelect -> [drawBusSelect]
                 | _ -> [displayBox]
             
             g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos; drawClk])
