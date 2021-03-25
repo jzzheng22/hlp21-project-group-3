@@ -19,7 +19,8 @@ type Model =
       AddingSymbol: bool
       DragStartPos: XYPos
       DraggingPos: XYPos
-      SelectedLabel: (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option}
+      SelectedLabel: (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option
+      ErrorMsg : string Option}
 
 type KeyboardMsg =
     | AltX
@@ -223,12 +224,12 @@ let getWires (model : Model) =
             |> BusWire.getWires model.Wire
         printf "hello UpdateWidth %A" conList
         let wModel, wCmd = BusWire.update (BusWire.UpdateWidth conList) model.Wire
-        (conns, wModel, wCmd)
+        (conns, wModel, wCmd, None)
     | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
         let wires = e.ConnectionsAffected
         printf "hello UpdateWidth Error \n Message: %s \n Connections: \n %A" e.Msg wires
         let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
-        (wires, wModel, wCmd)
+        (wires, wModel, wCmd, Some e.Msg)
 
 /// Sends a highlight error to buswire and symbol for the connection list given
 let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
@@ -236,7 +237,7 @@ let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
     let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel
     {model with Wire = sModel}, Cmd.batch [ Cmd.map Wire wCmd; Cmd.map Wire sCmd ]
 
-let drawError (msg : string) : ReactElement list = 
+let drawError (msg : string) : ReactElement = 
     let drawBox = 
         rect[
             X 0
@@ -253,14 +254,14 @@ let drawError (msg : string) : ReactElement list =
             X 0
             Y 0
             Style[
-                TextAnchor "middle"
-                DominantBaseline "middle"
-                FontSize 6.
+                TextAnchor "start"
+                DominantBaseline "hanging"
+                FontSize 10.
                 FontWeight "bold"
                 Fill "Black"
                 UserSelect UserSelectOptions.None]][str <| msg] //Prevent highlighting text
         
-    [drawText; drawBox]
+    g[][drawBox; drawText]
 
 /// This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
@@ -458,15 +459,18 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                 g [ Style [ Transform(sprintf "scale(%f)" model.Zoom) ] ] [  // top-level transform style attribute for zoom
                     svgReact
                   ]
-                g [] [
+                g [] [  
                         match model.SelectedPort with
                         | (Some _, _) -> drawPortConnectionLine model
                         | _ -> 
-                            match model.EditSizeOf with 
-                            | Some id -> highlightCorners model (Symbol.getBoundingBox model.Wire.Symbol id)
-                            | _ ->
-                                if model.SelectingMultiple then
-                                    drawSelectionBox model]
+                            match model.ErrorMsg with
+                            | Some e -> drawError e
+                            | None ->
+                                match model.EditSizeOf with 
+                                | Some id -> highlightCorners model (Symbol.getBoundingBox model.Wire.Symbol id)
+                                | _ ->
+                                    if model.SelectingMultiple then
+                                        drawSelectionBox model]
         ] 
     ] 
 
@@ -572,9 +576,9 @@ let deleteElements model =
               SelectedWireSegments = [] 
         }
 
-    let (wires, newModel, wCmd2) = getWires deleteModel
+    let (wires, newModel, wCmd2, msg) = getWires deleteModel
     let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) wires))) newModel
-    {deleteModel with Wire = sModel2}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
+    {deleteModel with Wire = sModel2; ErrorMsg = msg}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
 
 /// Finds the highest index for a Symbol type and increments that number
 let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : int = 
@@ -693,10 +697,9 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | EditSize (id, mousePos) -> 
         changeSymbolSize model id mousePos
     | UpdateWidths -> 
-        let wires, newModel, wCmd = getWires model
+        let wires, newModel, wCmd, msg = getWires model
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) newModel
-        {model with Wire = sModel}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
-    | ErrorMsg msg -> model, Cmd.none
+        {model with Wire = sModel; ErrorMsg = msg}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
     | SymbolAddFinish ->
         let snapModel, cmd = snapSymbolToGrid model
         {snapModel with SelectedComponents = []; AddingSymbol = false}, cmd
@@ -716,5 +719,6 @@ let init () =
       AddingSymbol = false
       DragStartPos = origin
       DraggingPos = origin 
-      SelectedLabel = None},
+      SelectedLabel = None
+      ErrorMsg = None},
     Cmd.map Wire cmds
