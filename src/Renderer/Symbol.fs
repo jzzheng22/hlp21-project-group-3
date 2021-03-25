@@ -37,6 +37,7 @@ type SymbolType =
     | RAM
     | Const
     | BusSelect
+    | IOLabel
     
 
 type GenericPort =
@@ -119,7 +120,7 @@ let typeToInfo (compType : ComponentType) : (string * string * int * int * Symbo
     | ComponentType.RAM x -> ("RAM", "RAM", x.AddressWidth, x.WordWidth, RAM)
     | ComponentType.Input x -> ((sprintf "In<%d:0>" (x - 1)), "" , x, x, IO) 
     | ComponentType.Output x -> ((sprintf "Out<%d:0>" (x - 1)), "" , x, x, IO) 
-    | ComponentType.IOLabel -> ("", "IO Label", 0, 0, IO) //Check generic type WHAT IS THIS?? 
+    | ComponentType.IOLabel -> ("", "IO Label", 0, 0, IOLabel) //Check generic type WHAT IS THIS?? 
     | ComponentType.BusSelection (x, y) -> ("Bus Select", (sprintf "[%i..%i]" x y), x, y, BusSelect)
     | ComponentType.MergeWires -> ("", "", 0, 0, Wires)
     | ComponentType.SplitWire x -> ("", "", x, 1, Wires)
@@ -953,7 +954,8 @@ let private renderObj =
             let symDraw = 
                 match sym.GenericType with
                 | Wires -> List.concat [wires; triangles]
-                | IO -> [drawIOlabel]
+                | IO -> [io]
+                | IOLabel ->[drawIOlabel]
                 | Const -> [drawconst]
                 | BusSelect -> [drawBusSelect]
                 | _ -> [displayBox]
