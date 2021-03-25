@@ -876,10 +876,10 @@ let private renderObj =
                 let pos =
                     match sym.GenericType with
                     |Const ->match sym.Rotation with
-                                |R0-> {X= sym.TopL.X + (xLength/4.);Y = mid.Y }
-                                |R90->{X= mid.X;Y = sym.TopL.Y + (yLength/4.) }
-                                |R180->{X= sym.BotR.X - (xLength/4.);Y = mid.Y }
-                                |R270-> {X= mid.X;Y = sym.BotR.Y - (yLength/4.) }
+                                |R0 -> {X= sym.TopL.X + (xLength/4.);Y = mid.Y }
+                                |R90 -> { X = mid.X; Y = sym.TopL.Y + (yLength/4.) }
+                                |R180 -> {X = sym.BotR.X - (xLength/4.); Y = mid.Y }
+                                |R270 -> {X = mid.X; Y = sym.BotR.Y - (yLength/4.) }
                     |_ -> mid
                 drawText pos.X pos.Y "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
             
@@ -907,46 +907,44 @@ let private renderObj =
                 let middle = midSym sym
                 ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical swapped
                 let length = match sym.Rotation with
-                                |R0 ->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
-                                |R180->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
-                                |_->{X =  sym.BotR.Y - sym.TopL.Y;Y= sym.BotR.X - sym.TopL.X; }                             
-                let TL = {X= middle.X - length.X/2. ; Y= middle.Y - length.Y/2. }
-                let BR = {X= middle.X + length.X/2. ; Y= middle.Y + length.Y/2. }
-                (TL,BR,middle,length)
+                                |R0 -> {X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
+                                |R180 -> {X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
+                                |_ -> {X =  sym.BotR.Y - sym.TopL.Y; Y = sym.BotR.X - sym.TopL.X }                             
+                let tL = {X = middle.X - length.X/2. ; Y = middle.Y - length.Y/2. }
+                let bR = {X = middle.X + length.X/2. ; Y = middle.Y + length.Y/2. }
+                (tL,bR,middle,length)
 
             let drawconst: ReactElement = 
-                let TL,BR,middle,length = nonRotatedSymbolCoords
-                let p1 = {X = TL.X ; Y = TL.Y}
-                let p2 = {X = TL.X + ( (2./3.)*length.X ); Y = TL.Y + length.Y/2. }
-                let p3 = {X = BR.X ; Y = TL.Y + length.Y/2. }
-                let p4 = {X = TL.X + ( (2./3.)*length.X ); Y = TL.Y + length.Y/2. }
-                let p5 = {X= TL.X; Y= BR.Y}
+                let tL,bR,middle,length = nonRotatedSymbolCoords
+                let p1 = {X = tL.X ; Y = tL.Y}
+                let p2 = {X = tL.X + ( (2./3.)*length.X ); Y = tL.Y + length.Y/2. }
+                let p3 = {X = bR.X ; Y = tL.Y + length.Y/2. }
+                let p4 = {X = tL.X + ( (2./3.)*length.X ); Y = tL.Y + length.Y/2. }
+                let p5 = {X = tL.X; Y = bR.Y}
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
             let drawBusSelect:ReactElement =
-                let TL,BR,middle,length = nonRotatedSymbolCoords
-                let p1 = TL
-                let p2 = {X=TL.X + length.X/2.;Y=TL.Y}
-                let p3 = {X =BR.X - length.X/4.; Y = TL.Y + length.Y/4. }
-                let p4 = {X=BR.X;Y= TL.Y + length.Y/4.}
-                let p5 = {X=BR.X;Y=BR.Y - length.Y/4.}
-                let p6 = {X =BR.X - length.X/4.;Y=BR.Y - length.Y/4. }
-                let p7 = {X=TL.X + length.X/2.;Y=BR.Y}
-                let p8 = {X= TL.X; Y=BR.Y}
+                let tL,bR,middle,length = nonRotatedSymbolCoords
+                let p1 = tL
+                let p2 = {X = tL.X + length.X/2.; Y = tL.Y }
+                let p3 = {X = bR.X - length.X/4.; Y = tL.Y + length.Y/4. }
+                let p4 = {X = bR.X ; Y = tL.Y + length.Y/4.}
+                let p5 = {X=bR.X;Y=bR.Y - length.Y/4.}
+                let p6 = {X = bR.X - length.X/4.; Y = bR.Y - length.Y/4. }
+                let p7 = {X = tL.X + length.X/2.; Y = bR.Y }
+                let p8 = {X = tL.X; Y = bR.Y }
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y p7.X p7.Y p8.X p8.Y
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
             let drawIOlabel =
-                let TL,BR,middle,length = nonRotatedSymbolCoords
-                let p1 = {X=TL.X ; Y = TL.Y + length.Y/2.}
-                let p2 = {X=TL.X + length.X/4.;Y=TL.Y}
-                let p3 = {X =BR.X - length.X/4.; Y = TL.Y}
-                let p4 = {X=BR.X;Y= TL.Y + length.Y/2.}
-                let p5 = {X=BR.X - length.X/4.;Y = BR.Y}
-                let p6 = {X =TL.X + length.X/4.;Y=BR.Y }
-                //let p7 = {X=TL.X + length.X/2.;Y=BR.Y}
-                //let p8 = {X= TL.X; Y=BR.Y}
+                let tL,bR,middle,length = nonRotatedSymbolCoords
+                let p1 = { X = tL.X ; Y = tL.Y + length.Y/2.}
+                let p2 = { X = tL.X + length.X/4. ; Y = tL.Y }
+                let p3 = { X = bR.X - length.X/4.; Y = tL.Y }
+                let p4 = { X = bR.X; Y = tL.Y + length.Y/2. }
+                let p5 = { X = bR.X - length.X/4. ; Y = bR.Y }
+                let p6 = { X = tL.X + length.X/4. ; Y = bR.Y }
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f " p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y 
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
@@ -955,7 +953,7 @@ let private renderObj =
                 match sym.GenericType with
                 | Wires -> List.concat [wires; triangles]
                 | IO -> [io]
-                | IOLabel ->[drawIOlabel]
+                | IOLabel -> [drawIOlabel]
                 | Const -> [drawconst]
                 | BusSelect -> [drawBusSelect]
                 | _ -> [displayBox]
