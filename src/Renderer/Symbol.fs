@@ -864,10 +864,8 @@ let private renderObj =
                     SVGAttr.StrokeWidth 0.5][]
 
             let title = 
-                let mid = {X=midSymX sym; Y = midSymY sym}
-               
+                let mid = midSym sym              
                 let xLength = sym.BotR.X - sym.TopL.X
-            
                 let yLength =  sym.BotR.Y - sym.TopL.Y
                 let pos =
                     match sym.GenericType with
@@ -902,22 +900,21 @@ let private renderObj =
             let drawconst: ReactElement = 
                 let middle = midSym sym
 
+                ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical flipped
                 let length = match sym.Rotation with
                                 |R0 ->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
                                 |R180->{X= sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y}
-                                |_->{X =  sym.BotR.Y - sym.TopL.Y;Y= sym.BotR.X - sym.TopL.X; }
-                let xLength = length.X
-                let yLength = length.Y                
-                let TL = {X= middle.X - xLength/2. ; Y= middle.Y - yLength/2. }
-                let BR = {X= middle.X + xLength/2. ; Y= middle.Y + yLength/2. }
-                
+                                |_->{X =  sym.BotR.Y - sym.TopL.Y;Y= sym.BotR.X - sym.TopL.X; }                             
+                let TL = {X= middle.X - length.X/2. ; Y= middle.Y - length.Y/2. }
+                let BR = {X= middle.X + length.X/2. ; Y= middle.Y + length.Y/2. }
                 let p1 = {X = TL.X ; Y = TL.Y}
-                let p2 = {X = TL.X + ( (2./3.)*xLength ); Y = TL.Y + yLength/2. }
-                let p3 = {X = BR.X ; Y = TL.Y + yLength/2. }
-                let p4 = {X = TL.X + ( (2./3.)*xLength ); Y = TL.Y + yLength/2. }
+                let p2 = {X = TL.X + ( (2./3.)*length.X ); Y = TL.Y + length.Y/2. }
+                let p3 = {X = BR.X ; Y = TL.Y + length.Y/2. }
+                let p4 = {X = TL.X + ( (2./3.)*length.X ); Y = TL.Y + length.Y/2. }
                 let p5 = {X= TL.X; Y= BR.Y}
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
+
 
             let symDraw = 
                 match sym.GenericType with
