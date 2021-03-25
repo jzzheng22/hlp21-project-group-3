@@ -670,6 +670,7 @@ let init () =
         (createSymbol (ComponentType.RAM memory) (findPortList 1 1 (ComponentType.RAM memory)) {X = 500.; Y = 300.} 0 (getSymLabel (ComponentType.RAM memory) 0))
         (createSymbol (ComponentType.Custom custom) (findPortList (List.length custom.InputLabels) (List.length custom.OutputLabels) (ComponentType.Custom custom)) {X = 20.; Y = 300.} 0 (getSymLabel (ComponentType.Custom custom) 0))
         (createSymbol (ComponentType.Constant (2,3) ) (findPortList 0 1 (ComponentType.Constant (2,3)) ) {X = 600.; Y = 300.} 0 (getSymLabel (ComponentType.Constant (2,3)) 22) )
+        (createSymbol (ComponentType.Constant (2, -2147483648) ) (findPortList 0 1 (ComponentType.Constant (2, -2147483648)) ) {X = 600.; Y = 300.} 0 (getSymLabel (ComponentType.Constant (2, -2147483648)) 522) )
     ]
     , Cmd.none
 
@@ -860,7 +861,12 @@ let private renderObj =
                     SVGAttr.Stroke strokeColour
                     SVGAttr.StrokeWidth 0.5][]
 
-            let title = drawText (midSymX sym) (midSymY sym) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
+            let title = 
+                let xLength = sym.BotR.X - sym.TopL.X
+                match sym.GenericType with
+                |Const -> drawText (sym.TopL.X + (xLength/4.) ) (midSymY sym) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
+                |_ -> drawText (midSymX sym) (midSymY sym) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
+            
             
             let symLabel = drawText (midSymX sym) (sym.TopL.Y - 10.) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Label]
             
