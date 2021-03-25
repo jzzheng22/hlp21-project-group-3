@@ -665,6 +665,7 @@ let init () =
         (createSymbol (ComponentType.DFFE) (findPortList 1 1 ComponentType.DFFE) {X = 500.; Y = 200.} 0 (getSymLabel ComponentType.DFFE 0))
         (createSymbol (ComponentType.RAM memory) (findPortList 1 1 (ComponentType.RAM memory)) {X = 500.; Y = 300.} 0 (getSymLabel (ComponentType.RAM memory) 0))
         (createSymbol (ComponentType.Custom custom) (findPortList (List.length custom.InputLabels) (List.length custom.OutputLabels) (ComponentType.Custom custom)) {X = 20.; Y = 300.} 0 (getSymLabel (ComponentType.Custom custom) 0))
+        (createSymbol (ComponentType.Constant (2,3) ) (findPortList 0 1 (ComponentType.Constant (2,3)) ) {X = 600.; Y = 300.} 0 (getSymLabel (ComponentType.Constant (2,3)) 22) )
     ]
     , Cmd.none
 
@@ -877,6 +878,20 @@ let private renderObj =
                     |> List.map(fun (i, _) -> drawCircle sym (displace -5. i sym) "purple" "purple" 0.4 1.[])
                 else []
             
+            let drawconst = 
+                let TL = sym.TopL
+                let BR = sym.BotR
+                let yLength =  BR.Y - TL.Y
+                let xLength = BR.X - TL.X
+                let middle = {X= TL.X + xLength/2.; Y= TL.Y + yLength/2.}
+                let p1 = {X = TL.X ; Y = TL.Y}
+                let p2 = {X = TL.X + ( (2./3.)*xLength ); Y = TL.Y + yLength/2. }
+                let p3 = {X = BR.X ; Y = TL.Y + yLength/2. }
+                let p4 = {X = TL.X + ( (2./3.)*xLength ); Y = TL.Y + yLength/2. }
+                let p5 = {X= TL.X; Y= BR.Y}
+                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y
+                drawPolygon stringPoints strokeColour color 1. (rotSide sym middle)
+
             let symDraw = 
                 match sym.GenericType with
                 | Wires -> List.concat [wires; triangles]
