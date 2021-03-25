@@ -237,22 +237,26 @@ let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
     let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel
     {model with Wire = sModel}, Cmd.batch [ Cmd.map Wire wCmd; Cmd.map Wire sCmd ]
 
+let splitStrings (str : string) : string list =
+    str.Split [|'\n'|]
+    |> Seq.toList
+
 let drawError (msg : string) : ReactElement = 
-    let drawBox = 
+    let drawBox (n : int) = 
         rect[
             X 0
             Y 0
-            SVGAttr.Height 30.
+            SVGAttr.Height (n * 10)
             SVGAttr.Width (String.length msg * 7)
             SVGAttr.Fill "red"
             SVGAttr.Stroke "red"
             SVGAttr.Opacity 0.5
             SVGAttr.StrokeWidth 1.][]
 
-    let drawText = 
+    let drawText (i : int) (msg : string) = 
         text[
             X 0
-            Y 0
+            Y (i * 10)
             Style[
                 TextAnchor "start"
                 DominantBaseline "hanging"
@@ -260,8 +264,15 @@ let drawError (msg : string) : ReactElement =
                 FontWeight "bold"
                 Fill "Black"
                 UserSelect UserSelectOptions.None]][str <| msg] //Prevent highlighting text
-        
-    g[][drawBox; drawText]
+    
+    let messages =
+        splitStrings msg
+        |> List.mapi drawText
+
+    let box = 
+        drawBox (List.length (splitStrings msg))
+
+    g[](List.concat[[box]; messages])
 
 /// This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
