@@ -184,20 +184,21 @@ let snapRot (oldRot : int) : Rotation =
     elif rot > 45 then R90
     else R0
 
+///increment rotation by 90
 let incrementRot (oldRot : Rotation) : Rotation = 
     match oldRot with
     | R0 -> R90
     | R90 -> R180
     | R180 -> R270
     | R270 -> R0
-
+///update rotation to the nearest 90 degree.
 let updateRot (rot : int) (oldRot : Rotation) : Rotation =
     match (snapRot rot) with  
     | R0 -> oldRot
     | R90 -> incrementRot oldRot
     | R180 -> incrementRot oldRot |> incrementRot
     | R270 -> incrementRot oldRot |> incrementRot |> incrementRot
-
+///convert rotation DU to int
 let rotToInt (rot : Rotation) : int =
     match rot with 
     | R0 -> 0
