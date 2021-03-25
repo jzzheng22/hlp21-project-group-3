@@ -191,7 +191,7 @@ let incrementRot (oldRot : Rotation) : Rotation =
     | R90 -> R180
     | R180 -> R270
     | R270 -> R0
-///update rotation to the nearest 90 degree.
+///update rotation to the nearest 90 degree.Outputs rotation DU
 let updateRot (rot : int) (oldRot : Rotation) : Rotation =
     match (snapRot rot) with  
     | R0 -> oldRot
@@ -806,6 +806,7 @@ let private renderObj =
                 | Wires -> 
                     if sym.HighlightError then "red"
                     elif sym.Highlight then "purple"
+                    elif sym.PortHighlight then "green"
                     else "darkgrey"
                 | _ -> 
                     if sym.HighlightError then "red"
