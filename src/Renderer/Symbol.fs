@@ -35,6 +35,7 @@ type SymbolType =
     | FF
     | FFE
     | RAM
+    | Const
 
 type GenericPort =
     | InOut
@@ -94,7 +95,7 @@ type Msg =
 /// Takes a component type and returns info (label, buswidth in, buswidth out, generic symbol type)
 let typeToInfo (compType : ComponentType) : (string * string * int * int * SymbolType) =
     match compType with
-    | ComponentType.Constant (x, y) -> ("C",(string(y)), x, x, LogMem) //This is a buffer right?
+    | ComponentType.Constant (x, y) -> ("C",(string(y)), x, x, Const) //This is a buffer right?
     | ComponentType.Not -> ("NOT", "1", 1, 1, LogMem)
     | ComponentType.And -> ("AND", "&", 1, 1, LogMem)
     | ComponentType.Or -> ("OR", ">=", 1, 1, LogMem)
@@ -492,6 +493,7 @@ let createLabelName (genPort : GenericPort) (portType : PortType) (compType : Co
                 match portType with 
                 | PortType.Input -> sprintf "%s" (fst(List.item i y.InputLabels))
                 | PortType.Output -> sprintf "%s" (fst(List.item i y.OutputLabels))
+            
             | _ ->
                 match portType with 
                 | PortType.Input -> sprintf "IN%d" i
@@ -878,7 +880,7 @@ let private renderObj =
                     |> List.map(fun (i, _) -> drawCircle sym (displace -5. i sym) "purple" "purple" 0.4 1.[])
                 else []
             
-            let drawconst = 
+            let drawconst: ReactElement = 
                 let TL = sym.TopL
                 let BR = sym.BotR
                 let yLength =  BR.Y - TL.Y
@@ -890,12 +892,13 @@ let private renderObj =
                 let p4 = {X = TL.X + ( (2./3.)*xLength ); Y = TL.Y + yLength/2. }
                 let p5 = {X= TL.X; Y= BR.Y}
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y
-                drawPolygon stringPoints strokeColour color 1. (rotSide sym middle)
+                drawPolygon stringPoints strokeColour color 1. (rotSide sym middle) []
 
             let symDraw = 
                 match sym.GenericType with
                 | Wires -> List.concat [wires; triangles]
                 | IO -> [io]
+                | Const -> [drawconst]
                 | _ -> [displayBox]
             
             g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos; drawClk])
