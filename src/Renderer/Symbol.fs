@@ -922,7 +922,7 @@ let private renderObj =
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
-            let drawBusSelect =
+            let drawBusSelect:ReactElement =
                 let TL,BR,middle,length = nonRotatedSymbolCoords
                 let p1 = TL
                 let p2 = {X=TL.X + length.X/2.;Y=TL.Y}
@@ -934,6 +934,20 @@ let private renderObj =
                 let p8 = {X= TL.X; Y=BR.Y}
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y p7.X p7.Y p8.X p8.Y
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
+
+            let drawIOlabel =
+                let TL,BR,middle,length = nonRotatedSymbolCoords
+                let p1 = {X=TL.X ; Y = TL.Y + length.Y/2.}
+                let p2 = {X=TL.X + length.X/4.;Y=TL.Y}
+                let p3 = {X =BR.X - length.X/4.; Y = TL.Y}
+                let p4 = {X=BR.X;Y= TL.Y + length.Y/2.}
+                let p5 = {X=BR.X - length.X/4.;Y = BR.Y}
+                let p6 = {X =TL.X + length.X/4.;Y=BR.Y }
+                //let p7 = {X=TL.X + length.X/2.;Y=BR.Y}
+                //let p8 = {X= TL.X; Y=BR.Y}
+                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f " p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y 
+                drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
+
 
             let symDraw = 
                 match sym.GenericType with
