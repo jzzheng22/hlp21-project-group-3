@@ -37,6 +37,7 @@ type SymbolType =
     | RAM
     | Const
     | BusSelect
+    
 
 type GenericPort =
     | InOut
@@ -952,7 +953,7 @@ let private renderObj =
             let symDraw = 
                 match sym.GenericType with
                 | Wires -> List.concat [wires; triangles]
-                | IO -> [io]
+                | IO -> [drawIOlabel]
                 | Const -> [drawconst]
                 | BusSelect -> [drawBusSelect]
                 | _ -> [displayBox]
