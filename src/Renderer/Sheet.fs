@@ -241,36 +241,37 @@ let splitStrings (str : string) : string list =
     str.Split [|'\n'|]
     |> Seq.toList
 
-let drawError (msg : string) : ReactElement = 
-    let drawBox (n : int) = 
-        rect[
-            X 0
-            Y 0
-            SVGAttr.Height (n * 10)
-            SVGAttr.Width (String.length msg * 7)
-            SVGAttr.Fill "red"
-            SVGAttr.Stroke "red"
-            SVGAttr.Opacity 0.5
-            SVGAttr.StrokeWidth 1.][]
+let drawBox (h : int) (len : int) = 
+    rect[
+        X 0
+        Y 0
+        SVGAttr.Height h
+        SVGAttr.Width len
+        SVGAttr.Fill "red"
+        SVGAttr.Stroke "red"
+        SVGAttr.Opacity 0.9
+        SVGAttr.StrokeWidth 1.][]
 
-    let drawText (i : int) (msg : string) = 
-        text[
-            X 0
-            Y (i * 10)
-            Style[
-                TextAnchor "start"
-                DominantBaseline "hanging"
-                FontSize 10.
-                FontWeight "bold"
-                Fill "Black"
-                UserSelect UserSelectOptions.None]][str <| msg] //Prevent highlighting text
-    
+let drawText (pos : int) (msg : string) (fontSize : int) = 
+    text[
+        X 0
+        Y pos
+        Style[
+            TextAnchor "start"
+            DominantBaseline "hanging"
+            FontSize fontSize
+            //FontWeight "bold"
+            Fill "#F1F227"
+            UserSelect UserSelectOptions.None]][str <| msg] //Prevent highlighting text
+
+let drawError (msg : string) : ReactElement = 
+    let fontSize = 10
     let messages =
         splitStrings msg
-        |> List.mapi drawText
+        |> List.mapi (fun i v -> drawText (i * fontSize) v fontSize)
 
     let box = 
-        drawBox (List.length (splitStrings msg))
+        drawBox (List.length (splitStrings msg) * fontSize) (String.length msg * (fontSize/2))
 
     g[](List.concat[[box]; messages])
 
