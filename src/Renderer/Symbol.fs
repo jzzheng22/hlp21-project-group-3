@@ -493,7 +493,9 @@ let createLabelName (genPort : GenericPort) (portType : PortType) (compType : Co
                 match portType with 
                 | PortType.Input -> sprintf "%s" (fst(List.item i y.InputLabels))
                 | PortType.Output -> sprintf "%s" (fst(List.item i y.OutputLabels))
-            
+            | ComponentType.Constant _ ->
+                match portType with
+                |_-> sprintf ""
             | _ ->
                 match portType with 
                 | PortType.Input -> sprintf "IN%d" i
