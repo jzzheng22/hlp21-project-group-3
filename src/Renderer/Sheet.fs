@@ -313,11 +313,11 @@ let mutable getSvgClientRect: (unit -> Types.ClientRect option) = (fun () -> Non
 let mouseDown model mousePos dispatch mDown =
     if model.AddingSymbol then
         dispatch <| SymbolAddFinish
-    elif mDown = 2. && not (List.isEmpty model.SelectedComponents) then 
+    elif mDown = 2. then 
         let wireSegmentIds = 
             BusWire.getBoundingBoxes model.Wire mousePos
             |> getWireSegmentIDList (List.filter (removeWireSegmentID inBoundingBox mousePos))
-        if List.isEmpty wireSegmentIds then 
+        if List.isEmpty wireSegmentIds  && not (List.isEmpty model.SelectedComponents) then 
             dispatch <| SelectLabel (validLabel model)
             dispatch <| SelectDragStart mousePos
         else 
