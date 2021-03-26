@@ -565,7 +565,6 @@ let addSymbol model =
         SelectingMultiple = false; 
         EditSizeOf = None}, Cmd.map Wire sCmd 
 
-
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
     | Wire wMsg ->
