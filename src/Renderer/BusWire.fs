@@ -367,11 +367,11 @@ let rec snapWireSegments  (currSrc:XYPos) (segLstOut:WireSegment List) (count:in
 /// Calculates and creates all wire segments
 let makeWireSegments (sm: Symbol.Model) (wId: CommonTypes.ConnectionId) (width: int) 
     (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : WireSegment list =
-    let portSrc= Symbol.getPortCoords sm sourcePortId
+    
     (routeWire sm sourcePortId targetPortId)
     |> List.pairwise
     |> List.map (fun (src,tgt) -> makeWireSegment wId 1 src tgt)
-    |> snapWireSegments portSrc [] 0 
+    
 
 
 /// Creates a new wire 
@@ -379,7 +379,8 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
     let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
     let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
-    let newSegments = makeWireSegments model.Symbol wId 1 srcPortId tgtPortId
+    let portSrc= Symbol.getPortCoords model.Symbol srcPortId
+    let newSegments = makeWireSegments model.Symbol wId 1 srcPortId tgtPortId |> snapWireSegments portSrc [] 0 
     let startHoriz = not (srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
     let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
             
