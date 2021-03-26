@@ -779,7 +779,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         let newPos oldPos =
             {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
 
-        let copyFold (model, cmd) compId =
+        let copySymbolFold (model, cmd) compId =
             let sym = Symbol.getSymbol model.Wire.Symbol compId
             let input, output = Symbol.getNumIOs sym
             let addMsg: Symbol.SymbolAdd = {
@@ -797,8 +797,27 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
 
 
 
-        List.fold copyFold ({model with SelectedComponents = []; CopyingSymbol = true}, Cmd.none) oldComponents
-        
+        List.fold copySymbolFold ({model with SelectedComponents = []; CopyingSymbol = true}, Cmd.none) oldComponents
+        // {model with sModel}
+        // let copyConnectionFold (model, cmd) wireId =
+        //     // let sym = Symbol.getSymbol model.Wire.Symbol compId
+        //     // let input, output = Symbol.getNumIOs sym
+        //     // let addMsg: Symbol.SymbolAdd = {
+        //     //     CompType = sym.Type
+        //     //     PagePos = newPos sym.TopL
+        //     //     Input = input
+        //     //     Output = output
+        //     //     Index = getNewSymbolIndex model sym.Type}
+        //     let wModel, wCmd = BusWire.update (BusWire.AddWire addMsg) model.Wire 
+        //     {model with 
+        //         Wire = wModel; 
+        //         SelectedWireSegments = (List.head wModel.WX).Id :: model.SelectedWireSegments
+        //         AddingSymbol = true;    
+        //     }, Cmd.batch[Cmd.map Wire sCmd; cmd]
+
+        // List.fold copyWireFold ({sModel with SelectedWireSegments = []; CopyingSymbol = true}, sCmd) oldConnections
+
+
 
 
 
