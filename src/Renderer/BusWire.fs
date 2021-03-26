@@ -70,6 +70,7 @@ type Msg =
     | UpdateWidth of (CommonTypes.ConnectionId * int Option) list
     | HighlightError of CommonTypes.ConnectionId list
     | AddSegment  of CommonTypes.ConnectionId * int * XYPos
+    | SnapWire of CommonTypes.ConnectionId * int 
 
 //-------------------Helpers for functions------------------------//
 
@@ -542,6 +543,7 @@ let segLength (seg: WireSegment): float =
     ||> Symbol.posDiff
     |> fun diff -> (sqrt diff.X ** 2. + diff.Y ** 2.)
 
+
 ///Returns true if first segment is shorter than offset (9.) and false otherwise
 let checkFirstSegmentLength (wire:Wire) (sm: Symbol.Model) =
     let src= Symbol.getPortCoords sm wire.SourcePortId
@@ -675,6 +677,10 @@ let moveWire (w:Wire) (vec:XYPos)=
     |> List.map (fun seg -> {seg with SourcePos= Symbol.posAdd seg.SourcePos vec
                                       ;TargetPos=Symbol.posAdd seg.TargetPos vec})
     
+
+let isHoriz (seg:WireSegment)= seg.SourcePos.Y=seg.TargetPos.Y
+
+
 // RULES FOR DECIDING WIRE ROUTING METHOD: 
 // Name must be of format routeRuleXXX
 // Must have signature Wire -> Symbol.Model -> bool
@@ -923,7 +929,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let humpSegments (seg:WireSegment)=
             addHumpVertices seg
             |> List.pairwise
-            |> List.map (fun (src,tgt) -> makeWireSegment id 1 src tgt)
+            |> List.map (fun (src,tgt) -> makeWireSegment id seg.Width src tgt)
             //|> setIndex
         let transformSeg(seg:WireSegment) =
             match seg.Index with 
@@ -946,6 +952,47 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             )
 
         {model with WX = wList}, Cmd.none
+    | SnapWire (wId, idx) -> 
+
+        let snap (pos:float)= (round (pos/ 10.))*10.
+        let badSnapSeg (seg:WireSegment) =
+            if isHoriz seg then
+                makeWireSegment wId seg.Width seg.SourcePos {X=snap seg.TargetPos.X ;Y=seg.TargetPos.Y}
+            else 
+                makeWireSegment wId seg.Width seg.SourcePos {X=seg.TargetPos.X ;Y= snap seg.TargetPos.Y}
+        let snapSeg (seg:WireSegment) (srcPos:XYPos)=
+            if isHoriz seg then
+                (makeWireSegment wId seg.Width srcPos {X=snap seg.TargetPos.X ;Y=srcPos.Y},{X=snap seg.TargetPos.X ;Y=srcPos.Y})
+            else 
+                (makeWireSegment wId seg.Width srcPos {X=srcPos.X ;Y= snap seg.TargetPos.Y},{X=srcPos.X ;Y= snap seg.TargetPos.Y})
+
+        let rec snapWireSegments (w:Wire) (currSrc:XYPos) (segLstOut:WireSegment List) (count:int)=
+
+            match count with 
+            | x when x= List.length w.Segments -> segLstOut
+            | _ -> 
+                let newSeg=fst (snapSeg (w.Segments.[count]) currSrc)
+                let newSrc=snd (snapSeg (w.Segments.[count]) currSrc)
+                snapWireSegments w newSrc (segLstOut@[newSeg]) (count + 1)
+        
+        let badSnap (w:Wire) =
+            w.Segments
+            |> List.map badSnapSeg
+
+
+        let wList=    
+            model.WX
+            |> List.map (fun w -> 
+                if w.Id = wId then
+                    let portSrc= Symbol.getPortCoords model.Symbol (w.SourcePortId)
+                    {w with Segments=snapWireSegments w portSrc [] 0}
+                    //{w with Segments=badSnap w}       
+                else 
+                    w
+            )
+        {model with WX = wList}, Cmd.none
+        
+
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
 
         

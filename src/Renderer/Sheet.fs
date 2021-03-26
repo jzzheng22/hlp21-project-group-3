@@ -648,6 +648,15 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | SelectDragEnd ->
         if not (List.isEmpty model.SelectedComponents) then
             snapSymbolToGrid model
+
+        else if not (List.isEmpty model.SelectedWireSegments) then 
+            let wModel, wCmd = 
+                BusWire.update(BusWire.SnapWire(List.head model.SelectedWireSegments)) model.Wire
+            { model with 
+                    SelectedPort = None, CommonTypes.PortType.Input
+                    SelectingMultiple = false 
+                    EditSizeOf = None
+                    Wire=wModel}, Cmd.map Wire wCmd
         else
             match model.EditSizeOf with 
             | Some id ->
@@ -661,6 +670,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                     SelectedPort = None, CommonTypes.PortType.Input;
                     SelectingMultiple = false 
                     EditSizeOf = None}, Cmd.none
+             
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
     | MoveElements mousePos ->
