@@ -36,10 +36,7 @@ let editMenu dispatch =
         invisibleMenu.label <- "Edit"
         invisibleMenu.visible <- true // false if you want keys but no "Edit" menu
         invisibleMenu.submenu <-
-            [|(*makeKeyItem "Default" "CmdOrCtrl+S" (fun () -> dispatch KeyboardMsg.CtrlS)
-               makeKeyItem "Red" "Alt+Z" (fun () -> dispatch KeyboardMsg.AltZ)
-               menuSeparator*)
-               makeKeyItem "Zoom Canvas In" "CmdOrCtrl+]" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
+            [| makeKeyItem "Zoom Canvas In" "CmdOrCtrl+]" (fun () -> dispatch KeyboardMsg.ZoomCanvasIn)
                makeKeyItem "Zoom Canvas Out" "CmdOrCtrl+[" (fun () -> dispatch KeyboardMsg.ZoomCanvasOut)
                menuSeparator
                makeKeyItem "Print Statistics" "Alt+Shift+Z" (fun () -> dispatch KeyboardMsg.AltShiftZ)
@@ -68,8 +65,6 @@ let symbolMenu dispatch =
                makeKeyItem "Magnify" "Alt+M" (fun () -> dispatch KeyboardMsg.SymbolMagnify)
                makeKeyItem "Shrink"  "Alt+D" (fun () -> dispatch KeyboardMsg.SymbolShrink)
                makeKeyItem "Copy"  "CmdOrCtrl+Shift+C" (fun () -> dispatch KeyboardMsg.CtrlShiftC)
-               makeKeyItem "Cut"  "CmdOrCtrl+Shift+X" (fun () -> dispatch KeyboardMsg.CtrlShiftX)
-               makeKeyItem "Paste"  "CmdOrCtrl+Shift+V" (fun () -> dispatch KeyboardMsg.CtrlShiftV)
                makeKeyItem "Cancel"  "Esc" (fun () -> dispatch KeyboardMsg.Esc)
 
             |]

@@ -941,19 +941,8 @@ let getWireSegList (wireId : CommonTypes.ConnectionId) (wModel : Model) : ( Comm
     |> function
     | Some wire -> 
         List.map (fun segment -> segment.wId, segment.Index) wire.Segments
-        // List.collect (fun wire -> 
-            // List.map (fun segment -> 
-                // (segment.wId, segment.Index)) wire.Segments)
     | None -> failwithf "Could not find wire"
 
-
-    // //     wModel.WX
-    // |> List.collect (fun w->
-    //                 List.map (fun (segment:WireSegment)->
-    //                             ( segment.wId,segment.Index,fst segment.BB, snd segment.BB))w.Segments)
-
-                    // List.map (fun (segment:WireSegment)->
-                                // ( segment.wId,segment.Index,fst segment.BB, snd segment.BB))w.Segments)
 //----------------------interface to Issie-----------------------//
 
 /// Converts a wire segment list into a list of distinct vertices

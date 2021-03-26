@@ -39,8 +39,6 @@ type KeyboardMsg =
     | SymbolMagnify
     | SymbolShrink 
     | CtrlShiftC
-    | CtrlShiftX
-    | CtrlShiftV
     | Esc
 
 type Msg =
@@ -68,15 +66,6 @@ type MouseOps =
     | MouseDown
     | MouseUp
     | MouseMove
-
-// type SymbolAdd = {
-//     CompType : CommonTypes.ComponentType
-//     PagePos: XYPos
-//     Input: int
-//     Output: int
-//     Index: int    
-// }
-
 
 let origin = { X = 0.; Y = 0. }
 
@@ -133,7 +122,7 @@ let dispatchSelection toggle symbolIDList wireSegmentIDList (dispatch: Dispatch<
         dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
 
 
-///Finds symmetric difference of 2 lists i.e. (A - B) U (B - A)
+/// Finds symmetric difference of 2 lists i.e. (A - B) U (B - A)
 let symmetricDifference list1 list2 = 
     let set1 = Set.ofList list1 
     let set2 = Set.ofList list2 
@@ -170,10 +159,6 @@ let filterWireListBySelectingMultiple model lst =
         if not (List.isEmpty missingWireIds) then
             List.filter (fun (id, _) -> not (List.contains id missingWireIds)) lst
         else
-        // Need to check that every segment is in bounding box
-        // Given list of tuples of wireID and segment index
-        // let allSegsInList 
-        
             id lst
 
 /// Selects elements inside the outer box
@@ -251,9 +236,7 @@ let validLabel (model : Model) =
 /// Converts the model into an Issie canvas state = (components, connections), and feeds this into buswidthinferer
 let inferWidth (model : Model) = 
     let comps = Symbol.extractComponents model.Wire.Symbol
-    printf"hello\n inferWidth comps:\n %A" comps
     let conns = BusWire.extractWires model.Wire
-    printf"hello\n inferWidth conns:\n %A" conns
     
     /// ----- Dirty fix for bug ----- ///
     let canvas = (comps, conns)
@@ -272,12 +255,10 @@ let getWires (model : Model) =
             conList 
             |> List.map (fun (x, _) -> x) 
             |> BusWire.getWires model.Wire
-        printf "hello UpdateWidth %A" conList
         let wModel, wCmd = BusWire.update (BusWire.UpdateWidth conList) model.Wire
         (conns, wModel, wCmd, None)
     | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
         let wires = e.ConnectionsAffected
-        printf "hello UpdateWidth Error \n Message: %s \n Connections: \n %A" e.Msg wires
         let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
         (wires, wModel, wCmd, Some e.Msg)
 
@@ -310,7 +291,6 @@ let drawText (pos : int) (msg : string) (fontSize : int) =
             TextAnchor "start"
             DominantBaseline "hanging"
             FontSize fontSize
-            //FontWeight "bold"
             Fill "#F1F227"
             UserSelect UserSelectOptions.None]][str <| msg] //Prevent highlighting text
 
@@ -420,38 +400,9 @@ let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : i
         |> List.max
         |> (+) 1
 
-    // | Add of compType: ComponentType * pagePos : XYPos * numIn : int * numOut : int * i : int 
-
-
-
-let pasteElements model mousePos dispatch = 
-    ()
-    // let oldComponents, oldConnections = model.Clipboard
-    // let firstSymbol = Symbol.getSymbol model.Wire.Symbol (List.head oldComponents)
-    // let oldPos = {X = firstSymbol.TopL.X; Y = firstSymbol.TopL.Y}
-    // let transVector = {X = mousePos.X - oldPos.X; Y = mousePos.Y - oldPos.Y}
-    // let newPos oldPos transVector =
-    //     {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
-    // // let newComponents = 
-    // oldComponents
-    // |> List.iter (fun compId -> 
-    //     let sym = Symbol.getSymbol model.Wire.Symbol compId
-    //     let input, output = Symbol.getNumIOs sym
-    //     let addMsg: Symbol.SymbolAdd = {
-    //         CompType = sym.Type
-    //         PagePos = newPos sym.TopL transVector
-    //         Input = input
-    //         Output = output
-    //         Index = getNewSymbolIndex model sym.Type}
-
-    //     dispatch <| Symbol(Symbol.Add addMsg))
-
 /// Handles down-press of mouse buttons.
 let mouseDown model mousePos dispatch mDown =
-    // if model.AddingSymbol then
-    // if not (List.isEmpty (fst model.Clipboard)) then
     if model.CopyingSymbol then
-        // pasteElements model mousePos dispatch
         dispatch <| SymbolAddFinish
         dispatch <| KeyPress CtrlShiftC
     elif model.AddingSymbol then
@@ -531,8 +482,6 @@ let mouseMove model mousePos dispatch mDown =
 
 
 let mDown (ev: Types.MouseEvent) = ev.buttons
-
-let kDown (ev: Types.KeyboardEvent) = ev.key
 
 let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (dispatch: Dispatch<Msg>) =
     let coordX = ev.clientX 
@@ -696,15 +645,6 @@ let deleteElements model =
     let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) wires))) newModel
     {deleteModel with Wire = sModel2; ErrorMsg = msg}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
 
-// let handleSelectDragEndMsg model =
-//     if not (List.isEmpty model.SelectedComponents) then
-//         snapSymbolToGrid model
-//     else
-//         { model with 
-//             SelectedPort = None, CommonTypes.PortType.Input;
-//             SelectingMultiple = false 
-//             EditSizeOf = None}, Cmd.none
-
 let getFirstSymbol model = List.head model.SelectedComponents
 let magnifyFactor = {X = 1.25; Y = 1.25}
 let shrinkFactor = {X = 0.8; Y = 0.8}
@@ -739,7 +679,69 @@ let addSymbol model =
         SelectingMultiple = false; 
         EditSizeOf = None}, Cmd.map Wire sCmd 
 
+let copyElements model =
+    let oldComponents, oldConnections = model.SelectedComponents, model.SelectedWireSegments
+    let firstSymbol = Symbol.getSymbol model.Wire.Symbol (List.head oldComponents)
+    let oldPos = {X = firstSymbol.TopL.X; Y = firstSymbol.TopL.Y}
+    let transVector = {X = model.DraggingPos.X - oldPos.X; Y = model.DraggingPos.Y - oldPos.Y}
+    let newPos oldPos =
+        {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
 
+    let copySymbolFold (model, cmd) compId =
+        let sym = Symbol.getSymbol model.Wire.Symbol compId
+        let input, output = Symbol.getNumIOs sym
+        let addMsg: Symbol.SymbolAdd = {
+            CompType = sym.Type
+            PagePos = newPos sym.TopL
+            Input = input
+            Output = output
+            Index = getNewSymbolIndex model sym.Type}
+        let sModel, sCmd = BusWire.update (BusWire.Symbol(Symbol.Add addMsg)) model.Wire 
+        {model with 
+            Wire = sModel; 
+            SelectedComponents = (List.head sModel.Symbol).Id :: model.SelectedComponents
+            AddingSymbol = true;    
+        }, Cmd.batch[Cmd.map Wire sCmd; cmd]
+
+    let newModel, newCmds = List.fold copySymbolFold ({model with SelectedComponents = []; CopyingSymbol = true}, Cmd.none) oldComponents
+    let newComponents = newModel.SelectedComponents
+    let mapPort (oldPort: CommonTypes.Port) (newPort: CommonTypes.Port) =
+        (CommonTypes.PortId oldPort.Id, CommonTypes.PortId newPort.Id)
+    let mapPorts oldCompId newCompId =
+        let oldComp = Symbol.getSymbol newModel.Wire.Symbol oldCompId
+        let newComp = Symbol.getSymbol newModel.Wire.Symbol newCompId
+        let inputs = 
+            (fst oldComp.IOList, fst newComp.IOList)
+            ||> List.map2 mapPort
+        let outputs = 
+            (snd oldComp.IOList, snd newComp.IOList)
+            ||> List.map2 mapPort
+        inputs @ outputs
+
+    let portMappings = 
+        (oldComponents, newComponents)
+        ||> List.map2 mapPorts
+        |> List.concat
+        |> Map.ofList
+
+    let mapToNewConnection (model, cmd) (wireId: CommonTypes.ConnectionId) =
+        let newPort portId =
+            match Map.tryFind portId portMappings with
+            | Some port -> port
+            | None -> failwithf "Could not find port ID in copy paste"
+        let oldStartPort, oldEndPort = BusWire.connectToPort model.Wire wireId
+        let newStartPort = newPort oldStartPort
+        let newEndPort = newPort oldEndPort
+        let wModel, wCmd = BusWire.update (BusWire.AddWire(newStartPort, newEndPort)) model.Wire
+        let newWireSegs = BusWire.getWireSegList (List.head wModel.WX).Id wModel
+        {model with 
+            Wire = wModel; 
+            SelectedWireSegments = newWireSegs @ model.SelectedWireSegments
+            AddingSymbol = true;    
+        }, Cmd.batch[Cmd.map Wire wCmd; cmd]
+    oldConnections
+    |> List.map (fun x -> fst x)
+    |> List.fold mapToNewConnection ({newModel with SelectedWireSegments = []; CopyingSymbol = true}, newCmds)
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -805,78 +807,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         vertAlignVector model
         |> alignComponents model
     | KeyPress CtrlShiftC ->
-        let oldComponents, oldConnections = model.SelectedComponents, model.SelectedWireSegments
-        let firstSymbol = Symbol.getSymbol model.Wire.Symbol (List.head oldComponents)
-        let oldPos = {X = firstSymbol.TopL.X; Y = firstSymbol.TopL.Y}
-        let transVector = {X = model.DraggingPos.X - oldPos.X; Y = model.DraggingPos.Y - oldPos.Y}
-        let newPos oldPos =
-            {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
+        copyElements model
 
-        let copySymbolFold (model, cmd) compId =
-            let sym = Symbol.getSymbol model.Wire.Symbol compId
-            let input, output = Symbol.getNumIOs sym
-            let addMsg: Symbol.SymbolAdd = {
-                CompType = sym.Type
-                PagePos = newPos sym.TopL
-                Input = input
-                Output = output
-                Index = getNewSymbolIndex model sym.Type}
-            let sModel, sCmd = BusWire.update (BusWire.Symbol(Symbol.Add addMsg)) model.Wire 
-            {model with 
-                Wire = sModel; 
-                SelectedComponents = (List.head sModel.Symbol).Id :: model.SelectedComponents
-                AddingSymbol = true;    
-            }, Cmd.batch[Cmd.map Wire sCmd; cmd]
-
-
-
-        let newModel, newCmds = List.fold copySymbolFold ({model with SelectedComponents = []; CopyingSymbol = true}, Cmd.none) oldComponents
-        let newComponents = newModel.SelectedComponents
-        let mapPort (oldPort: CommonTypes.Port) (newPort: CommonTypes.Port) =
-            (CommonTypes.PortId oldPort.Id, CommonTypes.PortId newPort.Id)
-        let mapPorts oldCompId newCompId =
-            let oldComp = Symbol.getSymbol newModel.Wire.Symbol oldCompId
-            let newComp = Symbol.getSymbol newModel.Wire.Symbol newCompId
-            let inputs = 
-                (fst oldComp.IOList, fst newComp.IOList)
-                ||> List.map2 mapPort
-            let outputs = 
-                (snd oldComp.IOList, snd newComp.IOList)
-                ||> List.map2 mapPort
-            inputs @ outputs
-
-        let portMappings = 
-            (oldComponents, newComponents)
-            ||> List.map2 mapPorts
-            |> List.concat
-            |> Map.ofList
-
-        let mapToNewConnection (model, cmd) (wireId: CommonTypes.ConnectionId) =
-            let newPort portId =
-                match Map.tryFind portId portMappings with
-                | Some port -> port
-                | None -> failwithf "Could not find port ID in copy paste"
-            let oldStartPort, oldEndPort = BusWire.connectToPort model.Wire wireId
-            let newStartPort = newPort oldStartPort
-            let newEndPort = newPort oldEndPort
-            let wModel, wCmd = BusWire.update (BusWire.AddWire(newStartPort, newEndPort)) model.Wire
-            let newWireSegs = BusWire.getWireSegList (List.head wModel.WX).Id wModel
-            {model with 
-                Wire = wModel; 
-                SelectedWireSegments = newWireSegs @ model.SelectedWireSegments
-                AddingSymbol = true;    
-            }, Cmd.batch[Cmd.map Wire wCmd; cmd]
-        oldConnections
-        |> List.map (fun x -> fst x)
-        |> List.fold mapToNewConnection ({newModel with SelectedWireSegments = []; CopyingSymbol = true}, newCmds)
-
-
-        // {model with Clipboard = model.SelectedComponents, model.SelectedWireSegments}, Cmd.none
-    | KeyPress CtrlShiftX ->
-        model, Cmd.none
-    | KeyPress CtrlShiftV ->
-        // pasteElements model
-        model, Cmd.none
     | KeyPress Esc ->
         {model with 
             SelectedPort = None, CommonTypes.PortType.Input
@@ -938,7 +870,6 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         if List.isEmpty model.SelectedComponents && List.isEmpty model.SelectedWireSegments then  
             model, Cmd.none
         else
-            printf "Set togglingselection to true"
             {model with TogglingSelection = true}, Cmd.none
     | ToggleSelectionClose -> {model with TogglingSelection = false}, Cmd.none
     | ToggleSymbols symbolIdList ->

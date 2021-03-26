@@ -1016,7 +1016,7 @@ let getPortType (symModel: Model) (pId : PortId) : PortType =
 /// Finds if a position lies on a port. Returns Some(position, portId) if found, none otherwise.
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     symModel
-    |>initPortSearch
+    |> initPortSearch
     |> List.filter (fun (_, port) -> getPortName port <> "Clk")
     |> List.tryFind (fun (v, _) -> testBox v pos)
     |> function
@@ -1090,13 +1090,6 @@ let getNumIOs (sym : Symbol) : (int * int) =
     | Adder -> (i - 1, o - 1)
     | Mux -> (i - 1, o)
     | _ -> (i, o)
-
-// let getIO (sId : ComponentId) (model : Model) = 
-//     model
-//     |> List.tryFind (fun sym -> sym.Id = sId)
-//     |> function
-//     | Some sym -> sym.IOList
-//     | None -> failwithf "couldnt find symbol"
     
 //----------------------interface to Issie-----------------------------//
 
