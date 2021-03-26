@@ -5,6 +5,7 @@
 
 ### Adding Symbols
 - Newly added symbol follows mouse movement and positions itself where the mouse first clicks. *Automatic snapping to grid*.
+- Each new symbol *comes with its own unique name label*.
 
 ### Selecting Symbols
 - May be done by: clicking on a symbol or dragging a box over multiple symbols.
@@ -25,6 +26,9 @@
 ### Aligning Selected Symbol Groups
 - May be done via drop-down menu or shortcuts: *Alt-X* for alignment along X-direction (horizontal); *Alt-Y* along Y-direction (vertical). Horizontally aligned symbols cannot be vertically aligned and vice versa.
 
+### Moving of ports and labels
+- Ports may be moved to other positions on the periphery of the symbol as per user convenience. This is done by holding down the right mouse button and dragging inwards, from a port towards the centre of the symbol. The port you drag is selected for movement.
+- The set of postions where the port can be moved will highlight in purple. To move the selected port to one of these positions, it must be dragged to the desired position while holding the right mouse button down.
 
 ## Wires
 
@@ -46,6 +50,9 @@
 - Routing can be manually adjusted by moving wire segments that aren't connected to any symbol port.
 - More segments can be added by right clicking on a wire - three additional segments will appear at the click position.
 
+### Adding Segments to Wires
+- When a user right-clicks on top of a wire, three new wire segments are genrated in the wire at the click position. This allows the user to have more flexibility in manual routing.
+
 ## Overall UI
 
 ### Zooming canvas
@@ -54,6 +61,11 @@
 ### Toggling Selection of Symbols
 - On holding down control, the app enters a "toggling" state. In this state, any unselected element that is selected (via click or drag) will become selected and highlighted, while selected elements will unselect and unhighlight. This is a feature similar to Windows OS.
 - This does not conflict with keyboard shortcuts.
+
+### Error Messages and Highlighting
+- When the user attempts to drag a wire between two ports of different width, the illegal connection and the two symbols on eitherr end are highlighted red.
+- A popup appears in the topleft corner of the screen explaining the cause of the error.
+- Both of the above changes disappear when the illegal connection/one or both of the connected symbols is deleted.
 
 ### Copy-Paste
 - INSERT EXPLANATION
