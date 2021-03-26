@@ -9,25 +9,31 @@
 
 ### Selecting Symbols
 - May be done by: 
-    - Clicking on a symbol 
+    - Clicking on a symbol.
     - Dragging a box over multiple symbols.
+    - Holding Ctrl and then mouse clicking
 
 ### Deleting Selected Symbols
 - May be done via drop-down menu or by pressing the 'delete' key.
-- Deleting a symbol deletes all connected wires and wire error messages.
+- Deleting a symbol deletes all connected wires and related wire error messages.
 
 ### Moving Selected Symbols
-- May be for a single symbol or for a group. Done by dragging a mouse (moving with left button down) so that selected symbols follow. *Automatic snapping to grid*.
+- Left click and drag the mouse
+- May be for a single symbol/wire or for a group.
+- *Automatic snapping to grid*.
 
 ### Transforming Symbols
 - **Rotation** - Can be done for selected symbol via drop-down menu or via shortcuts: Ctrl-E for clockwise and Ctrl-Q for anticlockwise rotation. Wire routing automatically adjusts.
 - **Scaling** - Interactive scaling by dragging from corner of selected/non-selected symbol. Selected symbol(s) can also be increased/decreased in side length by 1 grid square length at a time via drop down menu or shortcuts: ALt-M (magnify), ALt-D (diminish).
 - *All transformed symbols automatically snap to grid*. 
-- Ports do not automatically snap to grid after a scaling transformation, and require some user input to align correctly.
+- NOTE: Ports do not automatically snap to grid after a scaling transformation, and require some user input to align correctly.
 - Shrinking below a side length of one grid square length is not allowed.
 
 ### Aligning Selected Symbol Groups
-- May be done via drop-down menu or shortcuts: *Alt-X* for alignment along X-direction (horizontal); *Alt-Y* along Y-direction (vertical). Horizontally aligned symbols cannot be vertically aligned and vice versa.
+- May be done via drop-down menu or shortcuts:
+    - *Alt-X* for alignment along X-direction (horizontal)
+    - *Alt-Y* along Y-direction (vertical). 
+- Horizontally aligned symbols cannot be vertically aligned and vice versa.
 
 ### Moving of ports and labels
 - Ports may be moved to other positions on the periphery of the symbol as per user convenience. This is done by holding down the right mouse button at the location of the port and dragging in any direction.
