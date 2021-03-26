@@ -11,5 +11,5 @@ Code written by the group members for their individual modules may be found by n
 
 Documentation may be found in the [*doc*](doc) folder:
 - [*Features.md*](doc/Features.md) lists out the different features of our implementation of the Draw2D library as well as the user interface for each feature. **This is the single page summary of features desired for the assessment**.
-- [*External Interfaces.md*](doc/External Interfaces.md) is useful for future integration with ISSIE/ further development of code. It explains how the program could integrate with the existing ISSIE code e.g. the widthInferrer.
-- The folder [*Internal Interfaces*](doc/Internal Interfaces) contains the interfaces between the modules *Symbol.fs*, *BusWire.fs* and *Sheet.fs*. This is for reference.
+- [*External_Interfaces.md*](doc/External_Interfaces.md) is useful for future integration with ISSIE/ further development of code. It explains how the program could integrate with the existing ISSIE code e.g. the widthInferrer.
+- The folder [*Internal_Interfaces*](doc/Internal_Interfaces) contains the interfaces between the modules *Symbol.fs*, *BusWire.fs* and *Sheet.fs*. This is for reference.
