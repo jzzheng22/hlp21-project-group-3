@@ -21,7 +21,7 @@ type PortInfo =
     {
         Port: Port
         NumWires: int
-        Name : string
+        PortName : string
         Invert : bool
         Width : int
     }
@@ -48,7 +48,7 @@ type GenericPort =
     | Clk
     | Addr
 
-type Edge = Top | Bottom | Left | Right
+type Edge = Left | Right | Bottom | Top
 
 type Rotation = 
     | R0
@@ -76,13 +76,22 @@ type Symbol =
         Scale : XYPos
     }
 
+type SymbolAdd = {
+    CompType : ComponentType
+    PagePos: XYPos
+    Input: int
+    Output: int
+    Index: int    
+}
+
 type Model = Symbol list
 
 type Msg =
     /// Mouse info with coords adjusted form top-level zoom
     | MouseMsg of MouseT
     | Move of sIDList : ComponentId list * pagePos : XYPos
-    | Add of compType: ComponentType * pagePos : XYPos * numIn : int * numOut : int * i : int 
+    // | Add of compType: ComponentType * pagePos : XYPos * numIn : int * numOut : int * index : int 
+    | Add of addMsg: SymbolAdd
     | Delete of sIdList : ComponentId list
     | Highlight of sIdList: ComponentId list
     | HighlightError of sIdList: ComponentId list
@@ -302,7 +311,7 @@ let makePosList (n : int) (nBot : int) (topL : XYPos) (botR : XYPos) : (XYPos li
 //Functions for retrieving portinfo data from the option type:
 let getPortName (port : PortInfo Option) : string =
    match port with
-   | Some x -> x.Name
+   | Some x -> x.PortName
    | None -> "WHAT??"
 
 let getPortId (port : PortInfo Option) : PortId = 
@@ -328,7 +337,7 @@ let tagCoords (sym : Symbol) : string =
         (midX - 20. + (i + (a * 5.))) (midY - 10.) 
         (midX - 20. + (i + (a * 5.))) (midY + 10.) 
         (midX - ((i/7.) + (a * 10.))) (midY + 10.) 
-        (midX + 40. - ((i * 1.2) + (a * 5.))) midY 
+        (midX + 30. - ((i * 1.2) + (a * 5.))) midY 
         (midX - ((i/7.) + (a * 10.))) (midY - 10.))
 
 let cornerCoords (sym : Symbol) (i : XYPos) : XYPos = 
@@ -551,8 +560,16 @@ let makePort (i : int) (portType : PortType) (compId : ComponentId) : Port =
 
 let makeIssiePorts (l, r, b, t) (portType : PortType) : Port list =
     List.concat [l; r; b; t] 
-    |> List.filter (fun x -> x.Port.PortType = portType && x.Name <> "Clk") 
+    |> List.filter (fun x -> x.Port.PortType = portType && x.PortName <> "Clk") 
     |> List.map (fun x -> x.Port)
+
+let roundtoTen (x : float) : float = 
+    x + abs((x % 10.) - 10.)
+    
+let getWidth (width : float) (numPorts : float) =
+    let k =  (width - (10. * (numPorts - 1.) * (numPorts + 1.))) / (20. * (numPorts + 1.)) |> ceil
+    (20. * (numPorts + 1.) * k) + (10. * (numPorts - 1.) * (numPorts + 1.))
+
 //---------------------------------------------------------------------------//
 //----------------------helper initialisation funcs--------------------------//
 //---------------------------------------------------------------------------//
@@ -566,7 +583,7 @@ let createPortInfo (i : int) (portType : PortType) (compId : ComponentId) (name 
     {      
         Port = makePort i portType compId
         NumWires = 0
-        Name = name
+        PortName = name
         Invert = invert
         Width = w
     }
@@ -576,9 +593,6 @@ let portIndex (symType : SymbolType) (i : int) (len : int) (name : string) : int
     | FFE when name <> "D" && name <> "Q" -> len - 2
     | Mux when name = "S0" -> len - 1
     | _ -> i
-    
-let roundtoTen (n : float) : float = 
-    n + abs ((n % 10.) - 10.)
 
 /// Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) list list) (pos : XYPos) (index : int) (label : string) : Symbol =
@@ -598,6 +612,10 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
     let (leftPort, rightPort, botPort, topPort) = (portInfos.[0], portInfos.[1], portInfos.[2], portInfos.[3])
     let (left, right, bot, top) = (leftPort.Length, rightPort.Length, botPort.Length, topPort.Length)
 
+    let n = max left right |> float //The max number of ports initially will always be on the left or right of the box
+    let nBot = if bot > 0 || top > 0 then max bot top else (int (ratioHW * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
+    
+
     //Finding the length of labels/component name, there are 2 cases to consider
     //1. The sum of the labels on the top/bottom is larger than the component width
     //2. The max length of the label on the left/right * 2 , plus the name of the component is larger than the width
@@ -608,19 +626,21 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         max (max labelLens.[2] labelLens.[3]) ((max maxlens.[0] maxlens.[1])*2. + len) 
         |> (*) (float labelSize)
 
-    let n = max left right |> float //The max number of ports initially will always be on the left or right of the box
-    let nBot = if bot > 0 || top > 0 then max bot top else (int (ratioHW * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
     let h = 
         if left = 1 && right = 1 then 2. 
         else n + 1. 
         |> (*) (stdHeight)
+
+    //let testNum = if nBot % 2 = 0 then float nBot + 1. else float nBot
+    let testWidth = getWidth test (float nBot)
+    let standardWidth = getWidth (h * ratioHW) (float nBot)
+
     let w = 
         if bot <= 0 && top <= 0 then
-            max (ratioHW * h) test //Width is standard
-        else max ((float nBot) * stdHeight * 2.) test //Or width based on number of ports on the bottom
-        |> (+) 10.
-        |> roundtoTen
-    let botR = { X = pos.X + w; Y = pos.Y + h }
+            max standardWidth testWidth //Width is standard
+        else max ((float nBot) * stdHeight * 2.) testWidth //Or width based on number of ports on the bottom
+    let botR = {X = pos.X + w; Y = pos.Y + h}
+
     
     // ---- Making portMap ---- //
     let portMap = getPortMap leftPort rightPort botPort topPort (makePosList (int n) nBot pos botR)
@@ -688,8 +708,9 @@ let init () =
 
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     match msg with
-    | Add (compType, pagePos, numIn, numOut, i) ->
-        (createSymbol compType (findPortList numIn numOut compType) pagePos i (getSymLabel compType i)) :: model, Cmd.none
+    // | Add (compType, pagePos, numIn, numOut, index) ->
+    | Add addMsg ->
+        (createSymbol addMsg.CompType (findPortList addMsg.Input addMsg.Output addMsg.CompType) addMsg.PagePos addMsg.Index (getSymLabel addMsg.CompType addMsg.Index)) :: model, Cmd.none
 
     | Delete sIdList -> 
         List.filter (fun sym -> not (List.contains sym.Id sIdList)) model, Cmd.none
@@ -1007,7 +1028,7 @@ let getPortType (symModel: Model) (pId : PortId) : PortType =
 /// Finds if a position lies on a port. Returns Some(position, portId) if found, none otherwise.
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     symModel
-    |>initPortSearch
+    |> initPortSearch
     |> List.filter (fun (_, port) -> getPortName port <> "Clk")
     |> List.tryFind (fun (v, _) -> testBox v pos)
     |> function
@@ -1030,6 +1051,13 @@ let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (ComponentId * X
             |> Some
     | _ -> None
     
+
+let getSymbol (model : Model) (sId : ComponentId) : Symbol = 
+    model
+    |> List.tryFind (fun sym -> sym.Id = sId)
+    |> function
+    | Some sym -> sym
+    | None -> failwithf "Error in getSymbol, couldn't find symbol"
 
 //Returns a list of Port Ids for a given symbol
 let getPortIds (model : Model) (sId : ComponentId) : PortId list = 
@@ -1063,6 +1091,17 @@ let getPort (model : Model) (pId : PortId) : Port =
     |> function
     | Some x -> x.Port
     | None -> failwithf "Unexpected error in getPort"
+
+//Returns the number of inputs and outputs for a given symbol as a tuple
+let getNumIOs (sym : Symbol) : (int * int) =
+    let (inPorts, outPorts) = sym.IOList
+    let (i, o) = (List.length inPorts, List.length outPorts)
+    match sym.GenericType with
+    | RAM | FFE -> (i - 2, o)
+    | FF -> (i - 1, o)
+    | Adder -> (i - 1, o - 1)
+    | Mux -> (i - 1, o)
+    | _ -> (i, o)
     
 //----------------------interface to Issie-----------------------------//
 
