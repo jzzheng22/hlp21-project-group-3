@@ -49,6 +49,19 @@ Sheet can also access Symbol directly if needed.
  - XYPos is a translation vector.
  - Move wires in list by given translation vector.
 
+`UpdateWidth of (CommonTypes.ConnectionId * int Option) list`
+ - For each ConnectionID in the list, if the int is `Some x`, the width is updated to to `x`.
+ - If the int is `None`, there is no change.
+
+`HighlightError of CommonTypes.ConnectionId list`
+ - Highlights any wires in the list as having an error.
+
+`AddSegment of CommonTypes.ConnectionId * int * XYPos`
+- On a right-click, sends a message to BusWire to add a 'kink' (three short wire segments) to allow for easier manual routing.
+- Contains the ConnectionId, the current segment index, and the position on the page where the mouse was clicked.
+
+`SnapWire of CommonTypes.ConnectionId list`
+- Contains a list of ConnectionIds which need to be snapped to the nearest grid line.
 
 **To Symbol:** (see [symbol.md](./symbol.md) for description)
 
@@ -56,13 +69,25 @@ Sheet can also access Symbol directly if needed.
  - XYPos is a translation vector.
  - Move symbols in list by given translation vector.
 
-`Add of compType: CommonTypes.ComponentType * pagePos: XYPos * numIn: int * numOut: int`
+`Add of addMsg: SymbolAdd`
  - Adds a new symbol based on the provided information.
- - compType: type of component.
- - pagePos: location on canvas.
- - numIn: number of input ports.
-    - This number does not include any enable or clock signals
- - numOut: number of output ports.
+ - `Symbol.SymbolAdd` is a record type containing:
+
+   ```
+   type SymbolAdd = {
+      CompType : ComponentType
+      PagePos: XYPos
+      Input: int
+      Output: int
+      Index: int    
+   }
+   ```
+
+ - `CompType` is the component type.
+ - `PagePos` is where the top left corner of the symbol should be.
+ - `Input` and `Output` are the number of required input and output ports, respectively.
+    * `Input` does not include any enable or clock signals
+ - `Index` is the number at the end of the symbol label.
 
 `Delete of CommonTypes.ComponentId list`
  - Deletes all symbols whose IDs are in the list.
@@ -70,57 +95,84 @@ Sheet can also access Symbol directly if needed.
 
 `Highlight of CommonTypes.ComponentId list`
  - Highlights symbols in list.
- - See also later discussion.
+
+`HighlightError of sIdList: ComponentId list`
+ - Highlights symbols when they are in an error state.
+ - Sent from Sheet via BusWire.
 
 `HighlightPorts of CommonTypes.ComponentId list`
 - Highlight all ports of symbols in list.
 
-*Optional messages implemented in JEMerrick's Symbol:*
+`DragPort of sId : CommonTypes.ComponentId * pId : CommonTypes.PortId * pagePos: XYPos`
+ - Moves the selected port to the port position closest to the mouse.
+ - Ports have pre-specified locations where they can be moved to.
+
 `Rotate of sId : CommonTypes.ComponentId list * rot : int`
  - Rotates a list of symbols clockwise by `rot` degrees.
- - Unit of rotation is degrees, and limited to ints.
+ - Sent from Sheet via BusWire.
 
-`Scale of CommonTypes.ComponentId list * XYPos`
+`Scale of sId : CommonTypes.ComponentId list * scale : XYPos`
  - Scales a list of symbols by specified factor in X and Y directions.
  - Used to magnify, shrink, stretch and distort symbols.
-
-`HighlightError of sIdList: CommonTypes.ComponentId list`
- - Highlights symbols when they are in an error state.
  - Sent from Sheet via BusWire.
 
 `DisplaySlots of sId : ComponentId`
-- Displays all slots a port may be moved to on the component
+ - Highlights all possible positions a port may be moved to on the symbol
 
-`Rename of sId : ComponentId * name : string`
-- Changes the label on a component to the name given
+`Rename of sId : CommonTypes.ComponentId * name : string`
+- Changes the label of the component to a given string
 
-## BusWidthInferer interface
+## BusWidthInferer Interface
 
 `BusWidthInferer.inferConnectionsWidth ((comps,conns) : CanvasState) : Result<ConnectionsWidth, WidthInferError>`
-- Takes in a list of Issie Components and Issie Connections and returns 
-    * Ok x -> Some <Map<ConnectionId, int Option> | None
-    * Error {Msg : string; ConnectionsAffected : ConnectionId list}
-- In the first case where we have Ok x and Some y, we simply tell all the connections to update with the specified width
-- In the second case where we have Ok x and None, we ask Symbol what the width should be.
-    * If both port widths for the connection are equal, update the connection to that width
-    * If the port widths are not equal, then send the error highlight messages for the relavent connections/symbols
-- In the third case where we have Error then send the error highlight messages for the relavent connections/symbols
+- Takes in a list of ISSIE Components and ISSIE Connections and returns 
+    * `Ok x -> Some Map<ConnectionId, int Option> | None`
+    * `Error {Msg : string; ConnectionsAffected : ConnectionId list}`
+- In the first case where we have `Ok x` we simply tell all the connections to update with the specified width
+- In the second case where we have `Error` then send the error highlight messages for the relevant connections/symbols
+- Known issue and workaround:
+    - The `inferConnectionsWidth` returns only one error, even when multiple are present
+    - To overcome this, if an error is detected we call `inferConnectionsWidth` for each connection and concatenate the results.
 
 ## Interface Functions
 
+`BusWire.getWireSegList (wireId : CommonTypes.ConnectionId) (wModel : Model) : ( CommonTypes.ConnectionId * int) list`
+- Given a wireId and wire model, returns a list of tuples containing the wireId and the index of each segment for that wire.
+
 `BusWire.getBoundingBoxes (mouseCoord: XYPos) (model : Model)`
- - Returns list of `(id: CommonTypes.ComponentId * topLeft: XYPos * bottomRight: XYPos)`
- - Initially just returns all bounding boxes.
+ - Returns list of `(id: CommonTypes.ConnectionId * int * topLeft: XYPos * bottomRight: XYPos)`
+ - Returns all bounding boxes of each wire segment, as well their wire ID and wire segment index.
+
+`BusWire.extractWires (wModel : Model) : CommonTypes.Connection list`
+- This function will convert the wire model from the Wire datatype into the ISSIE-compliant Connection datatype
+
+`BusWire.getWires (wModel : Model) (cIdList : CommonTypes.ConnectionId list) : CommonTypes.ConnectionId list`
+- Takes a connectionId list and returns the connections in the model not in that list
+
+`BusWire.connectedSymbols (wModel : Model) (connect : CommonTypes.ConnectionId) : CommonTypes.ComponentId list`
+- Takes a ConnectionId and returns the Symbol IDs connected to that connection
+
+`BusWire.chooseWiresToUpdate (sIdList: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model)`
+- Calculates and returns the IDs of wires that must be updated using a provided list of symbols that have been updated.
 
 `BusWire.getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list`
  - Takes a list of PortIds as input and returns the IDs of all the wires connected to the supplied ports.
 
+`BusWire.connectToPort (wModel : Model) (connect : CommonTypes.ConnectionId) : (CommonTypes.PortId * CommonTypes.PortId)`
+ - Takes a ConnectionId and returns the (source port, target port) associated with that connection
+
 `Symbol.getBoundingBoxes (symbolModel : Model) (mouseCoord: XYPos)`
  - Returns list of `(id: CommonTypes.ComponentId * topleft: XYPos * bottomright: XYPos)`. Called by Sheet.
- - Initially returns all bounding boxes.
+ - Returns all bounding boxes.
 
 `Symbol.getPortType (symbolModel : Model) (portID: CommonTypes.PortId)`
  - Returns if port is input or output.
+
+`Symbol.isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
+ - Returns an option if the user clicked on a port label or not
+
+`Symbol.extractComponents (symModel: Model) : Component list`
+- Converts the model from a Symbol list to an ISSIE Component list
 
 `Symbol.isPort (symbolModel : Model) (portCoords: XYPos)`
  - Returns Option type indicating if mouse has clicked down on port. Called by Sheet.
@@ -137,19 +189,23 @@ Sheet can also access Symbol directly if needed.
 `Symbol.getBoundingBox symModel symID`
  - Returns the bounding box for a given Symbol ID
 
+`Symbol.getSymbol (model : Model) (sId : ComponentId) : Symbol`
+ - Takes in a Symbol model and a ComponentId, and returns the Symbol corresponding to that ComponentId.
+
+`Symbol.getNumIOs (sym : Symbol) : (int * int)`
+-Returns the number of inputs and outputs for a given symbol as a tuple
+
 ## Bounding Box
  - Each buswire and symbol owns its bounding box. 
  - Can be fully defined using top left and bottom right corners. 
  - Should be slightly bigger than each component to allow for negation bubble.
 
-**OPTION 1:** (Currently using this method)
 Sheet is able to access bounding boxes of BusWires and Symbols.
 `BusWire.getBoundingBoxes (wireModel: Model) (mouseCoord: XYPos)`
  - Return type: `(ID: CommonTypes.ConnectionId * topLeft: XYPos * bottomRight:  XYPos)`.
 
 `Symbol.getBoundingBoxes (symbolModel: Model) (mouseCoord: XYPos)`
  - Return type: `(ID: CommonTypes.ComponentId * topLeft: XYPos * bottomRight:  XYPos)`.
-
  - Sheet has coordinates of mouse/mouse click.
  - Sheet calls `getBoundingBoxes`, which returns a list of the bounding box of each component for that module.
  - Sheet performs exhaustive search to find which bounding box(es) are selected.
@@ -164,12 +220,6 @@ Potential Optimisations:
     - How to handle bounding boxes which overlap across multiple sections.
  - Sort list by coordinates (proximity to bounding box) - binary search.
     - Could return single bounding box instead of list.
-
-**OPTION 2**
- 1. Send coords to BusWire and Symbol.
- 2. BusWire and Symbol run through their list of components.
- 3. Return list of components where mouse coords inside bounding box.
- 4. Sheet sends highlight message to highlight components in those lists.
 
 ## Highlight
 On mouse click down (including click and drag):
@@ -196,9 +246,3 @@ On mouse click up: call `Symbol.isPort (symbolModel: Model) (mouseCoord: XYPos)`
  - `Some (portCoord: XYPos * portID: CommonTypes.PortID)`: tell BusWire to draw new wire.
  - `None`: don't draw.
 In all cases stop rendering the dotted line.
-
-## State outputs (extension)
- - Inferred width of wires (to BusWire and ISSIE)
-
-## Stretch Goals
-Zooming, snap-to-grid etc can hopefully be implemented without adding to the above existing interface.

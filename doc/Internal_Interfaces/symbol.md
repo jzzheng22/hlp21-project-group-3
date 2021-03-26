@@ -42,17 +42,26 @@ Each Symbol owns its ports.
 
 `Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
  - Returns the ComponentID which the PortID belongs to.
- - This function is also called by jzzheng22's Sheet
+ - NOTE: This function is currently a bottleneck in the system as it is called multiple times, and requires a linear search of all ports in the model
+    - To improve this some structural change in other modules would be needed 
+        - e.g. for a model to store the ports in use and relevant hostIds in a map/list
+        - Or for busWire to store the hostId in the Wire object
 
 `Symbol.getBoundingBox symModel symID`
  - Returns the bounding box for a given Symbol ID
  - Called in jzzheng22's Sheet
 
- `Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge'
+`Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge`
  - Returns the edge of the symbol that the port is on
 
- `isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
+`Symbol.isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
  - Returns an option if the user clicked on a port label or not
+
+`Symbol.getSymbol (model : Model) (sId : ComponentId) : Symbol`
+ - Takes in a Symbol model and a ComponentId, and returns the Symbol corresponding to that ComponentId.
+
+`Symbol.getNumIOs (sym : Symbol) : (int * int)`
+-Returns the number of inputs and outputs for a given symbol as a tuple
 
 ## Issie interface functions
 
@@ -116,21 +125,3 @@ Each Symbol owns its ports.
 
 `Rename of sId : CommonTypes.ComponentId * name : string`
 - Changes the label of the component to a given string
-
-## State Outputs
- - SymbolBBs (to Sheet and BusWire)
- - Symbol port positions (to Sheet and BusWire)
- - Symbol port type (to Sheet)
- - Symbol information (to BusWire)
- - Connections (with highlight info) (to ISSIE: extension)
-
-## Symbol needs to be able to do these:
- - Move symbol (from Sheet)
- - Delete symbols (from Sheet)
- - Add symbols (from Sheet and ISSIE)
- - Highlight symbols (from Sheet and ISSIE)
- - Change symbol (extension)
- - Init canvas (extension)
-
- ## Stretch Goals
- 
