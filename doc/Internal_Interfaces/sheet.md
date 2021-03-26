@@ -206,7 +206,6 @@ Sheet is able to access bounding boxes of BusWires and Symbols.
 
 `Symbol.getBoundingBoxes (symbolModel: Model) (mouseCoord: XYPos)`
  - Return type: `(ID: CommonTypes.ComponentId * topLeft: XYPos * bottomRight:  XYPos)`.
-
  - Sheet has coordinates of mouse/mouse click.
  - Sheet calls `getBoundingBoxes`, which returns a list of the bounding box of each component for that module.
  - Sheet performs exhaustive search to find which bounding box(es) are selected.
