@@ -772,12 +772,19 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         vertAlignVector model
         |> alignComponents model
     | KeyPress CtrlShiftC ->
+        let oldComponents, oldConnections = model.SelectedComponents, model.SelectedWireSegments
+        let firstSymbol = Symbol.getSymbol model.Wire.Symbol (List.head oldComponents)
+        let oldPos = {X = firstSymbol.TopL.X; Y = firstSymbol.TopL.Y}
+        let transVector = {X = model.DraggingPos.X - oldPos.X; Y = model.DraggingPos.Y - oldPos.Y}
+        let newPos oldPos =
+            {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
+
         let copyFold (model, cmd) compId =
             let sym = Symbol.getSymbol model.Wire.Symbol compId
             let input, output = Symbol.getNumIOs sym
             let addMsg: Symbol.SymbolAdd = {
                 CompType = sym.Type
-                PagePos = model.DraggingPos
+                PagePos = newPos sym.TopL
                 Input = input
                 Output = output
                 Index = getNewSymbolIndex model sym.Type}
@@ -788,7 +795,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                 AddingSymbol = true;    
             }, Cmd.batch[Cmd.map Wire sCmd; cmd]
 
-        let oldComponents, oldConnections = model.SelectedComponents, model.SelectedWireSegments
+
+
         List.fold copyFold ({model with SelectedComponents = []; CopyingSymbol = true}, Cmd.none) oldComponents
         
 
