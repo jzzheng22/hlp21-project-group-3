@@ -142,7 +142,6 @@ Sheet can also access Symbol directly if needed.
  - Can be fully defined using top left and bottom right corners. 
  - Should be slightly bigger than each component to allow for negation bubble.
 
-**OPTION 1:** (Currently using this method)
 Sheet is able to access bounding boxes of BusWires and Symbols.
 `BusWire.getBoundingBoxes (wireModel: Model) (mouseCoord: XYPos)`
  - Return type: `(ID: CommonTypes.ConnectionId * topLeft: XYPos * bottomRight:  XYPos)`.
@@ -164,12 +163,6 @@ Potential Optimisations:
     - How to handle bounding boxes which overlap across multiple sections.
  - Sort list by coordinates (proximity to bounding box) - binary search.
     - Could return single bounding box instead of list.
-
-**OPTION 2**
- 1. Send coords to BusWire and Symbol.
- 2. BusWire and Symbol run through their list of components.
- 3. Return list of components where mouse coords inside bounding box.
- 4. Sheet sends highlight message to highlight components in those lists.
 
 ## Highlight
 On mouse click down (including click and drag):
