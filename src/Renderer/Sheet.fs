@@ -340,7 +340,7 @@ let drawPortConnectionLine model =
                    FillOpacity 0.1 ] ] []
 
 /// Draws red circles on the corners of a Symbol's bounding box.
-let highlightCorners model box = 
+let highlightCorners model box colour = 
     let circleGen centre =  
         circle [
             Cx (centre.X)
@@ -348,7 +348,7 @@ let highlightCorners model box =
             R 5
             Style [
                 Stroke "black"
-                Fill "red"
+                Fill colour
             ]
         ] []
 
@@ -488,10 +488,13 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                             | Some e -> drawError e
                             | None -> ()
                             match model.EditSizeOf with 
-                            | Some id -> highlightCorners model (Symbol.getBoundingBox model.Wire.Symbol id)
+                            | Some id -> highlightCorners model (Symbol.getBoundingBox model.Wire.Symbol id) "blue"
                             | _ ->
-                                if model.SelectingMultiple then
-                                    drawSelectionBox model]
+                                match model.SelectedComponents with 
+                                | [] -> if model.SelectingMultiple then
+                                            drawSelectionBox model
+                                | symList -> highlightCorners model (Symbol.getBoundingBox model.Wire.Symbol symList.Head) "red"
+                                ]
         ] 
     ] 
 
