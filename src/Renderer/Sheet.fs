@@ -509,17 +509,28 @@ let changeSymbolSize model id mousePos =
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
 /// Moves a symbol so that it snaps to grid.
-let snapSymbolToGrid model =
+let snapToGrid model =
+
     let transVector =
-        Symbol.getBoundingBox model.Wire.Symbol (List.head model.SelectedComponents)
-        |> function
-        | (topL, _) ->
-            snapGridVector topL
-    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire 
+        match model.SelectedComponents with 
+        | hd::_ -> 
+            Symbol.getBoundingBox model.Wire.Symbol (hd)
+            |> function
+            | (topL, _) ->
+                snapGridVector topL
+        | [] -> {X=0. ; Y=0.}
+    
+
+    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire
+    let selectedWires= model.SelectedWireSegments |> List.map fst |> List.distinct
+    let wiresToSnap = BusWire.chooseWiresToUpdate model.SelectedComponents model.Wire sModel.Symbol @ selectedWires
+    let wModel, wCmd = 
+                BusWire.update(BusWire.SnapWire(wiresToSnap)) sModel
     { model with 
-        Wire = sModel;
+        Wire = wModel;
         SelectedPort = None, CommonTypes.PortType.Input;
-        SelectingMultiple = false }, Cmd.map Wire sCmd
+        SelectingMultiple = false; 
+        },Cmd.batch [Cmd.map Wire sCmd ;Cmd.map Wire wCmd]
 
 ///Top left corners of all symbols.
 let topleftCorners model =
@@ -606,7 +617,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                     BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 0.8; Y = 0.8}))) model.Wire
                 | _ -> 
                     failwithf "Unexpected input in symbol transformation."
-            let snapModel, snapCmd = snapSymbolToGrid {model with Wire = sModel}
+            let snapModel, snapCmd = snapToGrid {model with Wire = sModel}
             snapModel, Cmd.batch [ Cmd.map Wire sCmd; snapCmd]
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
@@ -646,10 +657,10 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               DraggingPos = dragMsg },
         Cmd.none
     | SelectDragEnd ->
-        if not (List.isEmpty model.SelectedComponents) then
-            snapSymbolToGrid model
-
-        else if not (List.isEmpty model.SelectedWireSegments) then 
+        if (not (List.isEmpty model.SelectedComponents) || not (List.isEmpty model.SelectedWireSegments) )then
+            snapToGrid model
+        (*
+        else if not (List.isEmpty model.SelectedWireSegments)then 
             let wModel, wCmd = 
                 BusWire.update(BusWire.SnapWire(List.head model.SelectedWireSegments)) model.Wire
             { model with 
@@ -657,11 +668,12 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                     SelectingMultiple = false 
                     EditSizeOf = None
                     Wire=wModel}, Cmd.map Wire wCmd
+        *)
         else
             match model.EditSizeOf with 
             | Some id ->
                 let previousComponents = model.SelectedComponents
-                let snapModel, cmd = snapSymbolToGrid {model with SelectedComponents = [id]}
+                let snapModel, cmd = snapToGrid {model with SelectedComponents = [id]}
                 { snapModel with 
                     SelectedComponents = previousComponents
                     EditSizeOf = None}, cmd
@@ -685,7 +697,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         {model with Wire = sModel}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
     | ErrorMsg msg -> model, Cmd.none
     | SymbolAddFinish ->
-        let snapModel, cmd = snapSymbolToGrid model
+        let snapModel, cmd = snapToGrid model
         {snapModel with SelectedComponents = []; AddingSymbol = false}, cmd
     | SelectLabel x -> 
         { model with SelectedLabel = x }, Cmd.none
