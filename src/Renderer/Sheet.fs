@@ -661,7 +661,7 @@ let deleteElements model =
 
     let (wires, newModel, wCmd2, msg) = getWires deleteModel
     let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) wires))) newModel
-    {deleteModel with Wire = sModel2; ErrorMsg = msg; CopyingSymbol = false; SelectingMultiple = false}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
+    {deleteModel with Wire = sModel2; ErrorMsg = msg; CopyingSymbol = false; SelectingMultiple = false; AddingSymbol = false}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
 
 let getFirstSymbol model = List.head model.SelectedComponents
 let magnifyFactor = {X = 1.25; Y = 1.25}
@@ -893,7 +893,8 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             model, Cmd.none
         else
             {model with TogglingSelection = true}, Cmd.none
-    | ToggleSelectionClose -> {model with TogglingSelection = false}, Cmd.none
+    | ToggleSelectionClose -> 
+        {model with TogglingSelection = false}, Cmd.none
     | ToggleSymbols symbolIdList ->
         let selectedSymbols = symmetricDifference symbolIdList model.SelectedComponents
         let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Highlight selectedSymbols)) model.Wire 
