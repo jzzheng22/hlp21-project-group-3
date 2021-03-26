@@ -680,8 +680,8 @@ let init () =
         (createSymbol (ComponentType.Custom custom) (findPortList (List.length custom.InputLabels) (List.length custom.OutputLabels) (ComponentType.Custom custom)) { X = 20.; Y = 300.} 0 (getSymLabel (ComponentType.Custom custom) 0))
         (createSymbol (ComponentType.Constant (2,3) ) (findPortList 0 1 (ComponentType.Constant (2,3)) ) { X = 600.; Y = 300.} 0 (getSymLabel (ComponentType.Constant (2,3)) 0) )
         (createSymbol (ComponentType.Constant (2, 5) ) (findPortList 0 1 (ComponentType.Constant (2, 5)) ) { X = 600.; Y = 300.} 0 (getSymLabel (ComponentType.Constant (2, 5)) 1) )
-        (createSymbol (ComponentType.BusSelection (2,2) ) (findPortList 1 1 (ComponentType.BusSelection (2,2)) ) { X = 700.; Y = 300.} 0 (getSymLabel (ComponentType.BusSelection (2,2)) 522) )
-        (createSymbol (ComponentType.IOLabel ) (findPortList 1 1 (ComponentType.IOLabel) ) { X = 800.; Y = 300.} 0 (getSymLabel (ComponentType.IOLabel) 522) )
+        (createSymbol (ComponentType.BusSelection (2,2) ) (findPortList 1 1 (ComponentType.BusSelection (2,2)) ) { X = 700.; Y = 300.} 0 (getSymLabel (ComponentType.BusSelection (2,2)) 0) )
+        (createSymbol (ComponentType.IOLabel ) (findPortList 1 1 (ComponentType.IOLabel) ) { X = 800.; Y = 300.} 0 (getSymLabel (ComponentType.IOLabel) 0) )
 
     ]
     , Cmd.none
