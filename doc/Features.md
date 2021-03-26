@@ -12,10 +12,10 @@
     - Clicking on a symbol.
     - Dragging a box over multiple symbols.
     - Holding `Ctrl` and then mouse clicking/dragging to select multiple
-- Upon selecting a symbol red circles will appear at the corners to show the user where to drag from to scale the symbol.
+- Upon selecting a symbol, red circles will appear at the corners to show the user where to drag from to scale the symbol.
 
 ### Deleting Selected Symbols
-- May be done via drop-down menu or by pressing the `delete` key.
+- May be done via drop-down menu or by pressing the `Delete` key.
 - Deleting a symbol deletes all connected wires and related wire error messages.
 
 ### Moving Selected Symbols
@@ -24,14 +24,14 @@
 - Automatic snapping to grid is supported for moving symbols.
 
 ### Transforming Symbols
-- **Rotation** - Can be done for selected symbol via drop-down menu or via shortcuts: `Ctrl-E` for clockwise and `Ctrl-Q` for anticlockwise rotation. Wire routing automatically adjusts.
+- **Rotation** - Can be done for selected symbol via drop-down menu or via shortcuts: `Ctrl-Q` for anticlockwise and `Ctrl-E` for clockwise rotation. Wire routing automatically adjusts.
 - **Scaling** 
     - Interactive scaling by dragging from corner of selected/non-selected symbol.
         - Upon selecting a symbol the corners will be highlighted with red cirlces
         - Upon selecting one of these circles, they will turn blue as feedback to the user
     - Selected symbol(s) can also be increased/decreased in side length by 1 grid square length at a time by
         - Selecting Magnify/Diminish in the drop down menu (found in Symbol dropdown options)
-        - Or with shortcuts: `ALt-M` (magnify), `ALt-D` (diminish).
+        - Or with shortcuts: `Alt-M` (magnify), `Alt-D` (diminish).
 - All transformed symbols automatically snap to grid. 
 - NOTE: Ports do not automatically snap to grid after a scaling transformation, and require some user input to align correctly.
 - Shrinking below a side length of one grid square length is not allowed.
@@ -45,7 +45,7 @@
 ### Moving of ports and labels
 - Ports may be moved to other positions on the periphery of the symbol as per user convenience. This is done by holding down the right mouse button at the location of the port and dragging in any direction.
 - The set of postions where the port can be moved will highlight in purple. Drag the mouse towards one of these locations. Upon mouse release the selected port will be moved (and possibly swapped with) the closest point to the mouse release position. 
-- NOTE: Known issue - Subsequent port move operations after the initial one require 2 tries to work. This is likely due to not updating the model in sheet correctly but currently unknown why this happens.
+- NOTE: Known issue - Subsequent port move operations after the initial one require 2 tries to work. This is likely due to not updating the model in Sheet correctly but currently unknown why this happens.
 
 ## Wires
 
@@ -62,7 +62,7 @@
 
 ### Deleting selected Wire(s)
 - Wires can be deleted by:
-    - Pressing the `delete` key 
+    - Pressing the `Delete` key 
     - Using drop down menu (found in Edit -> Delete)
 
 ### Routing
@@ -82,10 +82,10 @@
 ## Overall UI
 
 ### Zooming canvas
-- Via drop down menu or shortcuts: `Ctrl-Z` (zoom in) and `Ctrl-Y` (zoom out). Zooming is in steps of 1.25.
+- Via drop down menu or shortcuts: `Ctrl-[` (zoom out) and `Ctrl-[` (zoom in). Zooming is by factors of 1.25.
 
 ### Toggling Selection of Symbols
-- On holding down `Ctrl`, the app enters a "toggling" state. In this state, any unselected element that is selected (via click or drag) will become selected and highlighted, while selected elements will unselect and unhighlight. This is a feature similar to Windows OS.
+- On holding down `Ctrl`, the app enters a "toggling" state. In this state, any unselected element that is selected (via click or drag) will become selected and highlighted, while selected elements will unselect and unhighlight. 
 - This does not conflict with keyboard shortcuts.
 
 ### Error Messages and Highlighting
@@ -95,6 +95,7 @@
 
 ### Copy-Paste
 - First highlight the symbol(s) (and wire(s)), using the various selection options (drag, holding ctrl and clicking, clicking on a single symbol)
-- Press `Ctrl+C` to copy. A copy of the selected elements will move with the mouse.
+- Press `Ctrl-Shift-C` to copy. A copy of the selected elements will move with the mouse.
 - Click on the canvas where you want to paste. By default once the group of symbols and wires have been pasted, a new copy of these is generated that will move with the mouse.
-- To stop this repetitive pasting press `esc` or `delete` - or "Cancel" in the Symbol drop-down menu.
+- To stop this repetitive pasting press `Esc` or `Delete` - or "Cancel" in the Symbol drop-down menu.
+- Pressing `Esc` will keep the elements that have just been copied; `Del` will remove them.
