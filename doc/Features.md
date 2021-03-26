@@ -12,6 +12,7 @@
     - Clicking on a symbol.
     - Dragging a box over multiple symbols.
     - Holding `Ctrl` and then mouse clicking to select multiple
+- Upon selecting a symbol red circles will appear at the corners to show the user where to drag from to scale the symbol.
 
 ### Deleting Selected Symbols
 - May be done via drop-down menu or by pressing the `delete` key.
@@ -24,7 +25,13 @@
 
 ### Transforming Symbols
 - **Rotation** - Can be done for selected symbol via drop-down menu or via shortcuts: `Ctrl-E` for clockwise and `Ctrl-Q` for anticlockwise rotation. Wire routing automatically adjusts.
-- **Scaling** - Interactive scaling by dragging from corner of selected/non-selected symbol. Selected symbol(s) can also be increased/decreased in side length by 1 grid square length at a time via drop down menu or shortcuts: `ALt-M` (magnify), `ALt-D` (diminish).
+- **Scaling** 
+    - Interactive scaling by dragging from corner of selected/non-selected symbol.
+        - Upon selecting a symbol the corners will be highlighted with red cirlces
+        - Upon selecting one of these circles, they will turn blue as feedback to the user
+    - Selected symbol(s) can also be increased/decreased in side length by 1 grid square length at a time by
+        - Selecting Magnify/Diminish in the drop down menu (found in Symbol dropdown options)
+        - Or with shortcuts: `ALt-M` (magnify), `ALt-D` (diminish).
 - All transformed symbols automatically snap to grid. 
 - NOTE: Ports do not automatically snap to grid after a scaling transformation, and require some user input to align correctly.
 - Shrinking below a side length of one grid square length is not allowed.
