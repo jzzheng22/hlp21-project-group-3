@@ -218,6 +218,7 @@ let collectWidthErrors (comps : CommonTypes.Component list, conns : CommonTypes.
     let msgList = 
         errorList
         |> List.map (fun x -> x.Msg)
+        |> List.distinct
         |> String.concat "\n"
 
     let conList =
