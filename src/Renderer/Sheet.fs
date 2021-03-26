@@ -132,10 +132,12 @@ let dispatchSelection toggle symbolIDList wireSegmentIDList (dispatch: Dispatch<
         dispatch <| SelectWireSegments wireSegmentIDList
         dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
 
+
 ///Finds symmetric difference of 2 lists i.e. (A - B) U (B - A)
 let symmetricDifference list1 list2 = 
-    List.append list1 list2
-    |> List.distinct
+    let set1 = Set.ofList list1 
+    let set2 = Set.ofList list2 
+    Set.toList (Set.union ( Set.difference set1 set2 ) ( Set.difference set2 set1 ))
 
 let removeSymbolID predicate coords (_, a, b) = predicate coords (a, b)
 
@@ -549,12 +551,12 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                         | _ -> 
                             match model.ErrorMsg with
                             | Some e -> drawError e
-                            | None ->
-                                match model.EditSizeOf with 
-                                | Some id -> highlightCorners model (Symbol.getBoundingBox model.Wire.Symbol id)
-                                | _ ->
-                                    if model.SelectingMultiple then
-                                        drawSelectionBox model]
+                            | None -> ()
+                            match model.EditSizeOf with 
+                            | Some id -> highlightCorners model (Symbol.getBoundingBox model.Wire.Symbol id)
+                            | _ ->
+                                if model.SelectingMultiple then
+                                    drawSelectionBox model]
         ] 
     ] 
 
@@ -620,17 +622,22 @@ let changeSymbolSize model id mousePos =
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale scaleMsg)) model.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
-/// Moves a symbol so that it snaps to grid.
-let snapSymbolToGrid model =
-    let transVector =
-        Symbol.getBoundingBox model.Wire.Symbol (List.head model.SelectedComponents)
-        |> fst
-        |> snapGridVector
-    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire 
+/// Moves selected symbols so that they snap to grid.
+let snapSymbolsToGrid model =
+    let transVectors =
+        model.SelectedComponents
+        |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
+        |> List.map (function | (topL, _) -> snapGridVector topL)
+    let snapFold (inModel, inCmd) (id, vector) = 
+        let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move([id], vector))) inModel
+        sModel, Cmd.batch [inCmd; sCmd] 
+    let wModel, wCmd =     
+        List.zip model.SelectedComponents transVectors
+        |> List.fold snapFold (model.Wire, Cmd.none) 
     { model with 
-        Wire = sModel;
+        Wire = wModel;
         SelectedPort = None, CommonTypes.PortType.Input;
-        SelectingMultiple = false }, Cmd.map Wire sCmd
+        SelectingMultiple = false }, Cmd.map Wire wCmd
 
 
 let topleftCorners model =
@@ -663,14 +670,14 @@ let deleteElements model =
     let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) wires))) newModel
     {deleteModel with Wire = sModel2; ErrorMsg = msg}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
 
-let handleSelectDragEndMsg model =
-    if not (List.isEmpty model.SelectedComponents) then
-        snapSymbolToGrid model
-    else
-        { model with 
-            SelectedPort = None, CommonTypes.PortType.Input;
-            SelectingMultiple = false 
-            EditSizeOf = None}, Cmd.none
+// let handleSelectDragEndMsg model =
+//     if not (List.isEmpty model.SelectedComponents) then
+//         snapSymbolToGrid model
+//     else
+//         { model with 
+//             SelectedPort = None, CommonTypes.PortType.Input;
+//             SelectingMultiple = false 
+//             EditSizeOf = None}, Cmd.none
 
 let getFirstSymbol model = List.head model.SelectedComponents
 let magnifyFactor = {X = 1.25; Y = 1.25}
@@ -753,7 +760,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                     
                 | _ -> 
                     failwithf "Unexpected input in symbol transformation."
-            let snapModel, snapCmd = snapSymbolToGrid {model with Wire = sModel}
+            let snapModel, snapCmd = snapSymbolsToGrid {model with Wire = sModel}
             snapModel, Cmd.batch [ Cmd.map Wire sCmd; snapCmd]
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
@@ -850,12 +857,12 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         Cmd.none
     | SelectDragEnd ->
         if not (List.isEmpty model.SelectedComponents) then
-            snapSymbolToGrid model
+            snapSymbolsToGrid model
         else
             match model.EditSizeOf with 
             | Some id ->
                 let previousComponents = model.SelectedComponents
-                let snapModel, cmd = snapSymbolToGrid {model with SelectedComponents = [id]}
+                let snapModel, cmd = snapSymbolsToGrid {model with SelectedComponents = [id]}
                 { snapModel with 
                     SelectedComponents = previousComponents
                     EditSizeOf = None}, cmd
@@ -877,7 +884,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) newModel
         {model with Wire = sModel; ErrorMsg = msg}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
     | SymbolAddFinish ->
-        let snapModel, cmd = snapSymbolToGrid model
+        let snapModel, cmd = snapSymbolsToGrid model
         if model.CopyingSymbol then
             {snapModel with AddingSymbol = false}, cmd
         else
