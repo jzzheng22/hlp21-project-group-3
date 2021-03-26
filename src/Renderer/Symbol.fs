@@ -913,7 +913,8 @@ let private renderObj =
                 let p1 = { X = tL.X ; Y = tL.Y }
                 let p2 = { X = tL.X + 2. / 3. * length.X ; Y = tL.Y + length.Y / 2. }
                 let p3 = { X = bR.X ; Y = tL.Y + length.Y/2. }
-                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p2.X p2.Y p1.X p1.Y
+                let p4 = { X = tL.X ; Y = bR.Y }
+                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p2.X p2.Y p4.X p4.Y
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
             let drawBusSelect : ReactElement =
