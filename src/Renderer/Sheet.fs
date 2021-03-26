@@ -23,6 +23,7 @@ type Model =
       Clipboard: CommonTypes.ComponentId list * (CommonTypes.ConnectionId * int) list
       SelectedLabel: (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option
       ErrorMsg : string Option
+      CopyingSymbol: bool
     }
 
 type KeyboardMsg =
@@ -55,7 +56,6 @@ type Msg =
     | MoveElements of XYPos
     | BeginSizeEdit of CommonTypes.ComponentId
     | EditSize of (CommonTypes.ComponentId * XYPos)
-    | ErrorMsg of string
     | UpdateWidths 
     | SymbolAddFinish
     | SelectLabel of (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option
@@ -132,6 +132,11 @@ let dispatchSelection toggle symbolIDList wireSegmentIDList (dispatch: Dispatch<
         dispatch <| SelectWireSegments wireSegmentIDList
         dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
 
+///Finds symmetric difference of 2 lists i.e. (A - B) U (B - A)
+let symmetricDifference list1 list2 = 
+    List.append list1 list2
+    |> List.distinct
+
 let removeSymbolID predicate coords (_, a, b) = predicate coords (a, b)
 
 let removeWireSegmentID predicate coords (_, _, a, b) = predicate coords (a, b)
@@ -142,6 +147,7 @@ let filterBySelectingMultiple predicate lst =
         |> List.last
     else
         id lst
+
 
 /// Selects elements inside the outer box
 let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>) =
@@ -392,38 +398,37 @@ let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : i
 
 
 let pasteElements model mousePos dispatch = 
-    let oldComponents, oldConnections = model.Clipboard
-    let firstSymbol = Symbol.getSymbol model.Wire.Symbol (List.head oldComponents)
-    let oldPos = {X = firstSymbol.TopL.X; Y = firstSymbol.TopL.Y}
-    let transVector = {X = mousePos.X - oldPos.X; Y = mousePos.Y - oldPos.Y}
-    let newPos oldPos transVector =
-        {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
-    // let newComponents = 
-    oldComponents
-    |> List.iter (fun compId -> 
-        let sym = Symbol.getSymbol model.Wire.Symbol compId
-        let input, output = Symbol.getNumIOs sym
-        let addMsg: Symbol.SymbolAdd = {
-            CompType = sym.Type
-            PagePos = newPos sym.TopL transVector
-            Input = input
-            Output = output
-            Index = getNewSymbolIndex model sym.Type}
+    ()
+    // let oldComponents, oldConnections = model.Clipboard
+    // let firstSymbol = Symbol.getSymbol model.Wire.Symbol (List.head oldComponents)
+    // let oldPos = {X = firstSymbol.TopL.X; Y = firstSymbol.TopL.Y}
+    // let transVector = {X = mousePos.X - oldPos.X; Y = mousePos.Y - oldPos.Y}
+    // let newPos oldPos transVector =
+    //     {X = oldPos.X + transVector.X; Y = oldPos.Y + transVector.Y}
+    // // let newComponents = 
+    // oldComponents
+    // |> List.iter (fun compId -> 
+    //     let sym = Symbol.getSymbol model.Wire.Symbol compId
+    //     let input, output = Symbol.getNumIOs sym
+    //     let addMsg: Symbol.SymbolAdd = {
+    //         CompType = sym.Type
+    //         PagePos = newPos sym.TopL transVector
+    //         Input = input
+    //         Output = output
+    //         Index = getNewSymbolIndex model sym.Type}
 
-        dispatch <| Symbol(Symbol.Add addMsg))
+    //     dispatch <| Symbol(Symbol.Add addMsg))
 
-
-
-        // ()
-// let mouseDown model mousePos dispatch =
-//     if model.AddingSymbol then
-//         dispatch <| SymbolAddFinish
 /// Handles down-press of mouse buttons.
 let mouseDown model mousePos dispatch mDown =
-    if model.AddingSymbol then
+    // if model.AddingSymbol then
+    // if not (List.isEmpty (fst model.Clipboard)) then
+    if model.CopyingSymbol then
+        // pasteElements model mousePos dispatch
+        dispatch <| SymbolAddFinish
+        dispatch <| KeyPress CtrlShiftC
+    elif model.AddingSymbol then
         dispatch <| SymbolAddFinish     
-    elif not (List.isEmpty (fst model.Clipboard)) then
-        pasteElements model mousePos dispatch
     elif mDown = 2. && not (List.isEmpty model.SelectedComponents) then    
         dispatch <| SelectLabel (validLabel model)
         dispatch <| SelectDragStart mousePos
@@ -701,10 +706,7 @@ let addSymbol model =
         SelectingMultiple = false; 
         EditSizeOf = None}, Cmd.map Wire sCmd 
 
-///Finds symmetric difference of 2 lists i.e. (A - B) U (B - A)
-let symmetricDifference list1 list2 = 
-    List.append list1 list2
-    |> List.distinct
+
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
@@ -770,7 +772,29 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         vertAlignVector model
         |> alignComponents model
     | KeyPress CtrlShiftC ->
-        {model with Clipboard = model.SelectedComponents, model.SelectedWireSegments}, Cmd.none
+        let copyFold (model, cmd) compId =
+            let sym = Symbol.getSymbol model.Wire.Symbol compId
+            let input, output = Symbol.getNumIOs sym
+            let addMsg: Symbol.SymbolAdd = {
+                CompType = sym.Type
+                PagePos = model.DraggingPos
+                Input = input
+                Output = output
+                Index = getNewSymbolIndex model sym.Type}
+            let sModel, sCmd = BusWire.update (BusWire.Symbol(Symbol.Add addMsg)) model.Wire 
+            {model with 
+                Wire = sModel; 
+                SelectedComponents = (List.head sModel.Symbol).Id :: model.SelectedComponents
+                AddingSymbol = true;    
+            }, Cmd.batch[Cmd.map Wire sCmd; cmd]
+
+        let oldComponents, oldConnections = model.SelectedComponents, model.SelectedWireSegments
+        List.fold copyFold ({model with SelectedComponents = []; CopyingSymbol = true}, Cmd.none) oldComponents
+        
+
+
+
+        // {model with Clipboard = model.SelectedComponents, model.SelectedWireSegments}, Cmd.none
     | KeyPress CtrlShiftX ->
         model, Cmd.none
     | KeyPress CtrlShiftV ->
@@ -783,7 +807,9 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             SelectedWireSegments = []
             SelectingMultiple = false
             EditSizeOf = None
-            Clipboard = [], []            
+            Clipboard = [], []  
+            CopyingSymbol = false   
+            AddingSymbol = false       
             }, Cmd.none
     | SelectPort (portID, portType) -> 
         { model with SelectedPort = Some portID, portType }, Cmd.none
@@ -825,7 +851,10 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         {model with Wire = sModel; ErrorMsg = msg}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
     | SymbolAddFinish ->
         let snapModel, cmd = snapSymbolToGrid model
-        {snapModel with SelectedComponents = []; AddingSymbol = false}, cmd
+        if model.CopyingSymbol then
+            {snapModel with AddingSymbol = false}, cmd
+        else
+            {snapModel with SelectedComponents = []; AddingSymbol = false}, cmd
     | SelectLabel x -> 
         { model with SelectedLabel = x }, Cmd.none
     | ToggleSelectionOpen ->
@@ -860,5 +889,6 @@ let init () =
       DraggingPos = origin 
       Clipboard = [], []
       SelectedLabel = None
-      ErrorMsg = None},
+      ErrorMsg = None
+      CopyingSymbol = false},
     Cmd.map Wire cmds
