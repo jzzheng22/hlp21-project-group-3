@@ -133,14 +133,14 @@ let getHWObj (sym : Symbol) = getHW sym.BotR sym.TopL
 let midXY (botR : XYPos) (topL : XYPos) : XYPos =
     let midY = (botR.Y + topL.Y) / 2.
     let midX = (botR.X + topL.X) / 2.
-    { X = midX; Y = midY}
+    { X = midX; Y = midY }
 
 let midSym (sym : Symbol) : XYPos = midXY sym.BotR sym.TopL
 let midSymX (sym : Symbol) : float = (midSym sym).X 
 let midSymY (sym : Symbol) : float = (midSym sym).Y
 
 /// Adds a float value onto an XYPos
-let addXYVal (xy : XYPos) (n : float) : XYPos = { X = xy.X + n; Y = xy.Y + n}
+let addXYVal (xy : XYPos) (n : float) : XYPos = { X = xy.X + n; Y = xy.Y + n }
 let posDiff (a : XYPos) (b : XYPos) = { X=a.X-b.X; Y=a.Y-b.Y }
 let posAdd (a : XYPos) (b : XYPos) = { X=a.X+b.X; Y=a.Y+b.Y }
 let absDiff a b = 
@@ -160,7 +160,7 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : XYPos =
         if pos.Y = sym.TopL.Y then (pos.Y - n)
         elif pos.Y = sym.BotR.Y then (pos.Y + n)
         else pos.Y
-    { X = x; Y = y}
+    { X = x; Y = y }
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
@@ -177,7 +177,7 @@ let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos =
     let w = snd (getHW botR topL)
     let x = topL.X + (w * float(i + 1) / float(n + 1))
     let y = topL.Y + (h * float(i + 1) / float(n + 1))
-    { X = x; Y = y}
+    { X = x; Y = y }
    
 /// Snaps the rotation to one of: 0, 90, 180, 270
 let snapRot (oldRot : int) : Rotation =
@@ -188,21 +188,20 @@ let snapRot (oldRot : int) : Rotation =
     elif rot > 45 then R90
     else R0
 
-///increment rotation by 90
 let incrementRot (oldRot : Rotation) : Rotation = 
     match oldRot with
     | R0 -> R90
     | R90 -> R180
     | R180 -> R270
     | R270 -> R0
-///update rotation to the nearest 90 degree.Outputs rotation DU
+
 let updateRot (rot : int) (oldRot : Rotation) : Rotation =
     match (snapRot rot) with  
     | R0 -> oldRot
     | R90 -> incrementRot oldRot
     | R180 -> incrementRot oldRot |> incrementRot
     | R270 -> incrementRot oldRot |> incrementRot |> incrementRot
-///convert rotation DU to int
+
 let rotToInt (rot : Rotation) : int =
     match rot with 
     | R0 -> 0
@@ -462,12 +461,9 @@ let getTextAttr (sym : Symbol) (pos : XYPos) : (string * string) =
     | Bottom -> ("middle", "auto")
 
 let isInvert (portType : PortType) (compType : ComponentType) : bool =
-    match portType with
-    | PortType.Output when compType = ComponentType.Not
-                                    || compType = ComponentType.Nand
-                                    || compType = ComponentType.Nor
-                                    || compType = ComponentType.Xnor -> true;
-    | _ -> false;
+    match compType with
+    | Not | Nand | Nor | Xnor when portType = PortType.Output -> true
+    | _ -> false
 
 let createLabelName (genPort : GenericPort) (portType : PortType) (compType : ComponentType) (i : int) : string = 
     match genPort with
@@ -496,9 +492,7 @@ let createLabelName (genPort : GenericPort) (portType : PortType) (compType : Co
                 match portType with 
                 | PortType.Input -> sprintf "%s" (fst(List.item i y.InputLabels))
                 | PortType.Output -> sprintf "%s" (fst(List.item i y.OutputLabels))
-            | ComponentType.Constant _| ComponentType.IOLabel | ComponentType.BusSelection _->
-                match portType with
-                |_ -> sprintf ""
+            | ComponentType.Constant _ | ComponentType.IOLabel | ComponentType.BusSelection _ -> ""
             | _ ->
                 match portType with 
                 | PortType.Input -> sprintf "IN%d" i
@@ -614,7 +608,7 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         else max ((float nBot) * stdHeight * 2.) test //Or width based on number of ports on the bottom
         |> (+) 10.
         |> roundtoTen
-    let botR = { X = pos.X + w; Y = pos.Y + h}
+    let botR = { X = pos.X + w; Y = pos.Y + h }
     
     // ---- Making portMap ---- //
     let portMap = getPortMap leftPort rightPort botPort topPort (makePosList (int n) nBot pos botR)
@@ -640,7 +634,7 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         Label = label
         IOList = (inputList, outputList) //Interface with issie
         Rotation = R0
-        Scale = { X = 1.; Y = 1.}
+        Scale = { X = 1.; Y = 1. }
     }
 
 //-----------------------Skeleton Message type for symbols---------------------//
@@ -811,16 +805,13 @@ type private RenderObjProps =
 let private renderObj =
     FunctionComponent.Of(
         fun (props : RenderObjProps) ->
-            
             let sym = props.Obj //for ease of use
-            
             let strokeColour = if sym.PortHighlight then "green" else "black"
             let color =
                 match sym.GenericType with
                 | Wires -> 
                     if sym.HighlightError then "red"
-                    elif sym.Highlight then "purple"
-                    elif sym.PortHighlight then "green"
+                    elif sym.Highlight || sym.PortHighlight then "green"
                     else "darkgrey"
                 | _ -> 
                     if sym.HighlightError then "red"
@@ -875,12 +866,13 @@ let private renderObj =
                 let yLength =  sym.BotR.Y - sym.TopL.Y
                 let pos =
                     match sym.GenericType with
-                    |Const -> match sym.Rotation with
-                              |R0 -> { X = sym.TopL.X + (xLength/4.);Y = mid.Y }
-                              |R90 -> { X = mid.X; Y = sym.TopL.Y + (yLength/4.) }
-                              |R180 -> { X = sym.BotR.X - (xLength/4.); Y = mid.Y }
-                              |R270 -> { X = mid.X; Y = sym.BotR.Y - (yLength/4.) }
-                    |_ -> mid
+                    | Const -> 
+                        match sym.Rotation with
+                        | R0 -> { X = sym.TopL.X + (xLength / 4.); Y = mid.Y }
+                        | R90 -> { X = mid.X; Y = sym.TopL.Y + (yLength / 4.) }
+                        | R180 -> { X = sym.BotR.X - (xLength / 4.); Y = mid.Y }
+                        | R270 -> { X = mid.X; Y = sym.BotR.Y - (yLength / 4.) }
+                    | _ -> mid
                 drawText pos.X pos.Y "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
             
             let symLabel = drawText (midSymX sym) (sym.TopL.Y - 10.) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Label]
@@ -906,45 +898,44 @@ let private renderObj =
             let nonRotatedSymbolCoords =
                 let middle = midSym sym
                 ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical swapped
-                let length = match sym.Rotation with
-                             |R0 -> { X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y }
-                             |R180 -> { X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y }
-                             |_ -> { X =  sym.BotR.Y - sym.TopL.Y; Y = sym.BotR.X - sym.TopL.X }                             
-                let tL = { X = middle.X - length.X/2. ; Y = middle.Y - length.Y/2. }
-                let bR = { X = middle.X + length.X/2. ; Y = middle.Y + length.Y/2. }
-                (tL,bR,middle,length)
+                let length = 
+                    match sym.Rotation with
+                    | R0 -> { X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y }
+                    | R180 -> { X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y }
+                    | _ -> { X =  sym.BotR.Y - sym.TopL.Y; Y = sym.BotR.X - sym.TopL.X }                             
+                let tL = { X = middle.X - length.X / 2. ; Y = middle.Y - length.Y / 2. }
+                let bR = { X = middle.X + length.X / 2. ; Y = middle.Y + length.Y / 2. }
+                (tL, bR, middle, length)
 
-            let drawconst: ReactElement = 
-                let tL,bR,middle,length = nonRotatedSymbolCoords
+            let tL, bR, middle, length = nonRotatedSymbolCoords
+
+            let drawConst : ReactElement = 
                 let p1 = { X = tL.X ; Y = tL.Y }
-                let p2 = { X = tL.X + ( (2./3.)*length.X ); Y = tL.Y + length.Y/2. }
+                let p2 = { X = tL.X + 2. / 3. * length.X ; Y = tL.Y + length.Y / 2. }
                 let p3 = { X = bR.X ; Y = tL.Y + length.Y/2. }
-                let p4 = { X = tL.X + ( (2./3.)*length.X ); Y = tL.Y + length.Y/2. }
-                let p5 = { X = tL.X; Y = bR.Y }
-                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y
+                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p2.X p2.Y p1.X p1.Y
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
-            let drawBusSelect:ReactElement =
-                let tL,bR,middle,length = nonRotatedSymbolCoords
+            let drawBusSelect : ReactElement =
                 let p1 = tL
-                let p2 = { X = tL.X + length.X/2.; Y = tL.Y }
-                let p3 = { X = bR.X - length.X/4.; Y = tL.Y + length.Y/4. }
-                let p4 = { X = bR.X ; Y = tL.Y + length.Y/4. }
-                let p5 = { X=bR.X;Y=bR.Y - length.Y/4. }
-                let p6 = { X = bR.X - length.X/4.; Y = bR.Y - length.Y/4. }
-                let p7 = { X = tL.X + length.X/2.; Y = bR.Y }
-                let p8 = { X = tL.X; Y = bR.Y }
+                let p2 = { X = tL.X + length.X / 2.; Y = tL.Y }
+                let p3 = { X = bR.X - length.X / 4.; Y = tL.Y + length.Y / 4. }
+                let p4 = { X = bR.X ; Y = tL.Y + length.Y / 4. }
+                let p5 = { X = bR.X ; Y = bR.Y - length.Y / 4. }
+                let p6 = { X = bR.X - length.X / 4.; Y = bR.Y - length.Y / 4. }
+                let p7 = { X = tL.X + length.X / 2.; Y = bR.Y }
+                let p8 = { X = tL.X ; Y = bR.Y }
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y p7.X p7.Y p8.X p8.Y
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
             let drawIOlabel =
                 let tL,bR,middle,length = nonRotatedSymbolCoords
-                let p1 = { X = tL.X ; Y = tL.Y + length.Y/2.}
-                let p2 = { X = tL.X + length.X/4. ; Y = tL.Y }
-                let p3 = { X = bR.X - length.X/4.; Y = tL.Y }
-                let p4 = { X = bR.X; Y = tL.Y + length.Y/2. }
-                let p5 = { X = bR.X - length.X/4. ; Y = bR.Y }
-                let p6 = { X = tL.X + length.X/4. ; Y = bR.Y }
+                let p1 = { X = tL.X ; Y = tL.Y + length.Y / 2. }
+                let p2 = { X = tL.X + length.X / 4. ; Y = tL.Y }
+                let p3 = { X = bR.X - length.X / 4. ; Y = tL.Y }
+                let p4 = { X = bR.X ; Y = tL.Y + length.Y / 2. }
+                let p5 = { X = bR.X - length.X / 4. ; Y = bR.Y }
+                let p6 = { X = tL.X + length.X / 4. ; Y = bR.Y }
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f " p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y 
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
@@ -954,7 +945,7 @@ let private renderObj =
                 | Wires -> List.concat [wires; triangles]
                 | IO -> [io]
                 | IOLabel -> [drawIOlabel]
-                | Const -> [drawconst]
+                | Const -> [drawConst]
                 | BusSelect -> [drawBusSelect]
                 | _ -> [displayBox]
             
