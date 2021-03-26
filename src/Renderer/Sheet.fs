@@ -15,11 +15,13 @@ type Model =
       SelectedComponents: CommonTypes.ComponentId list
       SelectedWireSegments: (CommonTypes.ConnectionId * int) list
       SelectingMultiple: bool
+      TogglingSelection: bool
       EditSizeOf: CommonTypes.ComponentId option
       AddingSymbol: bool
       DragStartPos: XYPos
       DraggingPos: XYPos
-      SelectedLabel: (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option}
+      SelectedLabel: (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option
+      ErrorMsg : string Option}
 
 type KeyboardMsg =
     | AltX
@@ -51,6 +53,10 @@ type Msg =
     | UpdateWidths 
     | SymbolAddFinish
     | SelectLabel of (CommonTypes.ComponentId * XYPos * CommonTypes.PortId) Option
+    | ToggleSelectionOpen
+    | ToggleSelectionClose
+    | ToggleSymbols of CommonTypes.ComponentId list 
+    | ToggleWires of (CommonTypes.ConnectionId*int) list
 
 type MouseOps =
     | MouseDown
@@ -75,16 +81,14 @@ let pointNearBoxCorner point box =
     let yClose p1 p2 = (abs (p1.Y - p2.Y)) < threshold
     ( (xClose point (fst box)) || (xClose point (snd box)) ) && ( (yClose point (fst box)) || (yClose point (snd box)) )
 
-/// Takes in two coordinates and a bounding box
-/// Tests to see if box is between those two coordinates
+/// Takes in two coordinates and a bounding box. Tests to see if box is between those two coordinates.
 let boxInSelectedArea outerBox innerBox = 
     let outerTopL = {X = min (fst outerBox).X (snd outerBox).X; Y = min (fst outerBox).Y (snd outerBox).Y}
     let outerBotR = {X = max (fst outerBox).X (snd outerBox).X; Y = max (fst outerBox).Y (snd outerBox).Y}
     let outerBox = outerTopL, outerBotR
     inBoundingBox (fst innerBox) outerBox && inBoundingBox (snd innerBox) outerBox
 
-/// Takes in a point and returns translation vector 
-/// required to move to nearest square
+/// Takes in a point and returns translation vector required to move to nearest square.
 let snapGridVector (point: XYPos) = 
     let newXSquare = round (point.X / unzoomedGrid)
     let newYSquare = round (point.Y / unzoomedGrid)
@@ -104,11 +108,15 @@ let getWireSegmentIDList filter lst =
     |> filter
     |> List.map getWireSegmentID
 
-let dispatchSelection symbolIDList wireSegmentIDList (dispatch: Dispatch<Msg>) = 
-    dispatch <| SelectComponents symbolIDList
-    dispatch <| Symbol(Symbol.Highlight symbolIDList)
-    dispatch <| SelectWireSegments wireSegmentIDList
-    dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
+let dispatchSelection toggle symbolIDList wireSegmentIDList (dispatch: Dispatch<Msg>) =
+    if toggle then
+        dispatch <| ToggleSymbols symbolIDList
+        dispatch <| ToggleWires wireSegmentIDList
+    else 
+        dispatch <| SelectComponents symbolIDList
+        dispatch <| Symbol(Symbol.Highlight symbolIDList)
+        dispatch <| SelectWireSegments wireSegmentIDList
+        dispatch <| Wire(BusWire.HighlightWires (List.map fst wireSegmentIDList))
 
 /// Removes ID from Symbol tuple. Used for testing where IDs are not necessary 
 let removeSymbolID predicate coords (_, a, b) = predicate coords (a, b)
@@ -134,7 +142,7 @@ let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>)
         |> getWireSegmentIDList (List.filter (removeWireSegmentID predicate coords))
         |> filterBySelectingMultiple model.SelectingMultiple
 
-    dispatchSelection symbolIDList wireSegmentIDList dispatch
+    dispatchSelection model.TogglingSelection symbolIDList wireSegmentIDList dispatch
 
 /// Selects elements where mousePos is inside bounding box
 let selectElements (model: Model) (mousePos: XYPos) (dispatch: Dispatch<Msg>) =
@@ -164,6 +172,33 @@ let cornersToString startCoord endCoord =
         endCoord.X endCoord.Y
         startCoord.X endCoord.Y
 
+/// Feeds each connection into the width inferer one by one. Returns a Result type where the Error case encapsulates
+/// all affected connections.
+let collectWidthErrors (comps : CommonTypes.Component list, conns : CommonTypes.Connection list) =
+    
+    //errorList is the inferer output for each connection, with all Ok's discarded
+    let errorList =
+        conns
+        |> List.map (BusWidthInferer.inferConnectionsWidth << (fun x -> (comps, [x])))
+        |> List.collect (fun x -> 
+            match x with 
+            | Ok _ -> [] 
+            | Error e -> [e])
+    
+    let msgList = 
+        errorList
+        |> List.map (fun x -> x.Msg)
+        |> String.concat "\n"
+
+    let conList =
+        errorList
+        |> List.collect (fun x -> x.ConnectionsAffected)
+
+    Error {
+        CommonTypes.WidthInferError.Msg = msgList
+        CommonTypes.WidthInferError.ConnectionsAffected = conList
+    }
+
 let validLabel (model : Model) = 
     Symbol.isLabel model.Wire.Symbol model.DraggingPos (List.head model.SelectedComponents)
 
@@ -171,12 +206,18 @@ let validLabel (model : Model) =
 let inferWidth (model : Model) = 
     let comps = Symbol.extractComponents model.Wire.Symbol
     printf"hello\n inferWidth comps:\n %A" comps
-    let conns = BusWire.extractWires model.Wire 
+    let conns = BusWire.extractWires model.Wire
     printf"hello\n inferWidth conns:\n %A" conns
+    
+    /// ----- Dirty fix for bug ----- ///
     let canvas = (comps, conns)
-    BusWidthInferer.inferConnectionsWidth canvas
+    let test = BusWidthInferer.inferConnectionsWidth canvas
+    match test with 
+    | Ok x -> test
+    | Error e -> collectWidthErrors (comps, conns)
 
-///Updates model based on whether inferWidth detects a bus width error.
+
+/// Updates widths and dispatches error highlighting message based on output of inferwidth.
 let getWires (model : Model) =
     inferWidth model
     |> function
@@ -188,44 +229,56 @@ let getWires (model : Model) =
             |> BusWire.getWires model.Wire
         printf "hello UpdateWidth %A" conList
         let wModel, wCmd = BusWire.update (BusWire.UpdateWidth conList) model.Wire
-        (conns, wModel, wCmd)
+        (conns, wModel, wCmd, None)
     | Error e -> //this is a {Msg : string; ConnectionsAffected : ConnectionId list}
         let wires = e.ConnectionsAffected
         printf "hello UpdateWidth Error \n Message: %s \n Connections: \n %A" e.Msg wires
         let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
-        (wires, wModel, wCmd)
+        (wires, wModel, wCmd, Some e.Msg)
 
-/// Sends a highlight error to buswire and symbol for the connection list given
+/// Sends a highlight error to buswire and symbol for the connection list given.
 let dispatchError (model : Model) (wires : CommonTypes.ConnectionId list)  =
     let wModel, wCmd = BusWire.update (BusWire.HighlightError wires) model.Wire
     let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) wModel
     {model with Wire = sModel}, Cmd.batch [ Cmd.map Wire wCmd; Cmd.map Wire sCmd ]
 
-let drawError (msg : string) : ReactElement list = 
-    let drawBox = 
-        rect[
-            X 0
-            Y 0
-            SVGAttr.Height 30.
-            SVGAttr.Width (String.length msg * 7)
-            SVGAttr.Fill "red"
-            SVGAttr.Stroke "red"
-            SVGAttr.Opacity 0.5
-            SVGAttr.StrokeWidth 1.][]
+let splitStrings (str : string) : string list =
+    str.Split [|'\n'|]
+    |> Seq.toList
 
-    let drawText = 
-        text[
-            X 0
-            Y 0
-            Style[
-                TextAnchor "middle"
-                DominantBaseline "middle"
-                FontSize 6.
-                FontWeight "bold"
-                Fill "Black"
-                UserSelect UserSelectOptions.None]][str <| msg] //Prevent highlighting text
-        
-    [drawText; drawBox]
+let drawBox (h : int) (len : int) = 
+    rect[
+        X 0
+        Y 0
+        SVGAttr.Height h
+        SVGAttr.Width len
+        SVGAttr.Fill "red"
+        SVGAttr.Stroke "red"
+        SVGAttr.Opacity 0.9
+        SVGAttr.StrokeWidth 1.][]
+
+let drawText (pos : int) (msg : string) (fontSize : int) = 
+    text[
+        X 0
+        Y pos
+        Style[
+            TextAnchor "start"
+            DominantBaseline "hanging"
+            FontSize fontSize
+            //FontWeight "bold"
+            Fill "#F1F227"
+            UserSelect UserSelectOptions.None]][str <| msg] //Prevent highlighting text
+
+let drawError (msg : string) : ReactElement = 
+    let fontSize = 10
+    let messages =
+        splitStrings msg
+        |> List.mapi (fun i v -> drawText (i * fontSize) v fontSize)
+
+    let box = 
+        drawBox (List.length (splitStrings msg) * fontSize) (String.length msg * (fontSize/2))
+
+    g[](List.concat[[box]; messages])
 
 /// This function generates the background grid for the canvas by drawing spaced out lines
 let backgroundGrid zoom  = 
@@ -287,6 +340,7 @@ let drawPortConnectionLine model =
                        StrokeDasharray "5,5"
                    FillOpacity 0.1 ] ] []
 
+/// Draws red circles on the corners of a Symbol's bounding box.
 let highlightCorners model box = 
     let circleGen centre =  
         circle [
@@ -336,12 +390,12 @@ let mouseDown model mousePos dispatch mDown =
                     model.SelectedComponents
                     |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
                     |> List.filter (inBoundingBox mousePos) 
-                if List.isEmpty overlappingComponentList then
+                if List.isEmpty overlappingComponentList || model.TogglingSelection then
                     selectElements model mousePos dispatch
         dispatch <| SelectDragStart mousePos
     
+/// Handles release of left/right click.
 
-///Handles release of left/right click.
 let mouseUp model mousePos dispatch = 
     match validConnection model with
     | Some endPort ->
@@ -364,7 +418,7 @@ let mouseUp model mousePos dispatch =
 let increaseBoundingBox (a, topL, botR) = 
     a, {X = topL.X - 10.; Y = topL.Y - 10.}, {X = botR.X + 10.; Y = botR.Y + 10.}
 
-///Handles mouse movement.
+/// Handles mouse movement
 let mouseMove model mousePos dispatch mDown = 
     if model.AddingSymbol then 
         dispatch <| MoveElements mousePos
@@ -396,6 +450,8 @@ let mouseMove model mousePos dispatch mDown =
 
 
 let mDown (ev: Types.MouseEvent) = ev.buttons
+
+let kDown (ev: Types.KeyboardEvent) = ev.key
 
 let handleMouseOps (mouseOp: MouseOps) (model: Model) (ev: Types.MouseEvent) (dispatch: Dispatch<Msg>) =
     let coordX = ev.clientX 
@@ -433,10 +489,13 @@ let displaySvgWithZoom (model: Model) (svgReact: ReactElement) (dispatch: Dispat
                 g [ Style [ Transform(sprintf "scale(%f)" model.Zoom) ] ] [  // top-level transform style attribute for zoom
                     svgReact
                   ]
-                g [] [
+                g [] [  
                         match model.SelectedPort with
                         | (Some _, _) -> drawPortConnectionLine model
                         | _ -> 
+                            match model.ErrorMsg with
+                            | Some e -> drawError e
+                            | None -> ()
                             match model.EditSizeOf with 
                             | Some id -> highlightCorners model (Symbol.getBoundingBox model.Wire.Symbol id)
                             | _ ->
@@ -451,7 +510,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
     let wireSvg = BusWire.view model.Wire wDispatch
     displaySvgWithZoom model wireSvg dispatch
 
-///Deletes selected wires and those connected to deleted symbols.
+/// Deletes selected wires and those connected to deleted symbols.
 let deleteWires model =
     let connectedWires =
         model.SelectedComponents
@@ -468,17 +527,17 @@ let deleteWires model =
 let deleteSymbols model wModel =
     BusWire.update (BusWire.Symbol(Symbol.Delete model.SelectedComponents)) wModel
 
-///Updates positions of moved symbols/wire segments.
+/// Updates model with new positions of moved elements.
 let moveElements model mousePos =
     let transVector =
         { X = (mousePos.X - model.DraggingPos.X)
           Y = (mousePos.Y - model.DraggingPos.Y) }
     let newModel = {model with DraggingPos = mousePos}
-    if not (List.isEmpty model.SelectedComponents) then
+    if not (List.isEmpty model.SelectedComponents) && not model.TogglingSelection then
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) newModel.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
-    else if not (List.isEmpty model.SelectedWireSegments) then
+    else if not (List.isEmpty model.SelectedWireSegments) && not model.TogglingSelection then
         let wireSegment = List.head model.SelectedWireSegments
         let wModel, wCmd = BusWire.update (BusWire.MoveWires(fst wireSegment, snd wireSegment, transVector)) newModel.Wire
         {model with Wire = wModel}, Cmd.map Wire wCmd
@@ -508,23 +567,14 @@ let changeSymbolSize model id mousePos =
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Scale scaleMsg)) model.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
+
 /// Moves a symbol so that it snaps to grid.
 let snapToGrid model =
-    (*
-    let transVector =
-        match model.SelectedComponents with 
-        | hd::_ -> 
-            Symbol.getBoundingBox model.Wire.Symbol (hd)
-            |> function
-            | (topL, _) ->
-                snapGridVector topL
-        | [] -> {X=0. ; Y=0.}
-    *)
     let transVectors =
         model.SelectedComponents
         |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
         |> List.map (function | (topL, _) -> snapGridVector topL)
-
+        
     let snapFold (inModel, inCmd) (id, vector) = 
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move([id], vector))) inModel
         sModel, Cmd.batch [inCmd; sCmd]
@@ -543,6 +593,7 @@ let snapToGrid model =
         SelectedPort = None, CommonTypes.PortType.Input;
         SelectingMultiple = false; 
         },Cmd.batch [Cmd.map Wire s2Cmd ;Cmd.map Wire wCmd]
+
 
 ///Top left corners of all symbols.
 let topleftCorners model =
@@ -571,11 +622,11 @@ let deleteElements model =
               SelectedWireSegments = [] 
         }
 
-    let (wires, newModel, wCmd2) = getWires deleteModel
+    let (wires, newModel, wCmd2, msg) = getWires deleteModel
     let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) wires))) newModel
-    {deleteModel with Wire = sModel2}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
+    {deleteModel with Wire = sModel2; ErrorMsg = msg}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
 
-/// Finds the highest index for a Symbol type and increments that number
+/// Finds the highest index for a Symbol type and increments that number.
 let getNewSymbolIndex (model : Model) (compType : CommonTypes.ComponentType) : int = 
     let symbolList = 
         model.Wire.Symbol 
@@ -601,6 +652,12 @@ let addSymbol model =
         SelectingMultiple = false; 
         EditSizeOf = None}, Cmd.map Wire sCmd 
 
+///Finds symmetric difference of 2 lists i.e. (A - B) U (B - A)
+let symmetricDifference list1 list2 = 
+    let set1 = Set.ofList list1 
+    let set2 = Set.ofList list2 
+    Set.toList (Set.union ( Set.difference set1 set2 ) ( Set.difference set2 set1 ))
+
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
     | Wire wMsg ->
@@ -610,31 +667,50 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         let sModel, sCmd = BusWire.update (BusWire.Symbol sMsg) model.Wire
         { model with Wire = sModel }, Cmd.map Wire sCmd
     | KeyPress AltShiftZ ->
-        printStats () // print and reset the performance statistics in dev tools window
-        model, Cmd.none // do nothing else and return model unchanged
+        printStats () 
+        model, Cmd.none 
     | KeyPress SymbolClockwise | KeyPress SymbolAntiClock | KeyPress SymbolMagnify | KeyPress SymbolShrink -> 
         if List.isEmpty model.SelectedComponents then 
             model, Cmd.none
         else 
-            let symid = model.SelectedComponents
+            let symIdList = model.SelectedComponents
             let sModel, sCmd = 
                 match msg with 
                 | KeyPress SymbolClockwise -> 
-                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symid, 90))) model.Wire
+                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symIdList, 90))) model.Wire
                 | KeyPress SymbolAntiClock ->
-                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symid, 270))) model.Wire
-                | KeyPress SymbolMagnify ->
-                    BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 1.25; Y = 1.25}))) model.Wire
-                | KeyPress SymbolShrink -> 
-                    BusWire.update(BusWire.Symbol(Symbol.Scale (symid, {X = 0.8; Y = 0.8}))) model.Wire
+                    BusWire.update(BusWire.Symbol(Symbol.Rotate (symIdList, 270))) model.Wire
+                | KeyPress k when k = SymbolMagnify || k = SymbolShrink->
+                    
+                    let getWidthHeight id = 
+                        let c1, c2 = Symbol.getBoundingBox model.Wire.Symbol id 
+                        (abs (c1.X - c2.X), abs (c1.Y - c2.Y))
+
+                    let filteredList = 
+                        let predicate id = 
+                            let w, h = getWidthHeight id
+                            (w > unzoomedGrid) && (h > unzoomedGrid)
+                        if k = SymbolShrink then List.filter predicate symIdList else symIdList 
+
+                    let scalef value = if k = SymbolShrink then (1.0 - unzoomedGrid/value) else (1.0 + unzoomedGrid/value)  
+                
+                    let scalingFolder (inmodel: BusWire.Model, cmd: Cmd<BusWire.Msg>) (id: CommonTypes.ComponentId) =
+                        let w, h = getWidthHeight id  
+                        let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Scale ([id], {X = scalef w; Y = scalef h}))) inmodel
+                        sModel, Cmd.batch [ sCmd; cmd ]
+
+                    List.fold scalingFolder (model.Wire, Cmd.none) filteredList
+                    
                 | _ -> 
                     failwithf "Unexpected input in symbol transformation."
+
             let snapModel, snapCmd = snapToGrid {model with Wire = sModel}
             snapModel, Cmd.batch [ Cmd.map Wire sCmd; snapCmd]
+            
     | KeyPress ZoomCanvasIn -> 
         ({model with Zoom = model.Zoom * 1.25}, Cmd.none)
     | KeyPress ZoomCanvasOut -> 
-        ({model with Zoom = model.Zoom/1.25}, Cmd.none)
+        ({model with Zoom = model.Zoom / 1.25}, Cmd.none)
     | KeyPress Del ->
         deleteElements model
 
@@ -671,16 +747,6 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | SelectDragEnd ->
         if (not (List.isEmpty model.SelectedComponents) || not (List.isEmpty model.SelectedWireSegments) )then
             snapToGrid model
-        (*
-        else if not (List.isEmpty model.SelectedWireSegments)then 
-            let wModel, wCmd = 
-                BusWire.update(BusWire.SnapWire(List.head model.SelectedWireSegments)) model.Wire
-            { model with 
-                    SelectedPort = None, CommonTypes.PortType.Input
-                    SelectingMultiple = false 
-                    EditSizeOf = None
-                    Wire=wModel}, Cmd.map Wire wCmd
-        *)
         else
             match model.EditSizeOf with 
             | Some id ->
@@ -704,15 +770,29 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | EditSize (id, mousePos) -> 
         changeSymbolSize model id mousePos
     | UpdateWidths -> 
-        let wires, newModel, wCmd = getWires model
+        let wires, newModel, wCmd, msg = getWires model
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols model.Wire wire) wires))) newModel
-        {model with Wire = sModel}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
-    | ErrorMsg msg -> model, Cmd.none
+        {model with Wire = sModel; ErrorMsg = msg}, Cmd.batch [Cmd.map Wire wCmd; Cmd.map Wire sCmd]
     | SymbolAddFinish ->
         let snapModel, cmd = snapToGrid model
         {snapModel with SelectedComponents = []; AddingSymbol = false}, cmd
     | SelectLabel x -> 
         { model with SelectedLabel = x }, Cmd.none
+    | ToggleSelectionOpen ->
+        if List.isEmpty model.SelectedComponents && List.isEmpty model.SelectedWireSegments then  
+            model, Cmd.none
+        else 
+            {model with TogglingSelection = true}, Cmd.none
+    | ToggleSelectionClose -> {model with TogglingSelection = false}, Cmd.none
+    | ToggleSymbols symbolIdList ->
+        let selectedSymbols = symmetricDifference symbolIdList model.SelectedComponents
+        let sModel, sCmd = BusWire.update(BusWire.Symbol(Symbol.Highlight selectedSymbols)) model.Wire 
+        {model with Wire = sModel; SelectedComponents = selectedSymbols}, Cmd.map Wire sCmd
+    | ToggleWires wireSegmentIdList -> 
+        let selectedSegments = symmetricDifference wireSegmentIdList model.SelectedWireSegments
+        let wModel, wCmd = BusWire.update(BusWire.HighlightWires (List.map fst selectedSegments)) model.Wire
+        {model with Wire = wModel; SelectedWireSegments = selectedSegments}, Cmd.map Wire wCmd
+        
 
 let init () =
     let model, cmds = (BusWire.init 400) ()
@@ -723,9 +803,11 @@ let init () =
       SelectedComponents = []
       SelectedWireSegments = []
       SelectingMultiple = false
+      TogglingSelection = false
       EditSizeOf = None
       AddingSymbol = false
       DragStartPos = origin
       DraggingPos = origin 
-      SelectedLabel = None},
+      SelectedLabel = None
+      ErrorMsg = None},
     Cmd.map Wire cmds

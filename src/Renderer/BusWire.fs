@@ -502,7 +502,7 @@ let view (model:Model) (dispatch: Dispatch<Msg>)=
                 Width = w.Width
                 Highlight = w.Highlight
                 HighlightError = w.HighlightError
-                ColorP = model.Color.Text()
+                ColorP = "grey"
                 StrokeWidthP = "1px" }
             singleWireView props)
     let symbols = Symbol.view model.Symbol (fun sMsg -> dispatch (Symbol sMsg))

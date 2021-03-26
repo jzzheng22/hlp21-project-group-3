@@ -12,8 +12,8 @@ open CommonTypes
 //------------------------------------------------------------------------//
 
 //Static variables
-let stdHeight = 35.
-let ratioHW = 0.9
+let stdHeight = 30.
+let ratioHW = 0.8
 let radius = 3.
 let labelSize = 6
 
@@ -35,6 +35,10 @@ type SymbolType =
     | FF
     | FFE
     | RAM
+    | Const
+    | BusSelect
+    | IOLabel
+    
 
 type GenericPort =
     | InOut
@@ -94,7 +98,7 @@ type Msg =
 /// Takes a component type and returns info (label, buswidth in, buswidth out, generic symbol type)
 let typeToInfo (compType : ComponentType) : (string * string * int * int * SymbolType) =
     match compType with
-    | ComponentType.Constant (x, y) -> ("C",(string(y)), x, x, LogMem) //This is a buffer right?
+    | ComponentType.Constant (x, y) -> ("C",(string(y)), x, x, Const) //This is a buffer right?
     | ComponentType.Not -> ("NOT", "1", 1, 1, LogMem)
     | ComponentType.And -> ("AND", "&", 1, 1, LogMem)
     | ComponentType.Or -> ("OR", ">=", 1, 1, LogMem)
@@ -116,8 +120,8 @@ let typeToInfo (compType : ComponentType) : (string * string * int * int * Symbo
     | ComponentType.RAM x -> ("RAM", "RAM", x.AddressWidth, x.WordWidth, RAM)
     | ComponentType.Input x -> ((sprintf "In<%d:0>" (x - 1)), "" , x, x, IO) 
     | ComponentType.Output x -> ((sprintf "Out<%d:0>" (x - 1)), "" , x, x, IO) 
-    | ComponentType.IOLabel -> ("", "", 0, 0, IO) //Check generic type WHAT IS THIS?? 
-    | ComponentType.BusSelection (x, y) -> ("", "", x, y, Wires)
+    | ComponentType.IOLabel -> ("Label", "", 0, 0, IOLabel) //Check generic type WHAT IS THIS?? 
+    | ComponentType.BusSelection (x, y) -> ("Bus Select", (sprintf "[%i..%i]" x y), x, y, BusSelect)
     | ComponentType.MergeWires -> ("", "", 0, 0, Wires)
     | ComponentType.SplitWire x -> ("", "", x, 1, Wires)
 
@@ -129,16 +133,16 @@ let getHWObj (sym : Symbol) = getHW sym.BotR sym.TopL
 let midXY (botR : XYPos) (topL : XYPos) : XYPos =
     let midY = (botR.Y + topL.Y) / 2.
     let midX = (botR.X + topL.X) / 2.
-    {X = midX; Y = midY}
+    { X = midX; Y = midY }
 
 let midSym (sym : Symbol) : XYPos = midXY sym.BotR sym.TopL
 let midSymX (sym : Symbol) : float = (midSym sym).X 
 let midSymY (sym : Symbol) : float = (midSym sym).Y
 
 /// Adds a float value onto an XYPos
-let addXYVal (xy : XYPos) (n : float) : XYPos = {X = xy.X + n; Y = xy.Y + n}
-let posDiff (a : XYPos) (b : XYPos) = {X=a.X-b.X; Y=a.Y-b.Y}
-let posAdd (a : XYPos) (b : XYPos) = {X=a.X+b.X; Y=a.Y+b.Y}
+let addXYVal (xy : XYPos) (n : float) : XYPos = { X = xy.X + n; Y = xy.Y + n }
+let posDiff (a : XYPos) (b : XYPos) = { X=a.X-b.X; Y=a.Y-b.Y }
+let posAdd (a : XYPos) (b : XYPos) = { X=a.X+b.X; Y=a.Y+b.Y }
 let absDiff a b = 
     let diff = (posDiff a b)
     (abs diff.X) + (abs diff.Y)
@@ -156,7 +160,7 @@ let displace (n : float) (pos : XYPos) (sym : Symbol) : XYPos =
         if pos.Y = sym.TopL.Y then (pos.Y - n)
         elif pos.Y = sym.BotR.Y then (pos.Y + n)
         else pos.Y
-    {X = x; Y = y}
+    { X = x; Y = y }
 
 ///Finds whether a coordinate is within a port's bounding box
 let testBox (portPos : XYPos) (coord : XYPos) : bool =
@@ -173,7 +177,7 @@ let portPos (n : int) (topL : XYPos) (botR : XYPos) (i : int)  : XYPos =
     let w = snd (getHW botR topL)
     let x = topL.X + (w * float(i + 1) / float(n + 1))
     let y = topL.Y + (h * float(i + 1) / float(n + 1))
-    {X = x; Y = y}
+    { X = x; Y = y }
    
 /// Snaps the rotation to one of: 0, 90, 180, 270
 let snapRot (oldRot : int) : Rotation =
@@ -246,7 +250,7 @@ let transCoords (coord : XYPos) (centre : XYPos) (trans : float list list) : XYP
     let transNve = [[1.; 0.; -centre.X]; [0.; 1.; -centre.Y]; [0.; 0.; 1.]]
     let transPve = [[1.; 0.; centre.X]; [0.; 1.; centre.Y]; [0.; 0.; 1.]]
     let transform = multMatrix transPve ( multMatrix trans ( multMatrix transNve coordM) )
-    {X = transform.[0].[0]; Y = transform.[1].[0]}
+    { X = transform.[0].[0]; Y = transform.[1].[0]}
 
 /// Rotates a single set of coordinates
 let rotateCoords (coord : XYPos) (rot : int) (centre : XYPos) : XYPos =
@@ -258,8 +262,8 @@ let scaleCoords (coord : XYPos) (scale : XYPos) (centre : XYPos) : XYPos =
 
 /// Finds the new box parameters after transformations have been applied
 let getNewBox (topL : XYPos) (botR : XYPos) : (XYPos * XYPos) =
-    let newTopL = {X = min topL.X botR.X; Y = min topL.Y botR.Y}
-    let newBotR = {X = max topL.X botR.X; Y = max topL.Y botR.Y}
+    let newTopL = { X = min topL.X botR.X; Y = min topL.Y botR.Y }
+    let newBotR = { X = max topL.X botR.X; Y = max topL.Y botR.Y }
     (newTopL, newBotR)
 
 /// Converts map to list, applies a function, and returns back a map/list
@@ -283,8 +287,8 @@ let trans func sym trans =
 let log2 (n : int) : int = (log(float n) / log(2.)) |> ceil |> int
 
 //Helpers for makePosList
-let makeLR (len : int) (x : XYPos) (func : int -> XYPos) = List.map (fun i -> {X = x.X; Y = (func i).Y}) [0..len - 1]
-let makeTB (len : int) (y : XYPos) (func : int -> XYPos) = List.map (fun i -> {X = (func i).X; Y = y.Y}) [0..len - 1]
+let makeLR (len : int) (x : XYPos) (func : int -> XYPos) = List.map (fun i -> { X = x.X; Y = (func i).Y }) [0..len - 1]
+let makeTB (len : int) (y : XYPos) (func : int -> XYPos) = List.map (fun i -> { X = (func i).X; Y = y.Y }) [0..len - 1]
 let makeGen func len pos topL botR = func len pos (portPos len topL botR)
 
 /// Creates the list of positions for ports to slot in to on each side, returns in tupled list form
@@ -323,14 +327,26 @@ let tagCoords (sym : Symbol) : string =
     (sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" 
         (midX - 20. + (i + (a * 5.))) (midY - 10.) 
         (midX - 20. + (i + (a * 5.))) (midY + 10.) 
-        (midX - ((i/7.) + (a * 5.))) (midY + 10.) 
-        (midX + 20. - ((i * 1.2) + (a * 5.))) midY 
-        (midX - ((i/7.) + (a * 5.))) (midY - 10.))
+        (midX - ((i/7.) + (a * 10.))) (midY + 10.) 
+        (midX + 40. - ((i * 1.2) + (a * 5.))) midY 
+        (midX - ((i/7.) + (a * 10.))) (midY - 10.))
 
 let cornerCoords (sym : Symbol) (i : XYPos) : XYPos = 
     match sym.Rotation with
-    | R0 | R180 -> {X = midSymX sym; Y = i.Y}
-    | _ -> {X = i.X; Y = midSymY sym}
+    | R0 | R180 -> { X = midSymX sym; Y = i.Y }
+    | _ -> { X = i.X; Y = midSymY sym}
+
+let titlePos (sym : Symbol) : (float * float) =
+    let mid = midSym sym
+    let (h, w) = getHWObj sym
+    match sym.GenericType with
+    | Const ->
+        match sym.Rotation with
+            | R0 -> (sym.TopL.X + (w / 4.), mid.Y)
+            | R90 -> (mid.X, sym.TopL.Y + (h / 4.))
+            | R180 -> (sym.BotR.X - (w / 4.), mid.Y)
+            | R270 -> (mid.X, sym.BotR.Y - (h / 4.))
+    | _ -> (mid.X, mid.Y)
 
 let wireCoords (sym : Symbol) (i : XYPos) : string = 
     let corner = cornerCoords sym i
@@ -338,16 +354,10 @@ let wireCoords (sym : Symbol) (i : XYPos) : string =
 
 /// Returns the coordinates for a clock symbol
 let clkCoords (pos : XYPos) =
-    let p1 = {X = pos.X ; Y = pos.Y - (radius)}
-    let p2 = {X = pos.X + (2. * radius); Y = pos.Y }
-    let p3 = {X = pos.X ; Y = pos.Y + (radius)}
+    let p1 = { X = pos.X ; Y = pos.Y - (radius)}
+    let p2 = { X = pos.X + (2. * radius); Y = pos.Y }
+    let p3 = { X = pos.X ; Y = pos.Y + (radius)}
     sprintf "%f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y
-
-/// Returns the rotation for SVG transformations
-let rotString (sym : Symbol) (pos : XYPos) = 
-    sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
-
-let rotStringObj (sym : Symbol) = rotString sym (midSym sym)
 
 /// Converts a scale and a centre and returns the matrix for svg scaling about that central point
 let scaleString (scale : XYPos) (centre : XYPos) : string = 
@@ -439,6 +449,22 @@ let getPosEdge (sym : Symbol) (pos : XYPos) =
     elif pos.Y = sym.BotR.Y then Bottom
     else Left
 
+/// Returns the rotation for SVG transformations for shapes inside labels (e.g. clock symbol)
+let rotSide (sym : Symbol) (pos : XYPos) : string = 
+    let rot  = 
+        match getPosEdge sym pos with
+        | Left -> "0"
+        | Right -> "180"
+        | Top -> "90"
+        | Bottom -> "270"
+    sprintf "rotate (%s, %f, %f)" rot pos.X pos.Y
+
+/// Returns the rotation for SVG transformations
+let rotString (sym : Symbol) (pos : XYPos) : string = 
+    sprintf "rotate (%d, %f, %f)" (rotToInt sym.Rotation) pos.X pos.Y
+
+let rotStringObj (sym : Symbol) = rotString sym (midSym sym)
+
 let getTextAttr (sym : Symbol) (pos : XYPos) : (string * string) =
     match getPosEdge sym pos with
     | Left -> ("start", "middle")
@@ -447,12 +473,9 @@ let getTextAttr (sym : Symbol) (pos : XYPos) : (string * string) =
     | Bottom -> ("middle", "auto")
 
 let isInvert (portType : PortType) (compType : ComponentType) : bool =
-    match portType with
-    | PortType.Output when compType = ComponentType.Not
-                                    || compType = ComponentType.Nand
-                                    || compType = ComponentType.Nor
-                                    || compType = ComponentType.Xnor -> true;
-    | _ -> false;
+    match compType with
+    | Not | Nand | Nor | Xnor when portType = PortType.Output -> true
+    | _ -> false
 
 let createLabelName (genPort : GenericPort) (portType : PortType) (compType : ComponentType) (i : int) : string = 
     match genPort with
@@ -481,6 +504,7 @@ let createLabelName (genPort : GenericPort) (portType : PortType) (compType : Co
                 match portType with 
                 | PortType.Input -> sprintf "%s" (fst(List.item i y.InputLabels))
                 | PortType.Output -> sprintf "%s" (fst(List.item i y.OutputLabels))
+            | ComponentType.Constant _ | ComponentType.IOLabel | ComponentType.BusSelection _ -> ""
             | _ ->
                 match portType with 
                 | PortType.Input -> sprintf "IN%d" i
@@ -553,6 +577,9 @@ let portIndex (symType : SymbolType) (i : int) (len : int) (name : string) : int
     | Mux when name = "S0" -> len - 1
     | _ -> i
     
+let roundtoTen (n : float) : float = 
+    n + abs ((n % 10.) - 10.)
+
 /// Creates a new object of type symbol from component type, position, number of inputs, and number of outputs
 let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) list list) (pos : XYPos) (index : int) (label : string) : Symbol =
     
@@ -585,13 +612,15 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
     let nBot = if bot > 0 || top > 0 then max bot top else (int (ratioHW * n)) //If there is no ports on the top/bot, the component should still have ports in the portmap
     let h = 
         if left = 1 && right = 1 then 2. 
-        else n 
+        else n + 1. 
         |> (*) (stdHeight)
     let w = 
         if bot <= 0 && top <= 0 then
             max (ratioHW * h) test //Width is standard
-        else max ((float nBot) * stdHeight * 1.7) test //Or width based on number of ports on the bottom
-    let botR = {X = pos.X + w; Y = pos.Y + h}
+        else max ((float nBot) * stdHeight * 2.) test //Or width based on number of ports on the bottom
+        |> (+) 10.
+        |> roundtoTen
+    let botR = { X = pos.X + w; Y = pos.Y + h }
     
     // ---- Making portMap ---- //
     let portMap = getPortMap leftPort rightPort botPort topPort (makePosList (int n) nBot pos botR)
@@ -617,7 +646,7 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         Label = label
         IOList = (inputList, outputList) //Interface with issie
         Rotation = R0
-        Scale = {X = 1.; Y = 1.}
+        Scale = { X = 1.; Y = 1. }
     }
 
 //-----------------------Skeleton Message type for symbols---------------------//
@@ -638,17 +667,22 @@ let init () =
         CustomComponentType.OutputLabels = [("myOut1", 1); ("myOut2", 1)]  //(string * int) list 
     }
     [
-        //(createSymbol (ComponentType.And) [[("IN0", PortType.Input, false); ("IN1", PortType.Input, false)]; [("OUT1", PortType.Output, true)]; []; [("OUT2", PortType.Output, true); ("reallyreallyreallylonglabelname", PortType.Output, true); ("OUT4", PortType.Output, true)]] {X = 250.; Y = 150.} 0 (getSymLabel ComponentType.And 0))
-        (createSymbol (ComponentType.SplitWire 1) (findPortList 1 2 (ComponentType.SplitWire 1)) {X = 50.; Y = 100.} 0 (getSymLabel (ComponentType.SplitWire 1)0))
-        (createSymbol (ComponentType.Nand) (findPortList 2 1 ComponentType.Nand) {X = 200.; Y = 50.} 0 (getSymLabel ComponentType.Nand 0))
-        (createSymbol (ComponentType.Mux2) (findPortList 2 1 ComponentType.Mux2) {X = 300.; Y = 50.} 0 (getSymLabel ComponentType.Mux2 0))
-        (createSymbol (ComponentType.Demux2) (findPortList 1 2 ComponentType.Demux2) {X = 400.; Y = 50.} 0 (getSymLabel ComponentType.Demux2 0))
-        (createSymbol (ComponentType.Input 2) (findPortList 0 1 (ComponentType.Input 2)) {X = 200.; Y = 200.} 0 (getSymLabel (ComponentType.Input 2) 0))
-        (createSymbol (ComponentType.Decode4) (findPortList 2 4 ComponentType.Decode4) {X = 250.; Y = 250.} 0 (getSymLabel ComponentType.Decode4 0))
-        (createSymbol (ComponentType.Register 1) (findPortList 1 1 (ComponentType.Register 1)) {X = 500.; Y = 100.} 0 (getSymLabel (ComponentType.Register 1) 0))
-        (createSymbol (ComponentType.DFFE) (findPortList 1 1 ComponentType.DFFE) {X = 500.; Y = 200.} 0 (getSymLabel ComponentType.DFFE 0))
-        (createSymbol (ComponentType.RAM memory) (findPortList 1 1 (ComponentType.RAM memory)) {X = 500.; Y = 300.} 0 (getSymLabel (ComponentType.RAM memory) 0))
-        (createSymbol (ComponentType.Custom custom) (findPortList (List.length custom.InputLabels) (List.length custom.OutputLabels) (ComponentType.Custom custom)) {X = 20.; Y = 300.} 0 (getSymLabel (ComponentType.Custom custom) 0))
+        //(createSymbol (ComponentType.And) [[("IN0", PortType.Input, false); ("IN1", PortType.Input, false)]; [("OUT1", PortType.Output, true)]; []; [("OUT2", PortType.Output, true); ("reallyreallyreallylonglabelname", PortType.Output, true); ("OUT4", PortType.Output, true)]] { X = 250.; Y = 150.} 0 (getSymLabel ComponentType.And 0))
+        (createSymbol (ComponentType.SplitWire 1) (findPortList 1 2 (ComponentType.SplitWire 1)) { X = 50.; Y = 100.} 0 (getSymLabel (ComponentType.SplitWire 1)0))
+        (createSymbol (ComponentType.Nand) (findPortList 2 1 ComponentType.Nand) { X = 200.; Y = 50.} 0 (getSymLabel ComponentType.Nand 0))
+        (createSymbol (ComponentType.Mux2) (findPortList 2 1 ComponentType.Mux2) { X = 300.; Y = 50.} 0 (getSymLabel ComponentType.Mux2 0))
+        (createSymbol (ComponentType.Demux2) (findPortList 1 2 ComponentType.Demux2) { X = 400.; Y = 50.} 0 (getSymLabel ComponentType.Demux2 0))
+        (createSymbol (ComponentType.Input 2) (findPortList 0 1 (ComponentType.Input 2)) { X = 200.; Y = 200.} 0 (getSymLabel (ComponentType.Input 2) 0))
+        (createSymbol (ComponentType.Decode4) (findPortList 2 4 ComponentType.Decode4) { X = 250.; Y = 250.} 0 (getSymLabel ComponentType.Decode4 0))
+        (createSymbol (ComponentType.Register 1) (findPortList 1 1 (ComponentType.Register 1)) { X = 500.; Y = 100.} 0 (getSymLabel (ComponentType.Register 1) 0))
+        (createSymbol (ComponentType.DFFE) (findPortList 1 1 ComponentType.DFFE) { X = 500.; Y = 200.} 0 (getSymLabel ComponentType.DFFE 0))
+        (createSymbol (ComponentType.RAM memory) (findPortList 1 1 (ComponentType.RAM memory)) { X = 500.; Y = 300.} 0 (getSymLabel (ComponentType.RAM memory) 0))
+        (createSymbol (ComponentType.Custom custom) (findPortList (List.length custom.InputLabels) (List.length custom.OutputLabels) (ComponentType.Custom custom)) { X = 20.; Y = 300.} 0 (getSymLabel (ComponentType.Custom custom) 0))
+        (createSymbol (ComponentType.Constant (2,3) ) (findPortList 0 1 (ComponentType.Constant (2,3)) ) { X = 600.; Y = 300.} 0 (getSymLabel (ComponentType.Constant (2,3)) 22) )
+        (createSymbol (ComponentType.Constant (2, -2147483648) ) (findPortList 0 1 (ComponentType.Constant (2, -2147483648)) ) { X = 600.; Y = 300.} 0 (getSymLabel (ComponentType.Constant (2, -2147483648)) 522) )
+        (createSymbol (ComponentType.BusSelection (2,2) ) (findPortList 1 1 (ComponentType.BusSelection (2,2)) ) { X = 700.; Y = 300.} 0 (getSymLabel (ComponentType.BusSelection (2,2)) 522) )
+        (createSymbol (ComponentType.IOLabel ) (findPortList 1 1 (ComponentType.IOLabel) ) { X = 800.; Y = 300.} 0 (getSymLabel (ComponentType.IOLabel) 522) )
+
     ]
     , Cmd.none
 
@@ -734,7 +768,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
             if List.contains sym.Id sIdList then
                 let newSym = trans scaleCoords sym scale
                 { newSym with
-                    Scale = {X = sym.Scale.X * scale.X; Y = sym.Scale.Y * scale.Y }
+                    Scale = { X = sym.Scale.X * scale.X; Y = sym.Scale.Y * scale.Y }
                 }
             else
                 sym
@@ -790,7 +824,7 @@ let private renderObj =
                 match sym.GenericType with
                 | Wires -> 
                     if sym.HighlightError then "red"
-                    elif sym.Highlight then "purple"
+                    elif sym.Highlight || sym.PortHighlight then "green"
                     else "darkgrey"
                 | _ -> 
                     if sym.HighlightError then "red"
@@ -802,7 +836,7 @@ let private renderObj =
                 |> mapSetup
                 |> List.collect (fun (i, k) ->
                     if getPortName k = "Clk" then
-                        [(drawPolygon (clkCoords i) "black" color 1. (rotString sym i))[]]
+                        [(drawPolygon (clkCoords i) "black" color 1. (rotSide sym i))[]]
                     else [])
                 
             let labels : ReactElement list = 
@@ -839,7 +873,7 @@ let private renderObj =
                     SVGAttr.Stroke strokeColour
                     SVGAttr.StrokeWidth 0.5][]
 
-            let title = drawText (midSymX sym) (midSymY sym) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
+            let title = drawText (titlePos sym |> fst) (titlePos sym |> snd) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
             
             let symLabel = drawText (midSymX sym) (sym.TopL.Y - 10.) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Label]
             
@@ -851,6 +885,7 @@ let private renderObj =
                 if sym.PortHighlight then
                     sym
                     |> mapSetup
+                    |> List.filter (fun (_, port) -> getPortName port <> "Clk")
                     |> List.map(fun (i, _) -> drawCircle sym i "deepskyblue" "deepskyblue" 0.4 1.[])
                 else []
 
@@ -860,10 +895,59 @@ let private renderObj =
                     |> List.map(fun (i, _) -> drawCircle sym (displace -5. i sym) "purple" "purple" 0.4 1.[])
                 else []
             
+            let nonRotatedSymbolCoords =
+                let middle = midSym sym
+                ///Horizontal and vertical length. If at 90 or 270 degree then horizontal and verical swapped
+                let length = 
+                    match sym.Rotation with
+                    | R0 -> { X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y }
+                    | R180 -> { X = sym.BotR.X - sym.TopL.X; Y =  sym.BotR.Y - sym.TopL.Y }
+                    | _ -> { X =  sym.BotR.Y - sym.TopL.Y; Y = sym.BotR.X - sym.TopL.X }                             
+                let tL = { X = middle.X - length.X / 2. ; Y = middle.Y - length.Y / 2. }
+                let bR = { X = middle.X + length.X / 2. ; Y = middle.Y + length.Y / 2. }
+                (tL, bR, middle, length)
+
+            let tL, bR, middle, length = nonRotatedSymbolCoords
+
+            let drawConst : ReactElement = 
+                let p1 = { X = tL.X ; Y = tL.Y }
+                let p2 = { X = tL.X + 2. / 3. * length.X ; Y = tL.Y + length.Y / 2. }
+                let p3 = { X = bR.X ; Y = tL.Y + length.Y/2. }
+                let p4 = { X = tL.X ; Y = bR.Y }
+                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p2.X p2.Y p4.X p4.Y
+                drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
+
+            let drawBusSelect : ReactElement =
+                let p1 = tL
+                let p2 = { X = tL.X + length.X / 2.; Y = tL.Y }
+                let p3 = { X = bR.X - length.X / 4.; Y = tL.Y + length.Y / 4. }
+                let p4 = { X = bR.X ; Y = tL.Y + length.Y / 4. }
+                let p5 = { X = bR.X ; Y = bR.Y - length.Y / 4. }
+                let p6 = { X = bR.X - length.X / 4.; Y = bR.Y - length.Y / 4. }
+                let p7 = { X = tL.X + length.X / 2.; Y = bR.Y }
+                let p8 = { X = tL.X ; Y = bR.Y }
+                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f %f,%f" p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y p7.X p7.Y p8.X p8.Y
+                drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
+
+            let drawIOlabel =
+                let tL,bR,middle,length = nonRotatedSymbolCoords
+                let p1 = { X = tL.X ; Y = tL.Y + length.Y / 2. }
+                let p2 = { X = tL.X + length.X / 4. ; Y = tL.Y }
+                let p3 = { X = bR.X - length.X / 4. ; Y = tL.Y }
+                let p4 = { X = bR.X ; Y = tL.Y + length.Y / 2. }
+                let p5 = { X = bR.X - length.X / 4. ; Y = bR.Y }
+                let p6 = { X = tL.X + length.X / 4. ; Y = bR.Y }
+                let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f " p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y 
+                drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
+
+
             let symDraw = 
                 match sym.GenericType with
                 | Wires -> List.concat [wires; triangles]
                 | IO -> [io]
+                | IOLabel -> [drawIOlabel]
+                | Const -> [drawConst]
+                | BusSelect -> [drawBusSelect]
                 | _ -> [displayBox]
             
             g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos; drawClk])
@@ -924,6 +1008,7 @@ let getPortType (symModel: Model) (pId : PortId) : PortType =
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     symModel
     |>initPortSearch
+    |> List.filter (fun (_, port) -> getPortName port <> "Clk")
     |> List.tryFind (fun (v, _) -> testBox v pos)
     |> function
     | Some(v, Some k) -> Some(v, (PortId (k.Port.Id)))

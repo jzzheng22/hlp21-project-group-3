@@ -1,25 +1,15 @@
 # HLP21 Group 3 Main Repo
 
-## TODO: Test to see if 100 components and 200 wires works
+This repo contains our final deliverable code for the group project of HLP (ELEC 96019) 2021. It is an F# Elmish MVU implementation of the Draw2D JavaScript library used in [ISSIE](https://github.com/tomcl/ISSIE), which implements many advanced features in addition to those found in the current ISSIE application. 
 
-This code may be run by running the command `npm run dev` in this root directory.
+Code may be run by entrering on the command line `npm run dev` from within this root directory.
 
-Code written by the group members for their individual modules may be found by navigating to the `indiv_code` branch (link [here](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code)) and entering these directories:
+Code written by the group members for their individual modules may be found by navigating to the `indiv_code` branch (link [here](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code)). This code is now highly outdated compared to the latest commits in this repo.
 
-**Symbol**
-- [SY_JEMErrick](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/SY_JEMErrick) - Joanna Merrick
-- [SY_shafir360](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/SY_shafir360) - Shafir Rahman
 
-**BusWire**
-- [BW_adidesh20](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/BW_adidesh20) - Aditya Deshpande
-- [BW_gauthamravichandran](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/BW_gauthamravichandran) - Gautham Ravichandran
+## External Interface 
 
-**Sheet**
-- [SH_aamanrebello](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/SH_aamanrebello) - Aaman Rebello
-- [SH_jzzheng22](https://github.com/jzzheng22/hlp21-project-group-3/tree/indiv_code/SH_jzzheng22) - Jason Zheng
-
-To run code for any group member, cd into the relevant directory and run the code with that directory as build root. The demo schedules for each group member may be found in the README files in each of the above directories.
-
-## Interface Documentation
-
-Module documentation may be found in the [*doc*](doc) folder. There are three README files - [*sheet.md*](doc/sheet.md), [*buswire.md*](doc/buswire.md) and [*symbol.md*](doc/symbol.md) that detail the messages and interface functions that the three modules use to communicate with each other.
+Documentation may be found in the [*doc*](doc) folder:
+- [*Features.md*](doc/Features.md) lists out the different features of our implementation of the Draw2D library as well as the user interface for each feature. **This is the single page summary of features desired for the assessment**.
+- [*External_Interfaces.md*](doc/External_Interfaces.md) is useful for future integration with ISSIE/ further development of code. It explains how the program could integrate with the existing ISSIE code e.g. the widthInferrer.
+- The folder [*Internal_Interfaces*](doc/Internal_Interfaces) contains the interfaces between the modules *Symbol.fs*, *BusWire.fs* and *Sheet.fs*. This is for reference.
