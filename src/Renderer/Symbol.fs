@@ -76,13 +76,22 @@ type Symbol =
         Scale : XYPos
     }
 
+type SymbolAdd = {
+    CompType : ComponentType
+    PagePos: XYPos
+    Input: int
+    Output: int
+    Index: int    
+}
+
 type Model = Symbol list
 
 type Msg =
     /// Mouse info with coords adjusted form top-level zoom
     | MouseMsg of MouseT
     | Move of sIDList : ComponentId list * pagePos : XYPos
-    | Add of compType: ComponentType * pagePos : XYPos * numIn : int * numOut : int * i : int 
+    // | Add of compType: ComponentType * pagePos : XYPos * numIn : int * numOut : int * index : int 
+    | Add of addMsg: SymbolAdd
     | Delete of sIdList : ComponentId list
     | Highlight of sIdList: ComponentId list
     | HighlightError of sIdList: ComponentId list
@@ -699,8 +708,9 @@ let init () =
 
 let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
     match msg with
-    | Add (compType, pagePos, numIn, numOut, i) ->
-        (createSymbol compType (findPortList numIn numOut compType) pagePos i (getSymLabel compType i)) :: model, Cmd.none
+    // | Add (compType, pagePos, numIn, numOut, index) ->
+    | Add addMsg ->
+        (createSymbol addMsg.CompType (findPortList addMsg.Input addMsg.Output addMsg.CompType) addMsg.PagePos addMsg.Index (getSymLabel addMsg.CompType addMsg.Index)) :: model, Cmd.none
 
     | Delete sIdList -> 
         List.filter (fun sym -> not (List.contains sym.Id sIdList)) model, Cmd.none
@@ -1018,7 +1028,7 @@ let getPortType (symModel: Model) (pId : PortId) : PortType =
 /// Finds if a position lies on a port. Returns Some(position, portId) if found, none otherwise.
 let isPort (symModel : Model) (pos : XYPos) : (XYPos * PortId) Option =
     symModel
-    |>initPortSearch
+    |> initPortSearch
     |> List.filter (fun (_, port) -> getPortName port <> "Clk")
     |> List.tryFind (fun (v, _) -> testBox v pos)
     |> function
@@ -1041,6 +1051,13 @@ let isLabel (model : Model) (pos : XYPos) (sId : ComponentId) : (ComponentId * X
             |> Some
     | _ -> None
     
+
+let getSymbol (model : Model) (sId : ComponentId) : Symbol = 
+    model
+    |> List.tryFind (fun sym -> sym.Id = sId)
+    |> function
+    | Some sym -> sym
+    | None -> failwithf "Error in getSymbol, couldn't find symbol"
 
 //Returns a list of Port Ids for a given symbol
 let getPortIds (model : Model) (sId : ComponentId) : PortId list = 
@@ -1074,6 +1091,17 @@ let getPort (model : Model) (pId : PortId) : Port =
     |> function
     | Some x -> x.Port
     | None -> failwithf "Unexpected error in getPort"
+
+//Returns the number of inputs and outputs for a given symbol as a tuple
+let getNumIOs (sym : Symbol) : (int * int) =
+    let (inPorts, outPorts) = sym.IOList
+    let (i, o) = (List.length inPorts, List.length outPorts)
+    match sym.GenericType with
+    | RAM | FFE -> (i - 2, o)
+    | FF -> (i - 1, o)
+    | Adder -> (i - 1, o - 1)
+    | Mux -> (i - 1, o)
+    | _ -> (i, o)
     
 //----------------------interface to Issie-----------------------------//
 
