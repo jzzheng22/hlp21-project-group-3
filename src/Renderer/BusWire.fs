@@ -934,6 +934,26 @@ let getWires (wModel : Model) (cIdList : CommonTypes.ConnectionId list) : Common
     wModel.WX
     |> List.map (fun x -> x.Id)
     |> List.filter (fun x -> not (List.contains x cIdList))
+
+let getWireSegList (wireId : CommonTypes.ConnectionId) (wModel : Model) : ( CommonTypes.ConnectionId * int) list =
+    wModel.WX
+    |> List.tryFind (fun w -> w.Id = wireId)
+    |> function
+    | Some wire -> 
+        List.map (fun segment -> segment.wId, segment.Index) wire.Segments
+        // List.collect (fun wire -> 
+            // List.map (fun segment -> 
+                // (segment.wId, segment.Index)) wire.Segments)
+    | None -> failwithf "Could not find wire"
+
+
+    // //     wModel.WX
+    // |> List.collect (fun w->
+    //                 List.map (fun (segment:WireSegment)->
+    //                             ( segment.wId,segment.Index,fst segment.BB, snd segment.BB))w.Segments)
+
+                    // List.map (fun (segment:WireSegment)->
+                                // ( segment.wId,segment.Index,fst segment.BB, snd segment.BB))w.Segments)
 //----------------------interface to Issie-----------------------//
 
 /// Converts a wire segment list into a list of distinct vertices

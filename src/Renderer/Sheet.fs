@@ -584,6 +584,7 @@ let deleteSymbols model wModel =
 
 /// Updates model with new positions of moved elements.
 let moveElements model mousePos =
+    printf "%A" model.TogglingSelection
     let transVector =
         { X = (mousePos.X - model.DraggingPos.X)
           Y = (mousePos.Y - model.DraggingPos.Y) }
@@ -804,28 +805,49 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
 
 
 
-        List.fold copySymbolFold ({model with SelectedComponents = []; CopyingSymbol = true}, Cmd.none) oldComponents
-        // {model with sModel}
-        // let copyConnectionFold (model, cmd) wireId =
-        //     // let sym = Symbol.getSymbol model.Wire.Symbol compId
-        //     // let input, output = Symbol.getNumIOs sym
-        //     // let addMsg: Symbol.SymbolAdd = {
-        //     //     CompType = sym.Type
-        //     //     PagePos = newPos sym.TopL
-        //     //     Input = input
-        //     //     Output = output
-        //     //     Index = getNewSymbolIndex model sym.Type}
-        //     let wModel, wCmd = BusWire.update (BusWire.AddWire addMsg) model.Wire 
-        //     {model with 
-        //         Wire = wModel; 
-        //         SelectedWireSegments = (List.head wModel.WX).Id :: model.SelectedWireSegments
-        //         AddingSymbol = true;    
-        //     }, Cmd.batch[Cmd.map Wire sCmd; cmd]
+        let newModel, newCmds = List.fold copySymbolFold ({model with SelectedComponents = []; CopyingSymbol = true}, Cmd.none) oldComponents
+        let newComponents = newModel.SelectedComponents
+        let mapPort (oldPort: CommonTypes.Port) (newPort: CommonTypes.Port) =
+            (CommonTypes.PortId oldPort.Id, CommonTypes.PortId newPort.Id)
+        let mapPorts oldCompId newCompId =
+            let oldComp = Symbol.getSymbol newModel.Wire.Symbol oldCompId
+            let newComp = Symbol.getSymbol newModel.Wire.Symbol newCompId
+            let inputs = 
+                (fst oldComp.IOList, fst newComp.IOList)
+                ||> List.map2 mapPort
+            let outputs = 
+                (snd oldComp.IOList, snd newComp.IOList)
+                ||> List.map2 mapPort
+            inputs @ outputs
 
-        // List.fold copyWireFold ({sModel with SelectedWireSegments = []; CopyingSymbol = true}, sCmd) oldConnections
+        let portMappings = 
+            (oldComponents, newComponents)
+            ||> List.map2 mapPorts
+            |> List.concat
+            |> Map.ofList
 
+        let mapToNewConnection (model, cmd) (wireId: CommonTypes.ConnectionId) =
+            printf "mapToNEwCoenection"
+            let newPort portId =
+                match Map.tryFind portId portMappings with
+                | Some port -> port
+                | None -> failwithf "Could not find port ID in copy paste"
+            let oldStartPort, oldEndPort = BusWire.connectToPort model.Wire wireId
+            let newStartPort = newPort oldStartPort
+            let newEndPort = newPort oldEndPort
+            let wModel, wCmd = BusWire.update (BusWire.AddWire(newStartPort, newEndPort)) model.Wire
+            let newWireSegs = BusWire.getWireSegList (List.head wModel.WX).Id wModel
+            {model with 
+                Wire = wModel; 
+                SelectedWireSegments = newWireSegs @ model.SelectedWireSegments
+                AddingSymbol = true;    
+            }, Cmd.batch[Cmd.map Wire wCmd; cmd]
+        printf "Before oldConnections"
+        oldConnections
+        |> List.map (fun x -> fst x)
+        |> List.fold mapToNewConnection ({newModel with SelectedWireSegments = []; CopyingSymbol = true}, newCmds)
 
-
+        // newModel, newCmds
 
 
         // {model with Clipboard = model.SelectedComponents, model.SelectedWireSegments}, Cmd.none
@@ -892,9 +914,10 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | SelectLabel x -> 
         { model with SelectedLabel = x }, Cmd.none
     | ToggleSelectionOpen ->
-        if List.isEmpty model.SelectedComponents && List.isEmpty model.SelectedWireSegments then  
+        if List.isEmpty model.SelectedComponents || List.isEmpty model.SelectedWireSegments then  
             model, Cmd.none
-        else 
+        else
+            printf "Set togglingselection to true"
             {model with TogglingSelection = true}, Cmd.none
     | ToggleSelectionClose -> {model with TogglingSelection = false}, Cmd.none
     | ToggleSymbols symbolIdList ->
