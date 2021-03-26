@@ -839,7 +839,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} seg.TargetPos 
                 |_ -> seg
             |_ -> failwithf "Negative Index"
-        /// Returns true if first or last segment is too short and false otherwise
+        /// Returns false if first or last segment is too short and true otherwise
         let condition (w:Wire)=
             let head= List.head w.Segments
             let last = List.last w.Segments
