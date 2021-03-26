@@ -819,7 +819,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     | MoveWires (wId,idx,vec) ->
         let a = idx - 1
         let b = idx + 1
-        let move (w:Wire) (seg:WireSegment) idx wId vector=
+        let move (w:Wire)  idx wId vector (seg:WireSegment)=
             
             let last = (List.length w.Segments) - 1
             match idx with
@@ -839,7 +839,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} seg.TargetPos 
                 |_ -> seg
             |_ -> failwithf "Negative Index"
-        
+        /// Returns true if first or last segment is too short and false otherwise
         let condition (w:Wire)=
             let head= List.head w.Segments
             let last = List.last w.Segments
@@ -853,6 +853,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             |_,Symbol.Left when last.SourcePos.X>last.TargetPos.X - 9. ->false
             |_,Symbol.Bottom when last.SourcePos.Y<last.TargetPos.Y + 9. ->false
             |_ -> true
+           
+          
 
         let validateWires (wLst: Wire list): bool =
             wLst
@@ -865,14 +867,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let segLstLst =
             model.WX
             |> List.map (fun w ->
-                List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
+                List.map (fun (seg:WireSegment)-> move w  idx wId vec seg) w.Segments)
 
         let wList= 
             model.WX
             |> List.mapi (fun i w-> {w with Segments = setIndex segLstLst.[i]})
             |> List.map (fun w ->
-                if  w.Id=wId  then
+                if  w.Id=wId then
+                    
                     {w with Manual = true}
+                            
                 else 
                     w 
             )
@@ -880,6 +884,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             {model with WX = wList}, Cmd.none 
         else 
             model, Cmd.none
+        
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | UpdateWidth lst ->        
