@@ -127,9 +127,6 @@ Wires should be selectable: should do autorouting initially but be selectable an
 `Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
  - Returns the ComponentID which the PortID belongs to.
 
- `Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge`
- - Returns the edge of the symbol that the port is on
-
  `Symbol.getPortIds (model : Model) (sId : ComponentId) : PortId list`
  - Returns a list of PortIds for the ports on a given symbol.
 
