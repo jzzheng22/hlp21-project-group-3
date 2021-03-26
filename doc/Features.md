@@ -42,25 +42,34 @@
 ## Wires
 
 ### Adding Wires
-- Dragging a dotted line between symbol ports creates a new wire. User friendly UI highlights port positions and possible connections.
+- Dragging a dotted line between symbol ports creates a new wire.
+- User friendly UI highlights port positions and possible connections.
 - **Width inference** indicates an error by highlighting if input and output port widths are incompatible.
 
 ### Selecting Wire
-- Done by clicking or dragging selection box. For two selected symbols, all wires joing them are also selected.
+- Wires can be selected by:
+    - Clicking the wire.
+    - Dragging selection box over the wire.
+- For two selected symbols, all wires joing them are also selected.
 
 ### Deleting selected Wire(s)
-- Done by pressing 'delete' or by using drop down menu
-
-### Moving Wire Segments
-- Drag the mouse on a section of wire and the selected wire segment will follow.
+- Wires can be deleted by:
+    - Pressing the 'delete' key 
+    - Using drop down menu (found in Edit -> Delete)
 
 ### Routing
 - Initial routing: automatic routing with symbol avoidance.
 - Routing can be manually adjusted by moving wire segments that aren't connected to any symbol port.
 - More segments can be added by right clicking on a wire - three additional segments will appear at the click position.
 
+### Moving Wire Segments
+- To move wire segments:
+    - Left click the section of the wire you wish to move
+    - Holding left click, drag the mouse and the selected wire segment will follow.
+
 ### Adding Segments to Wires
-- When a user right-clicks on top of a wire, three new wire segments are generated in the wire at the click position. This allows the user to have more flexibility in manual routing.
+- When a user right-clicks on top of a wire, three new wire segments are generated in the wire at the click position. 
+- This allows the user to have more flexibility in manual routing.
 
 ## Overall UI
 
