@@ -71,7 +71,10 @@
 - Both of the above changes disappear when the illegal connection/one or both of the connected symbols is deleted.
 
 ### Copy-Paste
-- INSERT EXPLANATION
+- First highlight the symbol(s) (and wire(s)), using the various selection options (drag, holding ctrl and clicking, clicking on a single symbol)
+- Press Ctrl+C to copy
+- Click on the canvas where you want to paste
+- To stop pasting press `delete`
 
 ### Undo-Redo
 - INSERT EXPLANATION
