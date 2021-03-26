@@ -4,10 +4,11 @@
 ## Symbols:
 
 ### Adding Symbols
-- Newly added symbol follows mouse movement and positions itself where the mouse first clicks. *Automatic snapping to grid*.
+- Newly added symbol follows mouse movement and positions itself where the mouse first clicks.  
+- On clicking, the symbol automatically snaps to grid.
 - Each new symbol comes with its own unique name label.
 - Custom components are possible.
-- Clocked symbols have the clock icon (wires cannot be connected to clocks)
+- Clocked symbols have the clock icon (wires cannot be connected to clocks).
 
 ### Selecting Symbols
 - May be done by: 
