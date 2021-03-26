@@ -95,6 +95,6 @@
 
 ### Copy-Paste
 - First highlight the symbol(s) (and wire(s)), using the various selection options (drag, holding ctrl and clicking, clicking on a single symbol)
-- Press `Ctrl+C` to copy
-- Click on the canvas where you want to paste
-- To stop pasting press `esc`
+- Press `Ctrl+C` to copy. A copy of the selected elements will move with the mouse.
+- Click on the canvas where you want to paste. By default once the group of symbols and wires have been pasted, a new copy of these is generated that will move with the mouse.
+- To stop this repetitive pasting press `esc` or `delete` - or "Cancel" in the Symbol drop-down menu.
