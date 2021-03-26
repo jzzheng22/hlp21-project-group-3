@@ -510,7 +510,7 @@ let changeSymbolSize model id mousePos =
 
 /// Moves a symbol so that it snaps to grid.
 let snapToGrid model =
-
+    (*
     let transVector =
         match model.SelectedComponents with 
         | hd::_ -> 
@@ -519,18 +519,30 @@ let snapToGrid model =
             | (topL, _) ->
                 snapGridVector topL
         | [] -> {X=0. ; Y=0.}
-    
+    *)
+    let transVectors =
+        model.SelectedComponents
+        |> List.map (Symbol.getBoundingBox model.Wire.Symbol)
+        |> List.map (function | (topL, _) -> snapGridVector topL)
 
-    let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire
+    let snapFold (inModel, inCmd) (id, vector) = 
+        let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move([id], vector))) inModel
+        sModel, Cmd.batch [inCmd; sCmd]
+
+    let s2Model, s2Cmd =     
+        List.zip model.SelectedComponents transVectors
+        |> List.fold snapFold (model.Wire, Cmd.none)
+
+    //let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) model.Wire
     let selectedWires= model.SelectedWireSegments |> List.map fst |> List.distinct
-    let wiresToSnap = BusWire.chooseWiresToUpdate model.SelectedComponents model.Wire sModel.Symbol @ selectedWires
+    let wiresToSnap = BusWire.chooseWiresToUpdate model.SelectedComponents model.Wire s2Model.Symbol @ selectedWires
     let wModel, wCmd = 
-                BusWire.update(BusWire.SnapWire(wiresToSnap)) sModel
+                BusWire.update(BusWire.SnapWire(wiresToSnap)) s2Model
     { model with 
         Wire = wModel;
         SelectedPort = None, CommonTypes.PortType.Input;
         SelectingMultiple = false; 
-        },Cmd.batch [Cmd.map Wire sCmd ;Cmd.map Wire wCmd]
+        },Cmd.batch [Cmd.map Wire s2Cmd ;Cmd.map Wire wCmd]
 
 ///Top left corners of all symbols.
 let topleftCorners model =
