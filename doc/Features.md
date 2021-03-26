@@ -104,3 +104,7 @@
 - Click on the canvas where you want to paste. By default once the group of symbols and wires have been pasted, a new copy of these is generated that will move with the mouse.
 - To stop this repetitive pasting press `Esc` or `Delete` - or "Cancel" in the Symbol drop-down menu.
 - Pressing `Esc` will keep the elements that have just been copied; `Del` will remove them.
+
+### Grid
+- The grid on the canvas is currently set to 2000 by 2000
+- Each square is 10 x 10

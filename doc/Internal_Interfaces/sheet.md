@@ -49,6 +49,20 @@ Sheet can also access Symbol directly if needed.
  - XYPos is a translation vector.
  - Move wires in list by given translation vector.
 
+`UpdateWidth of (CommonTypes.ConnectionId * int Option) list`
+ - For each ConnectionID in the list, if the int is `Some x`, the width is updated to to `x`.
+ - If the int is `None`, there is no change.
+
+`HighlightError of CommonTypes.ConnectionId list`
+ - Highlights any wires in the list as having an error.
+
+`AddSegment of CommonTypes.ConnectionId * int * XYPos`
+- On a right-click, sends a message to BusWire to add a 'kink' (three short wire segments) to allow for easier manual routing.
+- Contains the ConnectionId, the current segment index, and the position on the page where the mouse was clicked.
+
+`SnapWire of CommonTypes.ConnectionId list`
+- Contains a list of ConnectionIds which need to be snapped to the nearest grid line.
+
 
 **To Symbol:** (see [symbol.md](./symbol.md) for description)
 
@@ -56,13 +70,25 @@ Sheet can also access Symbol directly if needed.
  - XYPos is a translation vector.
  - Move symbols in list by given translation vector.
 
-`Add of compType: CommonTypes.ComponentType * pagePos: XYPos * numIn: int * numOut: int`
+`Add of addMsg: SymbolAdd`
  - Adds a new symbol based on the provided information.
- - compType: type of component.
- - pagePos: location on canvas.
- - numIn: number of input ports.
-    - This number does not include any enable or clock signals
- - numOut: number of output ports.
+ - `Symbol.SymbolAdd` is a record type containing:
+
+   ```
+   type SymbolAdd = {
+      CompType : ComponentType
+      PagePos: XYPos
+      Input: int
+      Output: int
+      Index: int    
+   }
+   ```
+
+ - `CompType` is the component type.
+ - `PagePos` is where the top left corner of the symbol should be.
+ - `Input` and `Output` are the number of required input and output ports, respectively.
+    * `Input` does not include any enable or clock signals
+ - `Index` is the number at the end of the symbol label.
 
 `Delete of CommonTypes.ComponentId list`
  - Deletes all symbols whose IDs are in the list.
@@ -70,31 +96,34 @@ Sheet can also access Symbol directly if needed.
 
 `Highlight of CommonTypes.ComponentId list`
  - Highlights symbols in list.
- - See also later discussion.
+
+`HighlightError of sIdList: ComponentId list`
+ - Highlights symbols when they are in an error state.
+ - Sent from Sheet via BusWire.
 
 `HighlightPorts of CommonTypes.ComponentId list`
 - Highlight all ports of symbols in list.
 
-*Optional messages implemented in JEMerrick's Symbol:*
+`DragPort of sId : CommonTypes.ComponentId * pId : CommonTypes.PortId * pagePos: XYPos`
+ - Moves the selected port to the port position closest to the mouse.
+ - Ports have pre-specified locations where they can be moved to.
+
 `Rotate of sId : CommonTypes.ComponentId list * rot : int`
  - Rotates a list of symbols clockwise by `rot` degrees.
- - Unit of rotation is degrees, and limited to ints.
+ - Sent from Sheet via BusWire.
 
-`Scale of CommonTypes.ComponentId list * XYPos`
+`Scale of sId : CommonTypes.ComponentId list * scale : XYPos`
  - Scales a list of symbols by specified factor in X and Y directions.
  - Used to magnify, shrink, stretch and distort symbols.
-
-`HighlightError of sIdList: CommonTypes.ComponentId list`
- - Highlights symbols when they are in an error state.
  - Sent from Sheet via BusWire.
 
 `DisplaySlots of sId : ComponentId`
-- Displays all slots a port may be moved to on the component
+ - Highlights all possible positions a port may be moved to on the symbol
 
-`Rename of sId : ComponentId * name : string`
-- Changes the label on a component to the name given
+`Rename of sId : CommonTypes.ComponentId * name : string`
+- Changes the label of the component to a given string
 
-## BusWidthInferer interface
+## BusWidthInferer Interface
 
 `BusWidthInferer.inferConnectionsWidth ((comps,conns) : CanvasState) : Result<ConnectionsWidth, WidthInferError>`
 - Takes in a list of Issie Components and Issie Connections and returns 
