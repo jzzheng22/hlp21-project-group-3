@@ -11,7 +11,7 @@
 - May be done by: 
     - Clicking on a symbol.
     - Dragging a box over multiple symbols.
-    - Holding `Ctrl` and then mouse clicking to select multiple
+    - Holding `Ctrl` and then mouse clicking/dragging to select multiple
 - Upon selecting a symbol red circles will appear at the corners to show the user where to drag from to scale the symbol.
 
 ### Deleting Selected Symbols
