@@ -940,6 +940,29 @@ let private renderObj =
                 let stringPoints = sprintf "%f,%f %f,%f %f,%f %f,%f %f,%f %f,%f " p1.X p1.Y p2.X p2.Y p3.X p3.Y p4.X p4.Y p5.X p5.Y p6.X p6.Y 
                 drawPolygon stringPoints strokeColour color 1. (rotString sym middle) []
 
+            let drawcorners : ReactElement List =
+                let circle (pos : XYPos) : ReactElement =
+                    circle[
+                        Cx pos.X
+                        Cy pos.Y
+                        R 2.5
+                        SVGAttr.Fill "red"
+                        SVGAttr.Stroke "black"
+                        SVGAttr.Opacity 50.
+                        SVGAttr.StrokeWidth 1.][]
+                       
+                if sym.PortHighlight then
+                    let cornerSegLength = 5
+                    let p1 = sym.TopL
+                    let p2 = { X = sym.BotR.X ; Y = sym.TopL.Y }
+                    let p3 = { X = sym.TopL.X ; Y= sym.BotR.Y }
+                    let p4 = sym.BotR
+                    [circle p1;
+                     circle p2;
+                     circle p3;
+                     circle p4]
+                else
+                    [g[][]]
 
             let symDraw = 
                 match sym.GenericType with
@@ -950,7 +973,7 @@ let private renderObj =
                 | BusSelect -> [drawBusSelect]
                 | _ -> [displayBox]
             
-            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos; drawClk])
+            g[](List.concat [symDraw; labels; drawInvert; ports; [title]; [symLabel]; labelPos; drawClk; drawcorners])
             
     , "Circle"
     , equalsButFunctions
