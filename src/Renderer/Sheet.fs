@@ -565,7 +565,6 @@ let deleteSymbols model wModel =
 
 /// Updates model with new positions of moved elements.
 let moveElements model mousePos =
-    printf "%A" model.TogglingSelection
     let transVector =
         { X = (mousePos.X - model.DraggingPos.X)
           Y = (mousePos.Y - model.DraggingPos.Y) }
@@ -661,7 +660,7 @@ let deleteElements model =
 
     let (wires, newModel, wCmd2, msg) = getWires deleteModel
     let sModel2, sCmd2 = BusWire.update (BusWire.Symbol (Symbol.HighlightError (List.collect (fun wire -> BusWire.connectedSymbols deleteModel.Wire wire) wires))) newModel
-    {deleteModel with Wire = sModel2; ErrorMsg = msg}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
+    {deleteModel with Wire = sModel2; ErrorMsg = msg; CopyingSymbol = false; SelectingMultiple = false}, Cmd.batch [Cmd.map Wire wCmd1; Cmd.map Wire sCmd1; Cmd.map Wire wCmd2; Cmd.map Wire sCmd2]
 
 let getFirstSymbol model = List.head model.SelectedComponents
 let magnifyFactor = {X = 1.25; Y = 1.25}
@@ -738,7 +737,7 @@ let copyElements model =
         inputs @ outputs
 
     let portMappings = 
-        (oldComponents, newComponents)
+        (oldComponents, List.rev newComponents)
         ||> List.map2 mapPorts
         |> List.concat
         |> Map.ofList
