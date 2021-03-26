@@ -45,6 +45,7 @@
 ### Moving of ports and labels
 - Ports may be moved to other positions on the periphery of the symbol as per user convenience. This is done by holding down the right mouse button at the location of the port and dragging in any direction.
 - The set of postions where the port can be moved will highlight in purple. Drag the mouse towards one of these locations. Upon mouse release the selected port will be moved (and possibly swapped with) the closest point to the mouse release position. 
+- NOTE: Known issue - Subsequent port move operations after the initial one require 2 tries to work. This is likely due to not updating the model in sheet correctly but currently unknown why this happens.
 
 ## Wires
 
