@@ -14,6 +14,13 @@ This describes code interfaces. UI interfaces are described under [*Features.md*
 
 ## Sheet
 
+### Interface with WidthInferer
+- Whenever a wire is added or deleted (or a symbol is deleted)
+- UpdateWidths message is called
+- This first calls the extract functions in symbol and buswire to convert to issie types
+- Then sends this into widthInferer
+- In order to get all the error messages, if there was an error, it must send each one into widthInferer seperately and concatenate the results
+
 `Add symbol`
 - Pressing Alt+A currently adds a single MUX to the canvas.
 - This is detected as a KeyPress message in sheet. The update function of sheet in turn sends a `Symbol.Add of Symbol.SymbolAdd` message to the Symbol module, which then adds the new symbol. The *Symbol.SymbolAdd* type contains the information to create the new Symbol and is currently hardcoded to a mux with two inputs and one output.
