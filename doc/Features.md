@@ -6,6 +6,7 @@
 ### Adding Symbols
 - Newly added symbol follows mouse movement and positions itself where the mouse first clicks.  
 - On clicking, the symbol automatically snaps to grid.
+- Pressing `delete` deletes the symbol being dragged.
 - Each new symbol comes with its own unique name label.
 - Custom components are possible.
 - Clocked symbols have the clock icon (wires cannot be connected to clocks).
@@ -37,7 +38,7 @@
         - Selecting Magnify/Diminish in the drop down menu (found in Symbol dropdown options)
         - Or with shortcuts: `Alt-M` (magnify), `Alt-D` (diminish).
 - All transformed symbols automatically snap to grid. 
-- NOTE: Ports do not automatically snap to grid after a scaling transformation, and require some user input to align correctly.
+- **NOTE:** Ports do not automatically snap to grid after a scaling transformation, and require some user input to align correctly.
 - Shrinking below a side length of one grid square length is not allowed.
 
 ### Aligning Selected Symbol Groups
@@ -49,7 +50,7 @@
 ### Moving of ports and labels
 - Ports may be moved to other positions along the edge of the symbol. This is done by holding down the right mouse button at the location of the port and dragging.
 - The set of postions where the port can be moved will highlight in purple. Drag the mouse towards one of these locations. Upon mouse release the selected port will be moved (and possibly swapped with) the closest point to the mouse release position. 
-- NOTE: Known issue - Subsequent port move operations after the initial one require two tries to work. This is likely due to not updating the model in Sheet correctly but currently unknown why this happens.
+- **NOTE:** Known issue - Subsequent port move operations after the initial one require two tries to work. This is likely due to not updating the model in Sheet correctly but currently unknown why this happens.
 
 ## Wires
 
@@ -110,6 +111,7 @@ BusWire implements all of ISSIE's routing features, as well as supporting rotati
 ### Toggling Selection of Symbols
 - On holding down `Ctrl`, the app enters a "toggling" state. In this state, any unselected element that is selected (via click or drag) will become selected and highlighted, while selected elements will unselect and unhighlight. 
 - This does not conflict with keyboard shortcuts.
+- **NOTE:** Known issue - On holding down control and dragging the mouse, the dragging box does not render. However, symbols that would fall within the dragging box toggle their selction. This can probably be solved by an easy fix.
 
 ### Error Messages and Highlighting
 - When the user attempts to drag a wire between two ports of different width, the illegal connection and the two symbols on either end are highlighted red.
