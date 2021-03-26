@@ -75,6 +75,3 @@
 - Press Ctrl+C to copy
 - Click on the canvas where you want to paste
 - To stop pasting press `esc`
-
-### Undo-Redo
-- INSERT EXPLANATION
