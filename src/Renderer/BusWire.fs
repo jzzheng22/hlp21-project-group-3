@@ -36,8 +36,6 @@ type Wire = {
     TargetPortId: CommonTypes.PortId
     TargetPortEdge: Symbol.Edge
     Segments: WireSegment list
-    //Vertices: XYPos list
-    //BoundingBoxes: (CommonTypes.ConnectionId * XYPos * XYPos) list
     Width: int
     Highlight: bool
     HighlightError : bool
@@ -322,9 +320,11 @@ let makeWireBB (sPos:XYPos) (tPos:XYPos): XYPos * XYPos=
     | (sx,sy,tx,ty) when ty<sy -> ({X=tx-5.;Y=ty},{X=tx+5.;Y=sy})
     | (sx,sy,tx,ty) when (tx=sx && ty=sy) -> ({X=tx;Y=ty},{X=sx;Y=sy})
     | _ -> failwithf "diagonal line error"
-    
+/// Returns true is Wire Segment is horizontal and false otherwise    
 let isHoriz (seg:WireSegment)= seg.SourcePos.Y=seg.TargetPos.Y
+/// Snaps a X or Y co-ordinate to the grid.
 let snap (pos:float)= (round (pos/ 10.))*10.
+///Takes in WireSegment List and returns the the list with the correct index field for each segment
 let setIndex (lst: WireSegment list) =
     lst 
     |> List.mapi (fun i seg-> {seg with Index= i})
@@ -348,13 +348,13 @@ let makeWireSegment (wId:CommonTypes.ConnectionId) (width:int) (srcPos) (tgtPos)
         Width=width
     }
 
-/// Sets the indexes for each segment in a wire
+/// Snaps a single segment to the grid 
 let snapSeg (seg:WireSegment) (srcPos:XYPos)=
     if isHoriz seg then
         (makeWireSegment seg.wId seg.Width srcPos {X=snap seg.TargetPos.X ;Y=srcPos.Y},{X=snap seg.TargetPos.X ;Y=srcPos.Y})
     else 
         (makeWireSegment seg.wId seg.Width srcPos {X=srcPos.X ;Y= snap seg.TargetPos.Y},{X=srcPos.X ;Y= snap seg.TargetPos.Y})
-
+///Snaps a segment list (that makes up a whole wire) to the grid
 let rec snapWireSegments  (currSrc:XYPos) (segLstOut:WireSegment List) (count:int) (segLstIn:WireSegment List)=
 
     match count with 
@@ -566,7 +566,7 @@ let checkFirstSegmentLength (wire:Wire) (sm: Symbol.Model) =
     | Symbol.Top when head.TargetPos.Y>src.Y - 9. ->true
     | Symbol.Bottom when head.TargetPos.Y<src.Y + 9. ->true
     | _ -> false
-///Returns true if first segment is shorter than offset (9.) and true otherwise
+///Returns true if last segment is shorter than offset (9.) and false otherwise
 let checkLastSegmentLength (wire:Wire) (sm: Symbol.Model) =
 
     let tgt= Symbol.getPortCoords sm wire.TargetPortId
@@ -577,7 +577,8 @@ let checkLastSegmentLength (wire:Wire) (sm: Symbol.Model) =
     | Symbol.Top when tail.SourcePos.Y>tgt.Y - 9. ->true
     | Symbol.Bottom when tail.SourcePos.Y<tgt.Y + 9. ->true
     | _ -> false
-let manualRoute (wire: Wire) (sm: Symbol.Model)  (multipleMove:bool) : WireSegment list =
+///Determines movement of Wire when in manual routing mode and there is symbol movement
+let manualRouteSymbolMove (wire: Wire) (sm: Symbol.Model)  (multipleMove:bool) : WireSegment list =
     let noOfSegments= List.length wire.Segments
     let last = noOfSegments - 1
     let prevSrc= wire.Segments.[0].SourcePos
@@ -592,90 +593,81 @@ let manualRoute (wire: Wire) (sm: Symbol.Model)  (multipleMove:bool) : WireSegme
 
     let fstLength = checkFirstSegmentLength wire sm
     
-    //if head.TargetPos.X<src.X + 9. then true else false
+    
     let lstLength = checkLastSegmentLength wire sm
 
 
 
     wire.Segments
-    |> List.mapi (fun i seg -> 
+    |> List.mapi (fun i seg ->
+         
         match i ,wire.StartHoriz ,wire.EndHoriz with
-        | _ when multipleMove -> makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) (Symbol.posAdd seg.TargetPos vecSrc) 
-        | 0,true,_ when fstLength ->
-            makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
+        
+        | _ when multipleMove -> 
+            makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) (Symbol.posAdd seg.TargetPos vecSrc) 
+        (* 'PUSHING' FUNCTIONALITY - When symbol moves and either the first or last segment length get too small these 
+        lengths remain fixed and symbol pushes wire*)
+        
+        //when first segment is too short
+        | 0,_,_ when fstLength ->
+           makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
 
         | 1,true,_ when fstLength ->
             makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X + vecSrc.X; Y=seg.TargetPos.Y}
-
         | 2,true,_ when fstLength ->
             makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X + vecSrc.X; Y=seg.SourcePos.Y} seg.TargetPos
-
-        | 0,false,_ when fstLength ->
-            makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
-
+ 
         | 1,false,_ when fstLength ->
             makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) {X=seg.TargetPos.X ; Y=seg.TargetPos.Y+vecSrc.Y}
-
         | 2,false,_ when fstLength ->
             makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X ; Y=seg.SourcePos.Y+ vecSrc.Y} seg.TargetPos
         
-        | x,_,true when x=last && lstLength ->
+        //when last segment is too short
+        | x,_,_ when x=last && lstLength ->
             makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
-
+        
         | x,_,true when x=last - 1 && lstLength ->
             makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X + vecTgt.X; Y=seg.SourcePos.Y} (Symbol.posAdd seg.TargetPos vecTgt)
-
         | x,_,true when x=last - 2 && lstLength ->
             makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X + vecTgt.X; Y=seg.TargetPos.Y}
 
-        | x,_,false when x=last && lstLength ->
-            makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecTgt) tgt
 
         | x,_,false when x=last - 1 && lstLength ->
             makeWireSegment wire.Id wire.Width  {X=seg.SourcePos.X ; Y=seg.SourcePos.Y + vecTgt.Y} (Symbol.posAdd seg.TargetPos vecTgt)
-
         | x,_,false when x=last - 2 && lstLength ->
             makeWireSegment wire.Id wire.Width  seg.SourcePos {X=seg.TargetPos.X ; Y=seg.TargetPos.Y + vecTgt.Y}
         
+        (* WHEN THERE IS SYMBOL MOVEMENT THE 2 CLOSEST SEGMENT ATTACHED TO THE SYMBOL MUST UPDATE CORRECTLY, THE OTHERS REMAIN FIXED *)
+        // update first 2 segments when first segment is horizontal 
         | 0,true,_ ->
             makeWireSegment wire.Id wire.Width src {X=seg.TargetPos.X;Y=src.Y} 
-
         | 1,true,_ when noOfSegments>3 ->
             makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} seg.TargetPos 
-
         | x,true,true when (x= last - 1 && noOfSegments>3 )-> 
             makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}  
-
         | 1,true,true ->
             makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=src.Y} {X=seg.SourcePos.X;Y=tgt.Y} 
-
+        // update last 2 segments when first segment is horizontal
         | x,true,true when x=last-> 
             makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=tgt.Y} tgt 
-
         | x,true,false when (x= last - 1 && noOfSegments>3 )-> 
             makeWireSegment wire.Id wire.Width seg.SourcePos {X=tgt.X;Y=seg.SourcePos.Y}
-
         | x,true,false when x=last-> 
             makeWireSegment wire.Id wire.Width {X=tgt.X;Y=seg.SourcePos.Y} tgt
-
+        // update first 2 segments when first segment is vertical 
         | 0,false,_ ->
             makeWireSegment wire.Id wire.Width src {X=src.X;Y=seg.TargetPos.Y} 
-
         | 1,false,_ when noOfSegments>3 ->
             makeWireSegment wire.Id wire.Width {X=src.X;Y=seg.SourcePos.Y} seg.TargetPos
-
         | x,false,false when (x= last - 1 && noOfSegments>3 )-> 
             makeWireSegment wire.Id wire.Width seg.SourcePos {X=tgt.X;Y=seg.SourcePos.Y}
-
         | 1,false,false ->
             makeWireSegment wire.Id wire.Width {X=src.X;Y=seg.SourcePos.Y} {X=tgt.X;Y=seg.SourcePos.Y} 
-
+        // update last 2 segments when first segment is vertical
         | x,false,false when x=last-> 
             makeWireSegment wire.Id wire.Width {X=tgt.X;Y=seg.SourcePos.Y} tgt 
-
         | x,false,true when (x= last - 1 && noOfSegments>3 )-> 
             makeWireSegment wire.Id wire.Width seg.SourcePos {X=seg.SourcePos.X;Y=tgt.Y}
-
         | x,false,true when x=last-> 
             makeWireSegment wire.Id wire.Width {X=seg.SourcePos.X;Y=tgt.Y} tgt
 
@@ -683,11 +675,7 @@ let manualRoute (wire: Wire) (sm: Symbol.Model)  (multipleMove:bool) : WireSegme
     )
     |> setIndex
 
-let moveWire (w:Wire) (vec:XYPos)=
-    
-    w.Segments
-    |> List.map (fun seg -> {seg with SourcePos= Symbol.posAdd seg.SourcePos vec
-                                      ;TargetPos=Symbol.posAdd seg.TargetPos vec})
+
     
 
 
@@ -770,7 +758,7 @@ let updateWires (model: Model) (sm: Symbol.Model) (multipleMove:bool) (wIds: Com
             let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
             if newWire.Manual then
 
-                {newWire with Segments = (manualRoute newWire sm multipleMove)}
+                {newWire with Segments = (manualRouteSymbolMove newWire sm multipleMove)}
             else
                 {newWire with 
                     Segments = makeWireSegments sm newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
@@ -831,7 +819,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
     | MoveWires (wId,idx,vec) ->
         let a = idx - 1
         let b = idx + 1
-        let move (w:Wire) (seg:WireSegment) idx wId vector=
+        let move (w:Wire)  idx wId vector (seg:WireSegment)=
             
             let last = (List.length w.Segments) - 1
             match idx with
@@ -851,7 +839,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |x when x=b -> makeWireSegment wId w.Width {X=seg.SourcePos.X+vector.X;Y=seg.SourcePos.Y} seg.TargetPos 
                 |_ -> seg
             |_ -> failwithf "Negative Index"
-        
+        /// Returns false if first or last segment is too short and true otherwise
         let condition (w:Wire)=
             let head= List.head w.Segments
             let last = List.last w.Segments
@@ -865,6 +853,8 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             |_,Symbol.Left when last.SourcePos.X>last.TargetPos.X - 9. ->false
             |_,Symbol.Bottom when last.SourcePos.Y<last.TargetPos.Y + 9. ->false
             |_ -> true
+           
+          
 
         let validateWires (wLst: Wire list): bool =
             wLst
@@ -877,14 +867,16 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let segLstLst =
             model.WX
             |> List.map (fun w ->
-                List.map (fun (seg:WireSegment)-> move w seg idx wId vec) w.Segments)
+                List.map (fun (seg:WireSegment)-> move w  idx wId vec seg) w.Segments)
 
         let wList= 
             model.WX
             |> List.mapi (fun i w-> {w with Segments = setIndex segLstLst.[i]})
             |> List.map (fun w ->
-                if  w.Id=wId  then
+                if  w.Id=wId then
+                    
                     {w with Manual = true}
+                            
                 else 
                     w 
             )
@@ -892,6 +884,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             {model with WX = wList}, Cmd.none 
         else 
             model, Cmd.none
+        
 
     | SetColor c -> {model with Color = c}, Cmd.none
     | UpdateWidth lst ->        
@@ -920,7 +913,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         }
         , Cmd.none
     | AddSegment (id, index, mousePos) -> 
-        let isHoriz (seg:WireSegment)= seg.SourcePos.Y=seg.TargetPos.Y
+        
         let direction (seg:WireSegment) =
             match seg.SourcePos, seg.TargetPos with
             | (src,tar)when tar.X>src.X -> "E"
@@ -971,7 +964,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
             addHumpVertices seg
             |> List.pairwise
             |> List.map (fun (src,tgt) -> makeWireSegment id seg.Width src tgt)
-            //|> setIndex
+        
         let transformSeg(seg:WireSegment) =
             match seg.Index with 
             |x when x=index -> humpSegments seg
@@ -994,18 +987,6 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
 
         {model with WX = wList}, Cmd.none
     | SnapWire (wIds) -> 
-      
-
-        
-        let badSnapSeg (seg:WireSegment) =
-            if isHoriz seg then
-                makeWireSegment seg.wId seg.Width seg.SourcePos {X=snap seg.TargetPos.X ;Y=seg.TargetPos.Y}
-            else 
-                makeWireSegment seg.wId seg.Width seg.SourcePos {X=seg.TargetPos.X ;Y= snap seg.TargetPos.Y}
-        let badSnap (w:Wire) =
-            w.Segments
-            |> List.map badSnapSeg
-
 
         let wList=    
             model.WX
@@ -1013,10 +994,9 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 if List.contains w.Id wIds then
                     let portSrc= Symbol.getPortCoords model.Symbol (w.SourcePortId)
                     {w with Segments=snapWireSegments portSrc [] 0 w.Segments}
-                    //{w with Segments=badSnap w}       
+     
                 else 
-                    //let portSrc= Symbol.getPortCoords model.Symbol (w.SourcePortId)
-                    //{w with Segments=snapWireSegments w portSrc [] 0}
+
                     w
             )
         {model with WX = wList}, Cmd.none
