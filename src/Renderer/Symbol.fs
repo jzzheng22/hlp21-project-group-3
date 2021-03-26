@@ -661,7 +661,7 @@ let createSymbol (compType : ComponentType) (ports : (string * PortType * bool) 
         PortHighlight = false
         GenericType = symType
         PortMap = portMap
-        ShowSlots = true
+        ShowSlots = false
         Index = index
         Label = label
         IOList = (inputList, outputList) //Interface with issie
