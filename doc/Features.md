@@ -46,7 +46,7 @@
 - Horizontally aligned symbols cannot be vertically aligned and vice versa.
 
 ### Moving of ports and labels
-- Ports may be moved to other positions on the outside of the symbol. This is done by holding down the right mouse button at the location of the port and dragging to another legal port location.
+- Ports may be moved to other positions along the edge of the symbol. This is done by holding down the right mouse button at the location of the port and dragging.
 - The set of postions where the port can be moved will highlight in purple. Drag the mouse towards one of these locations. Upon mouse release the selected port will be moved (and possibly swapped with) the closest point to the mouse release position. 
 - NOTE: Known issue - Subsequent port move operations after the initial one require two tries to work. This is likely due to not updating the model in Sheet correctly but currently unknown why this happens.
 
