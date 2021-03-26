@@ -336,6 +336,18 @@ let cornerCoords (sym : Symbol) (i : XYPos) : XYPos =
     | R0 | R180 -> { X = midSymX sym; Y = i.Y }
     | _ -> { X = i.X; Y = midSymY sym}
 
+let titlePos (sym : Symbol) : (float * float) =
+    let mid = midSym sym
+    let (h, w) = getHWObj sym
+    match sym.GenericType with
+    | Const ->
+        match sym.Rotation with
+            | R0 -> (sym.TopL.X + (w / 4.), mid.Y)
+            | R90 -> (mid.X, sym.TopL.Y + (h / 4.))
+            | R180 -> (sym.BotR.X - (w / 4.), mid.Y)
+            | R270 -> (mid.X, sym.BotR.Y - (h / 4.))
+    | _ -> (mid.X, mid.Y)
+
 let wireCoords (sym : Symbol) (i : XYPos) : string = 
     let corner = cornerCoords sym i
     sprintf "%f,%f %f,%f %f,%f" i.X i.Y corner.X corner.Y (midSymX sym) (midSymY sym)
@@ -860,20 +872,7 @@ let private renderObj =
                     SVGAttr.Stroke strokeColour
                     SVGAttr.StrokeWidth 0.5][]
 
-            let title = 
-                let mid = midSym sym              
-                let xLength = sym.BotR.X - sym.TopL.X
-                let yLength =  sym.BotR.Y - sym.TopL.Y
-                let pos =
-                    match sym.GenericType with
-                    | Const -> 
-                        match sym.Rotation with
-                        | R0 -> { X = sym.TopL.X + (xLength / 4.); Y = mid.Y }
-                        | R90 -> { X = mid.X; Y = sym.TopL.Y + (yLength / 4.) }
-                        | R180 -> { X = sym.BotR.X - (xLength / 4.); Y = mid.Y }
-                        | R270 -> { X = mid.X; Y = sym.BotR.Y - (yLength / 4.) }
-                    | _ -> mid
-                drawText pos.X pos.Y "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
+            let title = drawText (titlePos sym |> fst) (titlePos sym |> snd) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Name]
             
             let symLabel = drawText (midSymX sym) (sym.TopL.Y - 10.) "10px" ("middle", "middle") [str <| sprintf "%A" sym.Label]
             
