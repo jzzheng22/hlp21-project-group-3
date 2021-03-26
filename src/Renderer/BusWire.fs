@@ -69,6 +69,8 @@ type Msg =
     | MouseMsg of MouseT
     | UpdateWidth of (CommonTypes.ConnectionId * int Option) list
     | HighlightError of CommonTypes.ConnectionId list
+    | AddSegment  of CommonTypes.ConnectionId * int * XYPos
+    | SnapWire of CommonTypes.ConnectionId list
 
 //-------------------Helpers for functions------------------------//
 
@@ -320,14 +322,14 @@ let makeWireBB (sPos:XYPos) (tPos:XYPos): XYPos * XYPos=
     | (sx,sy,tx,ty) when ty<sy -> ({X=tx-5.;Y=ty},{X=tx+5.;Y=sy})
     | (sx,sy,tx,ty) when (tx=sx && ty=sy) -> ({X=tx;Y=ty},{X=sx;Y=sy})
     | _ -> failwithf "diagonal line error"
+    
+let isHoriz (seg:WireSegment)= seg.SourcePos.Y=seg.TargetPos.Y
+let snap (pos:float)= (round (pos/ 10.))*10.
+let setIndex (lst: WireSegment list) =
+    lst 
+    |> List.mapi (fun i seg-> {seg with Index= i})
 
-let bbCollision (bb1:XYPos*XYPos) (bb2:XYPos*XYPos) =
-    match fst bb1, snd bb1, fst bb2, snd bb2 with
-    | (tL1, bR1, tL2, bR2) when bR2.Y < tL1.Y -> false
-    | (tL1, bR1, tL2, bR2) when tL2.X > bR1.X -> false
-    | (tL1, bR1, tL2, bR2) when tL2.Y > bR1.Y -> false
-    | (tL1, bR1, tL2, bR2) when bR2.X < tL1.X -> false
-    |  _ ->true
+
 
 /// look up wire in WireModel
 let wire (wModel: Model) (wId: CommonTypes.ConnectionId): Wire option =
@@ -347,18 +349,29 @@ let makeWireSegment (wId:CommonTypes.ConnectionId) (width:int) (srcPos) (tgtPos)
     }
 
 /// Sets the indexes for each segment in a wire
-let setIndex (lst: WireSegment list) =
-    lst 
-    |> List.mapi (fun i seg-> {seg with Index= i})
+let snapSeg (seg:WireSegment) (srcPos:XYPos)=
+    if isHoriz seg then
+        (makeWireSegment seg.wId seg.Width srcPos {X=snap seg.TargetPos.X ;Y=srcPos.Y},{X=snap seg.TargetPos.X ;Y=srcPos.Y})
+    else 
+        (makeWireSegment seg.wId seg.Width srcPos {X=srcPos.X ;Y= snap seg.TargetPos.Y},{X=srcPos.X ;Y= snap seg.TargetPos.Y})
+
+let rec snapWireSegments  (currSrc:XYPos) (segLstOut:WireSegment List) (count:int) (segLstIn:WireSegment List)=
+
+    match count with 
+    | x when x= List.length segLstIn -> segLstOut|>setIndex
+    | _ -> 
+        let newSeg=fst (snapSeg (segLstIn.[count]) currSrc)
+        let newSrc=snd (snapSeg (segLstIn.[count]) currSrc)
+        snapWireSegments newSrc (segLstOut@[newSeg]) (count + 1) segLstIn
 
 /// Calculates and creates all wire segments
 let makeWireSegments (sm: Symbol.Model) (wId: CommonTypes.ConnectionId) (width: int) 
     (sourcePortId: CommonTypes.PortId) (targetPortId: CommonTypes.PortId) : WireSegment list =
-
+    
     (routeWire sm sourcePortId targetPortId)
     |> List.pairwise
     |> List.map (fun (src,tgt) -> makeWireSegment wId 1 src tgt)
-    |> setIndex
+    
 
 
 /// Creates a new wire 
@@ -366,7 +379,8 @@ let makeNewWire (model: Model) (srcPortId: CommonTypes.PortId) (tgtPortId: Commo
     let wId = CommonTypes.ConnectionId (Helpers.uuid())
     let srcEdge = Symbol.getPortEdge model.Symbol srcPortId
     let tgtEdge = Symbol.getPortEdge model.Symbol tgtPortId
-    let newSegments = makeWireSegments model.Symbol wId 1 srcPortId tgtPortId
+    let portSrc= Symbol.getPortCoords model.Symbol srcPortId
+    let newSegments = makeWireSegments model.Symbol wId 1 srcPortId tgtPortId |> snapWireSegments portSrc [] 0 
     let startHoriz = not (srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
     let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
             
@@ -541,6 +555,7 @@ let segLength (seg: WireSegment): float =
     ||> Symbol.posDiff
     |> fun diff -> (sqrt diff.X ** 2. + diff.Y ** 2.)
 
+
 ///Returns true if first segment is shorter than offset (9.) and false otherwise
 let checkFirstSegmentLength (wire:Wire) (sm: Symbol.Model) =
     let src= Symbol.getPortCoords sm wire.SourcePortId
@@ -562,7 +577,7 @@ let checkLastSegmentLength (wire:Wire) (sm: Symbol.Model) =
     | Symbol.Top when tail.SourcePos.Y>tgt.Y - 9. ->true
     | Symbol.Bottom when tail.SourcePos.Y<tgt.Y + 9. ->true
     | _ -> false
-let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
+let manualRoute (wire: Wire) (sm: Symbol.Model)  (multipleMove:bool) : WireSegment list =
     let noOfSegments= List.length wire.Segments
     let last = noOfSegments - 1
     let prevSrc= wire.Segments.[0].SourcePos
@@ -585,6 +600,7 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
     wire.Segments
     |> List.mapi (fun i seg -> 
         match i ,wire.StartHoriz ,wire.EndHoriz with
+        | _ when multipleMove -> makeWireSegment wire.Id wire.Width (Symbol.posAdd seg.SourcePos vecSrc) (Symbol.posAdd seg.TargetPos vecSrc) 
         | 0,true,_ when fstLength ->
             makeWireSegment wire.Id wire.Width src (Symbol.posAdd seg.TargetPos vecSrc) 
 
@@ -667,6 +683,16 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
     )
     |> setIndex
 
+let moveWire (w:Wire) (vec:XYPos)=
+    
+    w.Segments
+    |> List.map (fun seg -> {seg with SourcePos= Symbol.posAdd seg.SourcePos vec
+                                      ;TargetPos=Symbol.posAdd seg.TargetPos vec})
+    
+
+
+
+
 // RULES FOR DECIDING WIRE ROUTING METHOD: 
 // Name must be of format routeRuleXXX
 // Must have signature Wire -> Symbol.Model -> bool
@@ -675,25 +701,27 @@ let manualRoute (wire: Wire) (sm: Symbol.Model): WireSegment list =
 /// routing the wire to its new position, as this indicates a need to 
 /// switch back to autorouting.
 /// 
-let routeRuleShortEnds (wire: Wire) (sm: Symbol.Model) : bool =
+let routeRuleShortEnds (wire: Wire) (sm: Symbol.Model) (model:Model) : bool =
     not (checkFirstSegmentLength wire sm && checkLastSegmentLength wire sm) 
 
 
-let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) : bool =
-    let currentSegmentCount = wire.Segments.Length
+let routeRuleCaseChange (wire: Wire) (sm: Symbol.Model) (model:Model) : bool =
+    let currentSegmentCount = //wire.Segments.Length
+        routeWire model.Symbol wire.SourcePortId wire.TargetPortId
+        |> List.length
     let newVertexCount = 
         routeWire sm wire.SourcePortId wire.TargetPortId
         |> List.length
-    currentSegmentCount = newVertexCount - 1 
+    currentSegmentCount = newVertexCount (*-1*) 
 
 
 /// Rule that states that the wire must switch back to autorouting after symbol rotation
-let routeRuleAfterRotation (wire: Wire) (sm: Symbol.Model) : bool =
+let routeRuleAfterRotation (wire: Wire) (sm: Symbol.Model) (model:Model) : bool =
     (wire.SourcePortEdge, wire.TargetPortEdge) = (Symbol.getPortEdge sm wire.SourcePortId, Symbol.getPortEdge sm wire.TargetPortId) 
 
 
 /// Rule stating two segment wires may not be autorouted
-let routeRuleTwoSegment (wire: Wire) (sm: Symbol.Model) : bool =
+let routeRuleTwoSegment (wire: Wire) (sm: Symbol.Model) (model:Model): bool =
     not (List.length wire.Segments < 3)
 
         
@@ -707,9 +735,9 @@ let routeRuleList =
 
 /// Decides whether a wire ought to continue being manually routed or be
 /// switched back to autorouting, and updates the Manual field accordingly
-let decideManual (wire: Wire) (sm: Symbol.Model) : Wire =
+let decideManual (wire: Wire) (sm: Symbol.Model) (model:Model): Wire =
     routeRuleList 
-    |> List.map (fun f -> f wire sm)
+    |> List.map (fun f -> f wire sm model)
     |> fun x ->
         if List.contains false x then
             {wire with Manual = false} 
@@ -730,17 +758,19 @@ let chooseWiresToUpdate (sIdList: CommonTypes.ComponentId list) (model: Model) (
     |> List.distinct
 
 /// Updates the wires in the model as specified by the provided list
-let updateWires (model: Model) (sm: Symbol.Model) (wIds: CommonTypes.ConnectionId list): Wire list =
+let updateWires (model: Model) (sm: Symbol.Model) (multipleMove:bool) (wIds: CommonTypes.ConnectionId list)  : Wire list =
+
     model.WX
     |> List.map (fun w -> 
         if List.contains w.Id wIds then
-            let newWire = decideManual w sm
+            let newWire = decideManual w sm model
             let srcEdge = Symbol.getPortEdge sm newWire.SourcePortId
             let tgtEdge = Symbol.getPortEdge sm newWire.TargetPortId
             let startHoriz = not (srcEdge=Symbol.Top || srcEdge=Symbol.Bottom)
             let endHoriz = not (tgtEdge=Symbol.Top || tgtEdge=Symbol.Bottom)
             if newWire.Manual then
-                {newWire with Segments = (manualRoute newWire sm)}
+
+                {newWire with Segments = (manualRoute newWire sm multipleMove)}
             else
                 {newWire with 
                     Segments = makeWireSegments sm newWire.Id newWire.Width newWire.SourcePortId newWire.TargetPortId 
@@ -758,14 +788,17 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let wList = 
             match sMsg with
             | Symbol.Move (sIdList,_) -> 
+                let multMove= List.length sIdList >1
                 chooseWiresToUpdate sIdList model sm
-                |> updateWires  model sm
+                |>updateWires  model sm multMove 
             | Symbol.Rotate (sIdList,_) ->
+                
                 chooseWiresToUpdate sIdList model sm
-                |> updateWires model sm
+                |>updateWires model sm false
             | Symbol.Scale (sIdList,_) ->
+                
                 chooseWiresToUpdate sIdList model sm
-                |> updateWires model sm
+                |>updateWires model sm false 
             | _ -> model.WX
             
         {model with Symbol=sm; WX = wList}, Cmd.map Symbol sCmd
@@ -799,6 +832,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
         let a = idx - 1
         let b = idx + 1
         let move (w:Wire) (seg:WireSegment) idx wId vector=
+            
             let last = (List.length w.Segments) - 1
             match idx with
             | 0  -> seg
@@ -885,7 +919,120 @@ let update (msg : Msg) (model : Model): Model*Cmd<Msg> =
                 |> List.map (fun wire -> {wire with HighlightError = List.contains wire.Id cIdList})
         }
         , Cmd.none
+    | AddSegment (id, index, mousePos) -> 
+        let isHoriz (seg:WireSegment)= seg.SourcePos.Y=seg.TargetPos.Y
+        let direction (seg:WireSegment) =
+            match seg.SourcePos, seg.TargetPos with
+            | (src,tar)when tar.X>src.X -> "E"
+            |(src,tar)when tar.X<src.X -> "W"
+            |(src,tar)when tar.Y>src.Y -> "S"
+            |(src,tar)when tar.Y<src.Y -> "N"
+            | _ -> failwithf "not a perpendicular wire"
+
+
+        let addHumpVertices (seg:WireSegment)=
+            let pos1= {X=seg.SourcePos.X;Y=seg.SourcePos.Y}
+            let pos6= {X=seg.TargetPos.X;Y=seg.TargetPos.Y}
+            match direction seg with 
+
+            | "E"->
+                
+                let pos2= {X=mousePos.X - 10.;Y=seg.SourcePos.Y}
+                let pos3= {X=mousePos.X - 10.;Y=seg.SourcePos.Y - 20.}
+                let pos4= {X=mousePos.X + 10.;Y=seg.SourcePos.Y - 20.}
+                let pos5= {X=mousePos.X + 10.;Y=seg.SourcePos.Y}
+                
+                [pos1;pos2;pos3;pos4;pos5;pos6]
+            | "W"->
+                let pos2= {X=mousePos.X + 10.;Y=seg.SourcePos.Y}
+                let pos3= {X=mousePos.X + 10.;Y=seg.SourcePos.Y - 20.}
+                let pos4= {X=mousePos.X - 10.;Y=seg.SourcePos.Y - 20.}
+                let pos5= {X=mousePos.X - 10.;Y=seg.SourcePos.Y}
+                [pos1;pos2;pos3;pos4;pos5;pos6]
+            | "S" ->
+                
+                let pos2= {Y=mousePos.Y - 10.;X=seg.SourcePos.X}
+                let pos3= {Y=mousePos.Y - 10.;X=seg.SourcePos.X + 20.}
+                let pos4= {Y=mousePos.Y + 10.;X=seg.SourcePos.X + 20.}
+                let pos5= {Y=mousePos.Y + 10.;X=seg.SourcePos.X}
+                
+                [pos1;pos2;pos3;pos4;pos5;pos6]
+            | "N"->
+                let pos2= {Y=mousePos.Y + 10.;X=seg.SourcePos.X}
+                let pos3= {Y=mousePos.Y + 10.;X=seg.SourcePos.X + 20.}
+                let pos4= {Y=mousePos.Y - 10.;X=seg.SourcePos.X + 20.}
+                let pos5= {Y=mousePos.Y - 10.;X=seg.SourcePos.X}
+                [pos1;pos2;pos3;pos4;pos5;pos6]                        
+            | _ -> failwithf "not a perpendicular wire"
+            
+            
+  
+        let humpSegments (seg:WireSegment)=
+            addHumpVertices seg
+            |> List.pairwise
+            |> List.map (fun (src,tgt) -> makeWireSegment id seg.Width src tgt)
+            //|> setIndex
+        let transformSeg(seg:WireSegment) =
+            match seg.Index with 
+            |x when x=index -> humpSegments seg
+            |_ -> [seg]
+            | _ -> failwithf "wagwan sexi"
+
+        let segments (w:Wire)=
+            w.Segments
+            |> List.collect transformSeg
+            |> setIndex
+        let wList=    
+            model.WX
+            |> List.map (fun w -> 
+                if w.Id = id then
+                    {w with Segments=segments w;
+                            Manual= true}
+                else 
+                    w
+            )
+
+        {model with WX = wList}, Cmd.none
+    | SnapWire (wIds) -> 
+      
+
+        
+        let badSnapSeg (seg:WireSegment) =
+            if isHoriz seg then
+                makeWireSegment seg.wId seg.Width seg.SourcePos {X=snap seg.TargetPos.X ;Y=seg.TargetPos.Y}
+            else 
+                makeWireSegment seg.wId seg.Width seg.SourcePos {X=seg.TargetPos.X ;Y= snap seg.TargetPos.Y}
+        let badSnap (w:Wire) =
+            w.Segments
+            |> List.map badSnapSeg
+
+
+        let wList=    
+            model.WX
+            |> List.map (fun w -> 
+                if List.contains w.Id wIds then
+                    let portSrc= Symbol.getPortCoords model.Symbol (w.SourcePortId)
+                    {w with Segments=snapWireSegments portSrc [] 0 w.Segments}
+                    //{w with Segments=badSnap w}       
+                else 
+                    //let portSrc= Symbol.getPortCoords model.Symbol (w.SourcePortId)
+                    //{w with Segments=snapWireSegments w portSrc [] 0}
+                    w
+            )
+        {model with WX = wList}, Cmd.none
+        
+
     | MouseMsg mMsg -> model, Cmd.ofMsg (Symbol (Symbol.MouseMsg mMsg))
+
+        
+   
+
+        
+
+
+
+                
+
 
 //---------------Other interface functions--------------------//
 
