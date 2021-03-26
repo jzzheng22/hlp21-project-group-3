@@ -53,6 +53,8 @@
 
 ## Wires
 
+BusWire implements all of ISSIE's routing features, as well as supporting rotation, adding segments and snapping wires to grid.
+
 ### Adding Wires
 - Dragging a dotted line between symbol ports creates a new wire.
 - User friendly UI highlights port positions and possible connections.
@@ -71,7 +73,8 @@
     - Using drop down menu (found in Edit -> Delete)
 
 ### Routing
-- Initial routing: automatic routing with symbol avoidance.
+- Initial routing: automatic routing with route calculated using positions of ports and which edge they lie on. 
+- Exhaustive autorouting for all cases, ranging from two to five segments.
 - Routing can be manually adjusted by moving wire segments that aren't connected to any symbol port.
 - More segments can be added by right clicking on a wire - three additional segments will appear at the click position.
 
@@ -79,10 +82,25 @@
 - To move wire segments:
     - Left click the section of the wire you wish to move
     - Holding left click, drag the mouse and the selected wire segment will follow.
+- After a segment has been moved, the wire goes into "manual routing mode".
+- When a Symbol connected to a wire in "manual routing mode" is moved:
+    - The wire is updated while keeping the middle segments fixed in place on the schematic.
+    - If a Symbol is moved in such a way that it would collide with a manually routed wire coming from itself, the position of the wire is updated to avoid a collision (the symbol 'pushes' the wire).
+    - Just like ISSIE in it's current form, if a Symbol is moved in a way that would result in route case change (e.g. three-segment to five-segment), the wire is switched back to autorouting mode.
+- Wire segments may not be manually moved in such a way that they collide with the symbol (i.e. the first and last segments of a wire cannot be resized to be smaller than a minimum length).
+
+### Snap Wire to Grid
+- Whenever the path of a wire is updated by moving a Symbol or a Wire Segement, the wire will automatically snap to grid on Mouse Up.
+
+### Handling Rotation of Symbols
+- When a wire is in autorouting mode, it will automatically change its route to align with a rotated symbol.
+- When a wire is in manual routing mode, it will switch to autorouting mode if the Symbol it is connected to is rotated.
 
 ### Adding Segments to Wires
 - When a user right-clicks on top of a wire, three new wire segments are generated in the wire at the click position. 
 - This allows the user to have more flexibility in manual routing.
+
+
 
 ## Overall UI
 
