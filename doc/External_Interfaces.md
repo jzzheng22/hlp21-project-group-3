@@ -1,5 +1,7 @@
 # External interfaces
 
+This describes code interfaces. UI interfaces are described under [*Features.md*](Features.md)
+
 ## BusWire
 
 `extractWires (wModel : Model) : CommonTypes.Connection list`
@@ -13,6 +15,6 @@
 ## Sheet
 
 `Add symbol`
-- Pressing Alt+A currently adds a single MUX to the canvas
-- This is detected as a KeyPress message in sheet, and calls `addSymbol (model : Model)`
-- To make this work with an external catalog, it would need to take in the ComponentType as well, and replace the 'Mux2' values with that
+- Pressing Alt+A currently adds a single MUX to the canvas.
+- This is detected as a KeyPress message in sheet. The update function of sheet in turn sends a `Symbol.Add of Symbol.SymbolAdd` message to the Symbol module, which then adds the new symbol. The *Symbol.SymbolAdd* type contains the information to create the new Symbol and is currently hardcoded to a mux with two inputs and one output.
+- To make this work with an external catalog, we merely need to dispatch the `Symbol.Add of Symbol.SymbolAdd` with information relevant to the selected symbol.
