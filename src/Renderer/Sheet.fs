@@ -143,25 +143,50 @@ let removeSymbolID predicate coords (_, a, b) = predicate coords (a, b)
 
 let removeWireSegmentID predicate coords (_, _, a, b) = predicate coords (a, b)
 
-let filterBySelectingMultiple predicate lst =
+let filterSymbolListBySelectingMultiple predicate lst =
     if not predicate then
         List.chunkBySize 1 lst
         |> List.last
     else
         id lst
 
+let filterWireListBySelectingMultiple model lst =
+    if not model.SelectingMultiple then
+        List.chunkBySize 1 lst
+        |> List.last
+    else
+        let wireIds = 
+            List.map (fun x -> fst x) lst
+            |> List.distinct
+        let requiredWireSegs =
+            List.collect (fun wireId -> BusWire.getWireSegList wireId model.Wire) wireIds
+            |> Set.ofList
+        let actualWireSegs = Set.ofList lst
+        let missingWireIds = 
+            Set.difference requiredWireSegs actualWireSegs
+            |> Set.map (fun x -> fst x)
+            |> Set.toList
+            |> List.distinct
+        if not (List.isEmpty missingWireIds) then
+            List.filter (fun (id, _) -> not (List.contains id missingWireIds)) lst
+        else
+        // Need to check that every segment is in bounding box
+        // Given list of tuples of wireID and segment index
+        // let allSegsInList 
+        
+            id lst
 
 /// Selects elements inside the outer box
 let dragSelectElements (model: Model) predicate coords (dispatch: Dispatch<Msg>) =
     let symbolIDList =
         Symbol.getBoundingBoxes model.Wire.Symbol model.DraggingPos
         |> getSymbolIDList (List.filter (removeSymbolID predicate coords)) 
-        |> filterBySelectingMultiple model.SelectingMultiple
+        |> filterSymbolListBySelectingMultiple model.SelectingMultiple
 
     let wireSegmentIDList =
         BusWire.getBoundingBoxes model.Wire model.DraggingPos
         |> getWireSegmentIDList (List.filter (removeWireSegmentID predicate coords))
-        |> filterBySelectingMultiple model.SelectingMultiple
+        |> filterWireListBySelectingMultiple model
 
     dispatchSelection model.TogglingSelection symbolIDList wireSegmentIDList dispatch
 
@@ -589,11 +614,11 @@ let moveElements model mousePos =
         { X = (mousePos.X - model.DraggingPos.X)
           Y = (mousePos.Y - model.DraggingPos.Y) }
     let newModel = {model with DraggingPos = mousePos}
-    if not (List.isEmpty model.SelectedComponents) && not model.TogglingSelection then
+    if not (List.isEmpty model.SelectedComponents) && not model.TogglingSelection || model.CopyingSymbol then
         let sModel, sCmd = BusWire.update (BusWire.Symbol (Symbol.Move(model.SelectedComponents, transVector))) newModel.Wire
         {model with Wire = sModel}, Cmd.map Wire sCmd
 
-    else if not (List.isEmpty model.SelectedWireSegments) && not model.TogglingSelection then
+    else if not (List.isEmpty model.SelectedWireSegments) && not model.TogglingSelection || model.CopyingSymbol then
         let wireSegment = List.head model.SelectedWireSegments
         let wModel, wCmd = BusWire.update (BusWire.MoveWires(fst wireSegment, snd wireSegment, transVector)) newModel.Wire
         {model with Wire = wModel}, Cmd.map Wire wCmd
@@ -827,7 +852,6 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
             |> Map.ofList
 
         let mapToNewConnection (model, cmd) (wireId: CommonTypes.ConnectionId) =
-            printf "mapToNEwCoenection"
             let newPort portId =
                 match Map.tryFind portId portMappings with
                 | Some port -> port
@@ -842,12 +866,9 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                 SelectedWireSegments = newWireSegs @ model.SelectedWireSegments
                 AddingSymbol = true;    
             }, Cmd.batch[Cmd.map Wire wCmd; cmd]
-        printf "Before oldConnections"
         oldConnections
         |> List.map (fun x -> fst x)
         |> List.fold mapToNewConnection ({newModel with SelectedWireSegments = []; CopyingSymbol = true}, newCmds)
-
-        // newModel, newCmds
 
 
         // {model with Clipboard = model.SelectedComponents, model.SelectedWireSegments}, Cmd.none
@@ -914,7 +935,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     | SelectLabel x -> 
         { model with SelectedLabel = x }, Cmd.none
     | ToggleSelectionOpen ->
-        if List.isEmpty model.SelectedComponents || List.isEmpty model.SelectedWireSegments then  
+        if List.isEmpty model.SelectedComponents && List.isEmpty model.SelectedWireSegments then  
             model, Cmd.none
         else
             printf "Set togglingselection to true"
