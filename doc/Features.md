@@ -6,6 +6,8 @@
 ### Adding Symbols
 - Newly added symbol follows mouse movement and positions itself where the mouse first clicks. *Automatic snapping to grid*.
 - Each new symbol comes with its own unique name label.
+- Custom components are possible.
+- Clocked symbols have the clock icon (wires cannot be connected to clocks)
 
 ### Selecting Symbols
 - May be done by: 
@@ -13,6 +15,7 @@
     - Dragging a box over multiple symbols.
     - Holding `Ctrl` and then mouse clicking/dragging to select multiple
 - Upon selecting a symbol, red circles will appear at the corners to show the user where to drag from to scale the symbol.
+- When clicking on overlapping symbols, only the top symbol will be selected.
 
 ### Deleting Selected Symbols
 - May be done via drop-down menu or by pressing the `Delete` key.
@@ -21,10 +24,10 @@
 ### Moving Selected Symbols
 - Left click and drag the mouse
 - May be for a single symbol/wire or for a group.
-- Automatic snapping to grid is supported for moving symbols.
+- Automatic snapping to grid is supported for when moving symbols.
 
 ### Transforming Symbols
-- **Rotation** - Can be done for selected symbol via drop-down menu or via shortcuts: `Ctrl-Q` for anticlockwise and `Ctrl-E` for clockwise rotation. Wire routing automatically adjusts.
+- **Rotation** - Can be done for selected symbol via drop-down menu or via shortcuts: `Ctrl-E` for anticlockwise and `Ctrl-Q` for clockwise rotation. Wire routing automatically adjusts.
 - **Scaling** 
     - Interactive scaling by dragging from corner of selected/non-selected symbol.
         - Upon selecting a symbol the corners will be highlighted with red cirlces
@@ -43,9 +46,9 @@
 - Horizontally aligned symbols cannot be vertically aligned and vice versa.
 
 ### Moving of ports and labels
-- Ports may be moved to other positions on the periphery of the symbol as per user convenience. This is done by holding down the right mouse button at the location of the port and dragging in any direction.
+- Ports may be moved to other positions on the outside of the symbol. This is done by holding down the right mouse button at the location of the port and dragging to another legal port location.
 - The set of postions where the port can be moved will highlight in purple. Drag the mouse towards one of these locations. Upon mouse release the selected port will be moved (and possibly swapped with) the closest point to the mouse release position. 
-- NOTE: Known issue - Subsequent port move operations after the initial one require 2 tries to work. This is likely due to not updating the model in Sheet correctly but currently unknown why this happens.
+- NOTE: Known issue - Subsequent port move operations after the initial one require two tries to work. This is likely due to not updating the model in Sheet correctly but currently unknown why this happens.
 
 ## Wires
 
@@ -53,12 +56,13 @@
 - Dragging a dotted line between symbol ports creates a new wire.
 - User friendly UI highlights port positions and possible connections.
 - **Width inference** indicates an error by highlighting if input and output port widths are incompatible.
+- Wires are automatically routed when first added
 
 ### Selecting Wire
 - Wires can be selected by:
     - Clicking the wire.
     - Dragging selection box over the wire.
-- For two selected symbols, all wires joing them are also selected.
+- For two selected symbols, any wires joining them are also selected.
 
 ### Deleting selected Wire(s)
 - Wires can be deleted by:
@@ -70,7 +74,7 @@
 - Routing can be manually adjusted by moving wire segments that aren't connected to any symbol port.
 - More segments can be added by right clicking on a wire - three additional segments will appear at the click position.
 
-### Moving Wire Segments
+### Moving Wire Segments (Manual Routing)
 - To move wire segments:
     - Left click the section of the wire you wish to move
     - Holding left click, drag the mouse and the selected wire segment will follow.
