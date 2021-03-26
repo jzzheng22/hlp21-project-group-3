@@ -189,9 +189,3 @@ On mouse click up: call `Symbol.isPort (symbolModel: Model) (mouseCoord: XYPos)`
  - `Some (portCoord: XYPos * portID: CommonTypes.PortID)`: tell BusWire to draw new wire.
  - `None`: don't draw.
 In all cases stop rendering the dotted line.
-
-## State outputs (extension)
- - Inferred width of wires (to BusWire and ISSIE)
-
-## Stretch Goals
-Zooming, snap-to-grid etc can hopefully be implemented without adding to the above existing interface.

@@ -103,12 +103,3 @@ Wires should be selectable: should do autorouting initially but be selectable an
  `Symbol.getPort (model : Model) (pId : PortId) : Port`
  - Returns the CommonTypes.Port object of a given pId
  - Used by buswire to convert to Issie datatypes
-
-## BusWire needs to be able to receive these:
- - Add connections (from Sheet and ISSIE)
- - Delete connections (from Sheet)
- - Move connection segment (from Sheet) -> WILL HAPPEN WHEN MANUAL ROUTING IS CONFIGURED
- - Highlight connections (from Sheet and ISSIE)
- - Init canvas (from ISSIE)
-
- ## Stretch Goals
