@@ -695,6 +695,7 @@ let update (msg : Msg) (model : Model): Model*Cmd<'a>  =
         List.filter (fun sym -> not (List.contains sym.Id sIdList)) model, Cmd.none
 
     | Move (compList, translate) ->
+       
         model
         |> List.map (fun sym ->
             if List.contains sym.Id compList then
