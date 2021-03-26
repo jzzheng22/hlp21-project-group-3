@@ -42,7 +42,10 @@ Each Symbol owns its ports.
 
 `Symbol.getHostId (model : Model) (pId : CommonTypes.PortId) : CommonTypes.ComponentId`
  - Returns the ComponentID which the PortID belongs to.
- - This function is also called by jzzheng22's Sheet
+ - NOTE: This function is currently a bottleneck in the system as it is called multiple times, and requires a linear search of all ports in the model
+    - To improve this some structural change in other modules would be needed 
+        - e.g. for a model to store the ports in use and relevant hostIds in a map/list
+        - Or for busWire to store the hostId in the Wire object
 
 `Symbol.getBoundingBox symModel symID`
  - Returns the bounding box for a given Symbol ID
