@@ -721,9 +721,7 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
               DraggingPos = dragMsg },
         Cmd.none
     | SelectDragEnd ->
-        if not (List.isEmpty model.SelectedComponents) then
-            snapSymbolsToGrid model
-        else
+        let sizeModel, sizeCmd = 
             match model.EditSizeOf with 
             | Some id ->
                 let previousComponents = model.SelectedComponents
@@ -736,6 +734,13 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
                     SelectedPort = None, CommonTypes.PortType.Input;
                     SelectingMultiple = false 
                     EditSizeOf = None}, Cmd.none
+
+        if not (List.isEmpty model.SelectedComponents) then
+            let finalModel, finalCmd = snapSymbolsToGrid sizeModel
+            finalModel, Cmd.batch [finalCmd; sizeCmd]
+        else
+            sizeModel, sizeCmd
+            
     | SelectDragging dragMsg ->
         { model with DraggingPos = dragMsg }, Cmd.none
     | MoveElements mousePos ->
