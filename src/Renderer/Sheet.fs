@@ -565,6 +565,15 @@ let addSymbol model =
         SelectingMultiple = false; 
         EditSizeOf = None}, Cmd.map Wire sCmd 
 
+<<<<<<< Updated upstream
+=======
+///Finds symmetric difference of 2 lists that are treated as sets i.e. (A - B) U (B - A)
+let symmetricDifference list1 list2 = 
+    let set1 = Set.ofList list1
+    let set2 = Set.ofList list2
+    Set.toList (Set.union (Set.difference set1 set2) (Set.difference set2 set1))
+
+>>>>>>> Stashed changes
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
     | Wire wMsg ->
