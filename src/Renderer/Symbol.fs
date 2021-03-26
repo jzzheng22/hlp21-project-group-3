@@ -955,7 +955,7 @@ let private renderObj =
                     let cornerSegLength = 5
                     let p1 = sym.TopL
                     let p2 = { X = sym.BotR.X ; Y = sym.TopL.Y }
-                    let p3 = { X = sym.TopL.X ; Y= sym.BotR.Y }
+                    let p3 = { X = sym.TopL.X ; Y = sym.BotR.Y }
                     let p4 = sym.BotR
                     [circle p1;
                      circle p2;
