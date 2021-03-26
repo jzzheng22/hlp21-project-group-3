@@ -63,7 +63,6 @@ Sheet can also access Symbol directly if needed.
 `SnapWire of CommonTypes.ConnectionId list`
 - Contains a list of ConnectionIds which need to be snapped to the nearest grid line.
 
-
 **To Symbol:** (see [symbol.md](./symbol.md) for description)
 
 `Move of CommonTypes.ComponentId list *  XYPos`
@@ -126,27 +125,45 @@ Sheet can also access Symbol directly if needed.
 ## BusWidthInferer Interface
 
 `BusWidthInferer.inferConnectionsWidth ((comps,conns) : CanvasState) : Result<ConnectionsWidth, WidthInferError>`
-- Takes in a list of Issie Components and Issie Connections and returns 
-    * Ok x -> Some <Map<ConnectionId, int Option> | None
-    * Error {Msg : string; ConnectionsAffected : ConnectionId list}
-- In the first case where we have Ok x we simply tell all the connections to update with the specified width
-- In the second case where we have Error then send the error highlight messages for the relevant connections/symbols
-- Known issue and workaround
-    - The inferConnectionsWidth only returns one error, even when multiple are present
-    - To overcome this, if an error is detected we call inferConnectionsWidth for each connection and concatenate the result
+- Takes in a list of ISSIE Components and ISSIE Connections and returns 
+    * `Ok x -> Some Map<ConnectionId, int Option> | None`
+    * `Error {Msg : string; ConnectionsAffected : ConnectionId list}`
+- In the first case where we have `Ok x` we simply tell all the connections to update with the specified width
+- In the second case where we have `Error` then send the error highlight messages for the relevant connections/symbols
+- Known issue and workaround:
+    - The `inferConnectionsWidth` returns only one error, even when multiple are present
+    - To overcome this, if an error is detected we call `inferConnectionsWidth` for each connection and concatenate the results.
 
 ## Interface Functions
 
+`BusWire.getWireSegList (wireId : CommonTypes.ConnectionId) (wModel : Model) : ( CommonTypes.ConnectionId * int) list`
+- Given a wireId and wire model, returns a list of tuples containing the wireId and the index of each segment for that wire.
+
 `BusWire.getBoundingBoxes (mouseCoord: XYPos) (model : Model)`
- - Returns list of `(id: CommonTypes.ComponentId * topLeft: XYPos * bottomRight: XYPos)`
- - Initially just returns all bounding boxes.
+ - Returns list of `(id: CommonTypes.ConnectionId * int * topLeft: XYPos * bottomRight: XYPos)`
+ - Returns all bounding boxes of each wire segment, as well their wire ID and wire segment index.
+
+`BusWire.extractWires (wModel : Model) : CommonTypes.Connection list`
+- This function will convert the wire model from the Wire datatype into the ISSIE-compliant Connection datatype
+
+`BusWire.getWires (wModel : Model) (cIdList : CommonTypes.ConnectionId list) : CommonTypes.ConnectionId list`
+- Takes a connectionId list and returns the connections in the model not in that list
+
+`BusWire.connectedSymbols (wModel : Model) (connect : CommonTypes.ConnectionId) : CommonTypes.ComponentId list`
+- Takes a ConnectionId and returns the Symbol IDs connected to that connection
+
+`BusWire.chooseWiresToUpdate (sIdList: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model)`
+- Calculates and returns the IDs of wires that must be updated using a provided list of symbols that have been updated.
 
 `BusWire.getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list`
  - Takes a list of PortIds as input and returns the IDs of all the wires connected to the supplied ports.
 
+`BusWire.connectToPort (wModel : Model) (connect : CommonTypes.ConnectionId) : (CommonTypes.PortId * CommonTypes.PortId)`
+ - Takes a ConnectionId and returns the (source port, target port) associated with that connection
+
 `Symbol.getBoundingBoxes (symbolModel : Model) (mouseCoord: XYPos)`
  - Returns list of `(id: CommonTypes.ComponentId * topleft: XYPos * bottomright: XYPos)`. Called by Sheet.
- - Initially returns all bounding boxes.
+ - Returns all bounding boxes.
 
 `Symbol.getPortType (symbolModel : Model) (portID: CommonTypes.PortId)`
  - Returns if port is input or output.

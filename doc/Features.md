@@ -24,7 +24,7 @@
 
 ### Moving Selected Symbols
 - Left click and drag the mouse
-- May be for a single symbol/wire or for a group.
+- Both single and multiple objects can be dragged.
 - Automatic snapping to grid is supported for when moving symbols.
 
 ### Transforming Symbols
@@ -87,7 +87,7 @@
 ## Overall UI
 
 ### Zooming canvas
-- Via drop down menu or shortcuts: `Ctrl-[` (zoom out) and `Ctrl-[` (zoom in). Zooming is by factors of 1.25.
+- Via drop down menu or shortcuts: `Ctrl-[` (zoom out) and `Ctrl-]` (zoom in). Zooming is by factors of 1.25.
 
 ### Toggling Selection of Symbols
 - On holding down `Ctrl`, the app enters a "toggling" state. In this state, any unselected element that is selected (via click or drag) will become selected and highlighted, while selected elements will unselect and unhighlight. 

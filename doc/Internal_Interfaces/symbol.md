@@ -51,10 +51,10 @@ Each Symbol owns its ports.
  - Returns the bounding box for a given Symbol ID
  - Called in jzzheng22's Sheet
 
- `Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge'
+`Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge`
  - Returns the edge of the symbol that the port is on
 
- `isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
+`isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
  - Returns an option if the user clicked on a port label or not
 
 ## Issie interface functions

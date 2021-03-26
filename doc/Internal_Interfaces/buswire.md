@@ -44,6 +44,9 @@ Wires should be selectable: should do autorouting initially but be selectable an
 
 ## Interface Functions (called by Sheet)
 
+`BusWire.getWireSegList (wireId : CommonTypes.ConnectionId) (wModel : Model) : ( CommonTypes.ConnectionId * int) list`
+- Given a wireId and wire model, returns a list of tuples containing the wireId and the index of each segment for that wire.
+
 `BusWire.getBoundingBoxes (mouseCoord: XYPos) (model : Model)`
  - Returns list of `(id: CommonTypes.ComponentId * topLeft: XYPos * bottomRight: XYPos)`
  - Initially just returns all bounding boxes.
@@ -58,6 +61,18 @@ Wires should be selectable: should do autorouting initially but be selectable an
     | WireID 1 | TopL 1B | BotR 1B |   
     | WireID 2 | Top L2  | Bot R2  |   
     | WireID 3 | Top L3  | Bot R3  |
+
+`BusWire.extractWires (wModel : Model) : CommonTypes.Connection list`
+- This function will convert the wire model from the Wire datatype into the ISSIE-compliant Connection datatype
+
+`BusWire.getWires (wModel : Model) (cIdList : CommonTypes.ConnectionId list) : CommonTypes.ConnectionId list`
+- Takes a connectionId list and returns the connections in the model not in that list
+
+`BusWire.connectedSymbols (wModel : Model) (connect : CommonTypes.ConnectionId) : CommonTypes.ComponentId list`
+- Takes a ConnectionId and returns the Symbol IDs connected to that connection
+
+`BusWire.chooseWiresToUpdate (sIdList: CommonTypes.ComponentId list) (model: Model) (sm: Symbol.Model)`
+- Calculates and returns the IDs of wires that must be updated using a provided list of symbols that have been updated.
 
 `BusWire.getWireIdsFromPortIds (wModel: Model) (portIds: CommonTypes.PortId list) : CommonTypes.ConnectionId list`
  - Takes a list of PortIds as input and returns the IDs of all the wires connected to the supplied ports.
