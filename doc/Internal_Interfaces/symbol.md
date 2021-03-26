@@ -54,8 +54,14 @@ Each Symbol owns its ports.
 `Symbol.getPortEdge (model : Model) (pId : CommonTypes.PortId) : Edge`
  - Returns the edge of the symbol that the port is on
 
-`isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
+`Symbol.isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
  - Returns an option if the user clicked on a port label or not
+
+`Symbol.getSymbol (model : Model) (sId : ComponentId) : Symbol`
+ - Takes in a Symbol model and a ComponentId, and returns the Symbol corresponding to that ComponentId.
+
+`Symbol.getNumIOs (sym : Symbol) : (int * int)`
+-Returns the number of inputs and outputs for a given symbol as a tuple
 
 ## Issie interface functions
 

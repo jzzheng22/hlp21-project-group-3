@@ -168,6 +168,12 @@ Sheet can also access Symbol directly if needed.
 `Symbol.getPortType (symbolModel : Model) (portID: CommonTypes.PortId)`
  - Returns if port is input or output.
 
+`Symbol.isLabel (model : Model) (pos : XYPos) (sId : CommonTypes.ComponentId) : (XYPos * CommonTypes.PortId) Option`
+ - Returns an option if the user clicked on a port label or not
+
+`Symbol.extractComponents (symModel: Model) : Component list`
+- Converts the model from a Symbol list to an ISSIE Component list
+
 `Symbol.isPort (symbolModel : Model) (portCoords: XYPos)`
  - Returns Option type indicating if mouse has clicked down on port. Called by Sheet.
  - `Some (portCoords: XYPos * portID: CommonTypes.PortID)`
@@ -182,6 +188,12 @@ Sheet can also access Symbol directly if needed.
 
 `Symbol.getBoundingBox symModel symID`
  - Returns the bounding box for a given Symbol ID
+
+`Symbol.getSymbol (model : Model) (sId : ComponentId) : Symbol`
+ - Takes in a Symbol model and a ComponentId, and returns the Symbol corresponding to that ComponentId.
+
+`Symbol.getNumIOs (sym : Symbol) : (int * int)`
+-Returns the number of inputs and outputs for a given symbol as a tuple
 
 ## Bounding Box
  - Each buswire and symbol owns its bounding box. 
